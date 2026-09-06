@@ -1,13 +1,82 @@
 # stock-signals
 
-A private technical signal engine for NSE equities. It scores a watchlist daily,
-emits buy/sell/trim signals with stop prices and position sizes, and shows the
-reasoning behind every number.
+**A portfolio advisor for NSE equities.** It reads Indian company filings, ranks
+a survivorship-free universe, and tells you what to do with what you already
+own — including when the honest answer is that it found nothing.
 
-**Read-only with respect to your broker.** It never places, modifies or cancels
-an order — GTT included. It computes and explains; you decide and click.
+> **[→ Feature overview](https://claude.ai/code/artifact/3e4ddd96-ba4b-4d97-9220-34ef68255dc0)** — a
+> visual walkthrough of what it does and what its backtests actually found.
+> *(Private link; visible only to people it has been shared with.)*
 
-Decision support, not investment advice.
+---
+
+### Read-only with respect to your broker
+
+It never places, modifies or cancels an order — **GTT orders included**. It
+computes and explains; every decision and every click stays yours. Decision
+support, not investment advice.
+
+### What it gives you
+
+| | |
+|---|---|
+| **A verdict per holding** | Buy · Trim · Exit · Hold, each with its reasoning, stop price, targets and position size |
+| **The distinction that matters** | *Trim* = the position is too big, not bad (you keep it). *Exit* = the reason to own it is gone (sell it all) |
+| **Tax-aware execution** | Delivers long-term shares first, waits when waiting pays, splits large trims into tranches |
+| **A lender rubric** | Banks scored on NPA, provision coverage and ROA — not on debt/equity and cash flow, which invert for a business that borrows to lend |
+| **Honest validation** | Survivorship-free backtests, random-pick controls, a train/holdout harness, and results reported whether or not they flatter |
+
+### The headline result
+
+| | 9-year CAGR |
+|---|---|
+| Momentum rotation | **14.5%** |
+| NIFTY 500 index | 11.3% |
+| Random-pick control | 1.8% |
+| v1 signal rules *(retired)* | 1.3% |
+
+After realistic Indian costs — STT, stamp duty, exchange fees, GST and slippage.
+Momentum sits 8.4 standard deviations above a random control drawn from the same
+universe. Its maximum drawdown is −44%, worse than the index's −38%. A real but
+modest edge, and the README says so on every page that touches it.
+
+### At a glance
+
+```
+3.84M   daily price rows          156   tests, one per bug found
+3,638   symbols, delisted included  489   ETFs excluded, with reasons
+2,607   trading days                  0   orders it can place
+```
+
+---
+
+## Quick start
+
+```bash
+uv venv && uv pip install -r requirements.txt
+
+# 1. Your positions -- a broker holdings export works unmodified
+cp config/holdings.example.csv config/holdings.csv
+
+# 2. Market history (~70 min, once)
+PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10
+PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty200 --years 10
+PYTHONPATH=. .venv/bin/python fetch_fundamentals.py
+
+# 3. Open the dashboard
+.venv/bin/python run_ui.py
+```
+
+## Contents
+
+- [Setup](#setup) · [Quick start](#quick-start)
+- [**Dashboard**](#dashboard) — two sections, badge system, target frames
+- [Portfolio advisor](#the-investing-guide-v2) — verdicts, buckets, tax
+- [Daily signals](#daily-signals) · [Backtest](#backtest) · [Experiments](#experiments-train--holdout)
+- [Refresh data](#refresh-price-data) · [Tests](#tests) · [Watchlist](#the-watchlist) · [Tuning](#tuning)
+- [**Current status**](#current-status-what-worked-and-what-didnt) — what worked, what didn't
+- [Data notes](#data-notes) — five NSE traps that fail silently
+- [Layout](#layout)
 
 ---
 
@@ -270,7 +339,7 @@ did not tune on* before believing the result.
 
 ---
 
-## Current status: the rules do not work
+## Current status: what worked and what didn't
 
 Backtested over 49 NIFTY 50 names after realistic Indian costs (STT, stamp duty,
 exchange fees, GST, slippage -- about 0.35% per round trip). All figures below
@@ -329,8 +398,9 @@ timing entries and exits destroyed value relative to holding. Per-symbol results
 are unanimous -- all 50 names show a negative strategy return while most of the
 underlying stocks rose several hundred percent.
 
-**Do not trade these rules.** The infrastructure is sound and tested; the rule
-set is not.
+**Do not trade the v1 signal rules.** They are kept in the repo because the
+negative result is evidence, and because the infrastructure beneath them --
+data, costs, controls -- is what the momentum work is built on.
 
 ## Data notes
 
