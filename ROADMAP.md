@@ -1,171 +1,213 @@
-# Roadmap: from timing engine to investing guide
+# Roadmap
 
-## Review of where v1 landed
-
-The infrastructure works and is tested: clean adjusted data, quality
-quarantine, honest backtest with Indian costs, shuffle controls, train/holdout
-discipline. Keep all of it.
-
-The strategy class is the problem. Every technical variant failed the same
-way, and the TCS trade log shows why at human scale: 57% of trades won, the
-strategy captured 1.3% of an 85% rise, because it was in the market 30% of the
-time. On large caps with strong upward drift, **being out of the market is the
-dominant cost**, and better entry signals cannot fix a design whose problem is
-absence.
-
-Three conclusions drive everything below:
-
-1. **Stop trying to time.** Move to strategies that stay invested and rotate
-   by rank. Cross-sectional momentum is the one technical factor with robust
-   evidence globally and in India (NSE's own NIFTY200 Momentum 30 index has
-   outperformed its parent for years). It never goes to cash on a stock-level
-   signal -- it swaps weaker names for stronger ones monthly.
-2. **Bring fundamentals in.** They were cut from v1 for data reasons, not
-   because they don't matter. For a small watchlist, a quarterly hand-entered
-   sheet is entirely workable and turns your manual analysis into something the
-   tool can score, rank and track over time.
-3. **Repurpose the exit machinery as a risk monitor.** Stops, trailing stops,
-   score collapse and regime detection are tested and correct. Their failure
-   was in *driving trades*; as *alerts on a buy-and-hold book* they are exactly
-   what a newer investor needs.
-
-Plus one framing rule the tool should state on its own output: **core +
-satellite**. The evidence says an index fund beats everything tested here.
-The framework's job is the satellite -- a deliberately sized slice -- not the
-whole portfolio.
+Two parts: what was built and what it turned out to be worth, then what is
+still wrong with it.
 
 ---
 
-## Tier 1 -- What to own (strongest evidence, build first)
+## Part 1 — Built
 
-### 1a. Cross-sectional momentum ranking
-- 12-month return skipping the most recent month (12-1), the standard
-  definition; optionally blend with 6-1.
-- Rank the universe monthly; hold the top N (say 10-15) equal-weighted;
-  rebalance monthly, swapping only names that drop out of the top band
-  (hysteresis: enter top 10, exit below top 20 -- cuts turnover).
-- Volatility-scaled variant: divide return by realised volatility so a calm
-  30% beats a violent 30%. Evidence says this improves Sharpe materially.
-- **Regime overlay kept**: momentum crashes hard in sharp reversals (2020).
-  When the NIFTY 500 is below its 200 DMA, scale exposure down rather than
-  to zero.
-- Universe should be NIFTY 200 or 500, not NIFTY 50: momentum needs
-  dispersion to rank across.
+The plan was to move from a timing engine to an investing guide. That happened.
+Every item below is implemented and tested.
 
-### 1b. Fundamentals sheet + Quality score
-`config/fundamentals.csv`, one row per stock per quarter, hand-entered from
-the results you already read:
+### DONE · Cross-sectional momentum ranking
 
-| symbol | quarter | revenue | pat | cfo | roe | roce | debt_equity | promoter_pct | pledge_pct | pe |
+12-1 momentum (twelve months excluding the most recent, because short-horizon
+returns reverse), divided by realised volatility, gated above the 200 DMA.
+Monthly rotation with hysteresis so boundary names do not churn. Regime overlay
+scales the number of positions down rather than going to cash.
 
-Tool computes the Quality Score from the original plan:
-- Growth (revenue and EPS CAGR, consistency)
-- Profitability (ROE, ROCE, margin trend)
-- Balance sheet (D/E, interest cover)
-- **Cash quality: CFO/PAT** -- the single best Indian-market screen for paper
-  profits
-- **Promoter holding change and pledge %** -- India-specific, loud
-  pre-collapse signal
-- Valuation vs the stock's own 5-year history, not an arbitrary threshold
+`strategy/momentum.py`, `backtest/pit_engine.py`
 
-Banks and NBFCs flagged and excluded from the generic score until a lender
-rubric exists.
+### DONE · Fundamentals, from NSE rather than by hand
 
-### 1c. Combined rank
-Final rank = momentum rank x quality gate. Quality below a floor removes a
-stock from candidacy regardless of momentum. This is the "what to own" list.
+The original plan assumed a hand-typed sheet. NSE's XBRL filings turned out to
+carry quarterly results, shareholding history and promoter pledge — so
+`fetch_fundamentals.py` populates it automatically, with Yahoo filling the
+ratios NSE does not publish. Quality score covers growth, profitability,
+balance sheet, cash quality and governance.
 
----
+`fundamentals.py`, `data/sources/nse_fundamentals.py`
 
-## Tier 2 -- How much (portfolio construction)
+### DONE · Lender rubric
 
-- **Kite holdings import** -- connect the MCP or hand-write `holdings.json`.
-  Everything in this tier is about *your* book, so it needs the book.
-- **Target weights**: equal weight by default, volatility parity as an
-  option (size inversely to volatility so each position risks similar
-  amounts -- the position-sizing logic already does this per trade).
-- **Drift report**: current weight vs target, flag anything more than X%
-  off, suggest the rebalancing trades (as suggestions -- never executed).
-- **Concentration checks**: single-stock cap, sector cap, correlation
-  clusters (three IT stocks are one bet, not three).
-- **Core/satellite split**: state how much of total capital the framework
-  governs and show the rest as index exposure.
+Banks scored on asset quality (35%), ROA (25%), efficiency and provisioning
+(30%), capital (10%). Debt/equity and CFO are excluded rather than
+down-weighted — for a business that borrows to lend, they invert. NBFCs, which
+file the ordinary schedule and so have no NPA data, get a separate path.
 
----
+### DONE · Portfolio advisor
 
-## Tier 3 -- When to worry (risk monitoring, repurposed exits)
+Buy / Add / Trim / Exit / Hold per holding, each with reasoning. The
+distinction the design turns on: **trim** is a sizing correction on a holding
+you keep, **exit** is a broken thesis and always the whole position.
 
-The existing exit engine, pointed at holdings instead of trades:
-- Hard and trailing stop levels per holding, shown daily; alert on breach.
-  Whether to act is yours -- the alert exists so a 40% drawdown never arrives
-  unnoticed.
-- Score-collapse and death-cross flags as *review prompts*, not sells.
-- Portfolio drawdown from peak; regime state; days since regime changed.
-- **Event calendar** from NSE announcements: results dates, dividend
-  ex-dates, upcoming splits/bonuses/rights on holdings, AGM.
-- **India-specific risk flags** from free NSE data:
-  - promoter pledge changes (shareholding pattern, quarterly)
-  - bulk and block deals in your names
-  - insider trading disclosures (SAST/PIT filings)
-  - **delivery %** -- already in the price data and unused; a rising
-    delivery share on up-days suggests institutional accumulation, on
-    down-days distribution. Untested; worth testing because it is free.
+`strategy/advisor.py`
 
----
+### DONE · Core / satellite / legacy
 
-## Tier 4 -- Signals worth keeping, changing, or dropping
+Classified on business characteristics, never price direction. **Legacy** was
+not in the original plan and had to be added: defaulting unclassified holdings
+to satellite meant rank-based exits fired on positions bought years earlier on
+other reasoning, which produced a recommendation to liquidate 60% of the book
+on first run. Legacy takes red flags but never rank.
 
-**Keep, with evidence**
-- Regime filter (index vs its 200 DMA) -- reduces drawdown in every test.
-- ATR-based stops and R-multiple targets -- tested, correct, useful as
-  levels even when not driving trades.
-- Relative strength -- extend to *vs sector* as well as vs index.
+`strategy/buckets.py`
 
-**Change**
-- Timing Score becomes a *ranking* input, not a trigger. Its buckets are
-  fine; its use as a cross-60 entry signal is what failed.
-- Volume bucket: add delivery % once tested.
+### DONE · Tax-aware execution
 
-**Drop**
-- 50 DMA trend-break exit -- proven to fire on noise and cut winners.
-- RSI-based trim -- no evidence it adds anything; adds turnover.
-- Entry cooldown -- irrelevant in a monthly-rebalance design.
+Delivers long-term shares first (12.5% against 20%), reading the long/short
+split from a broker statement. Waits when a position is near the twelve-month
+line. Will not trim into weakness. Splits large trims into tranches.
+
+`strategy/tax.py`
+
+### DONE · Risk monitoring
+
+The v1 exit engine pointed at holdings instead of trades: stop levels,
+trailing stops, drawdown from peak, score collapse — as review prompts, not
+instructions.
+
+`strategy/risk_monitor.py`
+
+### DONE · Survivorship-free backtesting
+
+Full-market bhavcopy: 3.84M rows, 2,607 days, 3,638 symbols including the 1,238
+that no longer trade. The universe is rebuilt at every rebalance from stocks
+actually trading and liquid on that date. ETFs and DVRs excluded by ISIN and
+listed in `config/etfs.csv` with reasons.
+
+`data/bhavcopy.py`, `instruments.py`
+
+### DONE · Dashboard
+
+Two sections — holdings with verdicts and trade plans, market with entry
+levels. Localhost only, deploy button disabled.
+
+`ui/`
+
+### DONE · Signals kept, changed, dropped
+
+Kept the regime filter, ATR stops and R-multiple targets. Changed the Timing
+Score from a trigger to a ranking input. Dropped the 50 DMA trend-break exit,
+the RSI trim and the entry cooldown — all shown to hurt or add nothing.
+
+### NOT BUILT · Telegram, scheduling, event calendar
+
+Deliberately deferred. See Part 2 — stale data is a real failure mode and
+scheduling is the fix, but the advice needs to be executable first.
 
 ---
 
-## Tier 5 -- Delivery (now worth building)
+## What it was worth
 
-Held back while the tool was a failed trader; worth it once it is a monitor:
-- Telegram daily digest: holdings status, any stop breach, upcoming events,
-  monthly rebalance suggestion on rebalance day.
-- Streamlit dashboard: rank table, holdings vs targets, drift, drawdown,
-  event calendar, backtest results, editable watchlist and fundamentals grid.
-- `launchd` job at 16:30 IST on trading days with a failure notification --
-  silence must never mean "nothing happened".
+| | 9-year CAGR |
+|---|---|
+| Momentum rotation | **14.5%** |
+| NIFTY 500 index | 11.3% |
+| Random-pick control | 1.8% |
+| v1 signal rules (retired) | 1.3% |
+
+Momentum sits 8.4 standard deviations above a random control drawn from the
+same universe, so the ranking carries real information. But the edge is 3.2
+points with a **−44% maximum drawdown against the index's −38%**, and a Sharpe
+of 0.64.
+
+Removing survivorship bias cost 14 points of apparent return (28.7% → 14.5%)
+and dropped the random control from 17.7% to 1.8%. That collapse is the bias
+measured directly.
+
+**Honest split: roughly 70% of this framework's value is monitoring and
+discipline — red flags, stops, concentration, tax-aware selling. Perhaps 30% is
+momentum alpha.** That should govern how much capital sits behind the momentum
+side.
 
 ---
 
-## Validation rules for everything above
+## Part 2 — What is still wrong
 
-- **Every new signal goes through the harness before it reaches the digest.**
-  Shuffle controls across seeds, train/holdout, per-symbol table.
-- **The 2023-2026 holdout is spent for timing-rule variants.** For the
-  momentum strategy -- a different strategy class -- validate on a different
-  universe (NIFTY 200/500 ex-NIFTY 50) as the out-of-sample set, and treat
-  the NIFTY 50 result as in-sample.
-- **The bar is always buy-and-hold of the same names**, not the index.
-- **Paper-trade the rebalance for three months** before real money.
-- Report failures as plainly as v1 did. A tool that only reports wins is
+Ordered by how much they undermine the tool's usefulness.
+
+### 1. The advice is not executable
+
+The advisor suggests roughly ₹4.5L of adds against ₹1.1L raised from sells.
+There is no cash constraint anywhere in `strategy/advisor.py`. A plan that
+cannot be executed is a ranked wish-list.
+
+**Fix:** rank adds by conviction, fund them from the sells in the same plan,
+stop when the money runs out. Show the shortfall explicitly rather than
+implying every line can be actioned.
+
+### 2. The largest risk in the book produces no action
+
+Financial Services sits at ~27% against a 25% cap, across eight holdings. The
+sector rule in `advise()` only trims **satellites** — and all eight are core or
+legacy. The one concentration the framework identifies, it does nothing about.
+
+**Fix:** enforce the sector cap across all buckets. A core holding can be
+trimmed for concentration without any view on the business — that is exactly
+what the trim/exit distinction exists to express.
+
+### 3. Nothing records what actually happened
+
+The roadmap called for three months of paper trading. There is no mechanism to
+log what the advisor said on a date and what the stock did afterward, so live
+behaviour can never be compared against the backtest.
+
+**Fix:** a decision log — every run appends its verdicts with date and price to
+a table. Three months of that is worth more than ten years of backtest.
+
+### 4. The drawdown, not the return, is the real problem
+
+−44% is worse than the index. A 3.2-point edge does not obviously compensate.
+
+**Fix:** volatility targeting — scale gross exposure to hit a target portfolio
+volatility. Best-evidenced improvement to momentum's Sharpe, and a structural
+change rather than a threshold tweak.
+
+**Validation constraint:** the 2023–26 holdout is spent. It was used for the v1
+exit experiments, and momentum was then run across the full period on the
+argument that it is a different strategy class. That argument is defensible but
+not clean. Declare everything from today forward as live out-of-sample and stop
+touching 2023–26.
+
+### 5. The universe can admit junk
+
+Top-200 by turnover has no market-cap or price floor. A thinly-held smallcap
+pumped for a month is precisely what ranks first on risk-adjusted momentum.
+
+**Fix:** a minimum price and market cap in `liquid_universe()`.
+
+### 6. Quality scores are shallower than they look
+
+Growth needs five quarters of results; one is on file. So "quality 96" is a
+snapshot of ratios, not a trend — and trend is what separates a good business
+from a good quarter. Banks have no capital adequacy at all; it is not in NSE's
+XBRL.
+
+**Fix:** fetch 5–8 quarters per symbol. Enter `car_pct` by hand or from RBI
+data. Track the ₹1.25L LTCG exemption across the year instead of applying the
+rate flat.
+
+### 7. Data goes stale silently
+
+Every refresh is manual. A dashboard showing three-week-old prices with no
+warning is a genuine failure mode, and the one most likely to cause a bad
+decision.
+
+**Fix:** a `launchd` job at 16:30 IST on trading days, and a staleness banner
+in the UI when the newest bar is more than a few sessions old. Silence must
+never mean "nothing happened".
+
+---
+
+## Validation rules
+
+Unchanged, and they are the reason the numbers above can be trusted.
+
+- Every new signal goes through the harness before it reaches the digest:
+  random controls across seeds, train/holdout, per-symbol table.
+- **The bar is buy-and-hold of the same names**, never the index alone.
+- Report failures as plainly as wins. A tool that only reports its successes is
   worse than no tool.
-
----
-
-## Suggested order
-
-1. Fundamentals sheet + Quality score (needs your input; everything else
-   can be built while you fill it)
-2. Momentum ranking on NIFTY 200, validated on the harness
-3. Kite holdings import, drift and concentration report
-4. Risk monitor + event calendar + India risk flags
-5. Delivery layer
-6. Delivery % and sector relative strength as *tested* additions
+- Paper-trade before real money — which needs item 3 above to exist first.
