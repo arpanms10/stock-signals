@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.stocksignals.daily</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT__/automation/run_daily.sh</string>
+  </array>
+  <!-- 16:30 IST. StartCalendarInterval uses the Mac's local time, so this
+       assumes the machine is set to IST. If you travel, change the hour or
+       the job will silently run at the wrong time relative to the close. -->
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>30</integer></dict>
+  <key>StandardOutPath</key><string>__PROJECT__/logs/daily.log</string>
+  <key>StandardErrorPath</key><string>__PROJECT__/logs/daily.err</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>

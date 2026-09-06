@@ -1,0 +1,123 @@
+# Every number the engine uses to make a decision lives here.
+# Ranges are [low, high]: a value at or below `low` scores 0, at or above
+# `high` scores 100, and interpolates linearly in between.
+
+weights:            # must sum to 1.0
+  trend: 0.30
+  momentum: 0.25
+  relative_strength: 0.20
+  volume: 0.15
+  volatility: 0.10
+
+trend:
+  weights: {px_vs_200: 0.30, px_vs_50: 0.20, slope_200: 0.25, golden_cross: 0.15, adx: 0.10}
+  px_vs_200_pct: [-10.0, 20.0]     # close vs 200 DMA, percent
+  px_vs_50_pct: [-8.0, 12.0]
+  slope_200_pct: [-3.0, 5.0]       # 200 DMA change over 21 bars, percent
+  adx: [15.0, 40.0]                # below 15 is chop, above 40 is a strong trend
+
+momentum:
+  weights: {rsi: 0.40, macd: 0.35, roc: 0.25}
+  rsi: [30.0, 70.0]
+  macd_hist_atr: [-0.5, 0.5]       # MACD histogram in ATR units (scale-free)
+  roc60_pct: [-15.0, 25.0]
+
+relative_strength:
+  weights: {excess_1m: 0.25, excess_3m: 0.40, excess_6m: 0.35}
+  excess_1m_pct: [-8.0, 8.0]       # return minus benchmark return
+  excess_3m_pct: [-12.0, 15.0]
+  excess_6m_pct: [-18.0, 22.0]
+
+volume:
+  weights: {ud_ratio: 0.45, obv_slope: 0.35, vol_ratio: 0.20}
+  ud_ratio: [0.7, 1.5]             # up-day volume / down-day volume, 20 bars
+  obv_slope_pct: [-25.0, 25.0]     # net directional volume, % of volume traded
+  vol_ratio: [0.5, 1.8]            # today's volume / 20-day average
+
+volatility:
+  # Calmer scores higher: a 2% ATR trend is far easier to hold, and to place a
+  # stop on, than an 8% one. Inverted range -- high ATR maps to a low score.
+  weights: {atr: 0.70, bb_width: 0.30}
+  atr_pct: [7.0, 1.5]
+  bb_width_pct: [30.0, 6.0]
+
+signals:
+  buy_score: 60.0                  # trend-entry threshold
+  exit_score: 30.0                 # score-collapse exit
+  trim_rsi_high: 75.0
+  trim_rsi_reset: 70.0
+  pullback_rsi: [40.0, 50.0]
+  breakout_lookback: 250           # bars for the 52-week high test
+  breakout_volume_mult: 1.5
+  trend_break_sma: 50              # 50 = cut on noise, 200 = cut on regime change
+  use_death_cross: true
+  regime_index: "NIFTY 500"
+  regime_sma: 200
+  cooldown_days: 5
+
+risk:
+  stop_atr_mult: 2.0               # hard stop distance below entry
+  stop_max_loss_pct: 15.0          # floor -- whichever is tighter wins
+  trail_activate_pct: 15.0         # profit needed before trailing begins
+  trail_atr_mult: 2.5              # chandelier exit distance
+  risk_per_trade_pct: 1.0          # max portfolio % lost if the stop hits
+  max_position_pct: 5.0
+  max_sector_pct: 25.0
+  max_positions: 10
+  trail_lookback_days: 365         # fallback when a purchase date is unknown
+
+targets:
+  # Targets are expressed in R -- multiples of the risk you are taking on the
+  # trade, where 1R = entry price minus stop price. Tying targets to risk
+  # rather than to a round percentage means a calm stock and a volatile one
+  # both get targets that are meaningful for *that* stock.
+  enabled: true
+  t1_r: 1.5                        # book part of the position here
+  t2_r: 3.0                        # book the remainder here
+  t1_book_pct: 50.0                # percent of the position sold at T1
+  breakeven_after_t1: true         # move the stop to entry once T1 is hit
+
+# ---------------------------------------------------------------------------
+# Cross-sectional momentum (Tier 1a). A different strategy class from the
+# signal rules above: it always holds a slice of the universe and rotates by
+# rank, rather than deciding whether to be in the market at all.
+# ---------------------------------------------------------------------------
+momentum_strategy:                 # NOTE: distinct from the `momentum:`
+                                   # scoring bucket above -- same word, very
+                                   # different thing. Do not merge them.
+  lookback_months: 12
+  skip_months: 1                   # exclude the latest month -- short-horizon
+                                   # returns reverse, so including it hurts
+  risk_adjusted: true              # divide momentum by realised volatility
+  vol_window: 252
+  require_above_200dma: true       # no falling knives in the top slice
+  n_hold: 15
+  enter_rank: 15                   # buy on reaching the top 15 ...
+  exit_rank: 30                    # ... and only sell after falling past 30
+                                   # (the gap stops boundary names churning)
+  rebalance_days: 21               # monthly
+  risk_off_scale: 0.5              # hold half as many names below the 200 DMA
+  quality_floor: 50.0              # fundamentals gate for the combined rank
+  allow_unknown_quality: true      # unscored stocks stay eligible, but every
+                                   # run names them -- so "unknown" never
+                                   # quietly passes as "acceptable"
+
+# ---------------------------------------------------------------------------
+# Indian equity capital gains, for trim/exit timing. Rates change with the
+# Budget -- these are editable precisely so they can be corrected without
+# touching code. Estimates only; this is not tax advice.
+# ---------------------------------------------------------------------------
+tax:
+  ltcg_threshold_days: 365         # held longer than this = long term
+  stcg_rate_pct: 20.0              # short-term capital gains on listed equity
+  ltcg_rate_pct: 12.5              # long-term, above the exemption
+  ltcg_exemption: 125000           # annual LTCG exemption, rupees
+  near_ltcg_days: 45               # "nearly long term" -- worth waiting out
+
+trimming:
+  # A trim is a drift correction, not an emergency. These control how patient
+  # the framework is allowed to be about executing one.
+  tolerance_multiple: 1.2          # only trim once past 1.2x the cap
+  tranches: 3                      # split a large trim rather than dumping it
+  tranche_min_value: 15000         # below this, one tranche -- costs dominate
+  prefer_strength: true            # trim into rallies, not into weakness

@@ -1,0 +1,21 @@
+# Local, single-user dashboard showing a real portfolio.
+
+[client]
+# Hides Streamlit's "Deploy" button. That button offers to publish the app to
+# Streamlit Community Cloud, where apps are PUBLIC by default -- and this one
+# renders holdings, quantities, average costs and P&L. It is a one-click way to
+# put a portfolio on the open internet, so it should not be sitting in the
+# corner of the screen.
+toolbarMode = "minimal"
+showErrorDetails = true
+
+[server]
+# Loopback only. Nothing here should be reachable from the network.
+address = "localhost"
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"

@@ -1,0 +1,9 @@
+# Copy to config/holdings.csv and fill in. A Kite holdings export works as-is:
+# the reader matches "Instrument", "Qty.", "Avg. cost", "Long term quantity"
+# and "Short term quantity" as well as the plain names below.
+#
+#   bucket  core | satellite | legacy   (blank = the framework suggests one)
+symbol,quantity,lt_quantity,st_quantity,avg_price,purchase_date,bucket,notes
+RELIANCE,40,40,0,831.76,,core,
+TCS,58,50,8,3130.61,,core,
+IRCTC,200,120,80,327.46,,legacy,

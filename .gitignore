@@ -1,0 +1,41 @@
+# --- Personal financial data -------------------------------------------
+# Your actual positions: quantities, average costs, P&L, tax lots.
+# Deliberately excluded even from a private repo. A private repo can be made
+# public by a misclick, collaborators added later see the whole history, and
+# git history is permanent -- removing a committed file needs a history
+# rewrite. The framework works with any holdings file, so the data does not
+# need to live in the repo at all.
+config/holdings.csv
+config/holdings.csv.bak
+data/holdings.json
+.env
+
+# --- Large generated data ----------------------------------------------
+# market.db is ~450MB; GitHub rejects files over 100MB and this is entirely
+# reproducible with run_market_ingest.py.
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/cache/
+
+# --- Fetched / derived config ------------------------------------------
+# All regenerable, and stale within days. NOTE: git does not support inline
+# comments in .gitignore -- a trailing "# note" becomes part of the pattern
+# and the file silently stays tracked. Comments go on their own lines.
+#
+# config/fundamentals.csv <- fetch_fundamentals.py
+# config/equities.csv, config/etfs.csv <- instruments.snapshot()
+# config/watchlist.csv <- seeded from the NIFTY index lists
+config/fundamentals.csv
+config/equities.csv
+config/etfs.csv
+config/watchlist.csv
+
+# --- Environment and noise ---------------------------------------------
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+logs_*.txt
+nohup.out
