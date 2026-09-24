@@ -143,6 +143,37 @@ def assess(price: float, avg_cost: float, qty: float, cfg: dict,
                    max(total, 0) * rate / 100, rate, to_ltcg, note)
 
 
+def apply_ltcg_exemption(sells: list[dict], cfg: dict) -> dict:
+    """Spread the annual LTCG exemption across a plan's long-term gains.
+
+    The per-holding estimates apply the rate flat, which overstates tax: the
+    first Rs 1.25 lakh of long-term gains in a financial year is exempt. That
+    allowance belongs to the year, not to any one sale, so it can only be
+    applied once the whole plan is known.
+
+    `sells` are dicts with `symbol`, `lt_gain` and `estimated_tax`.
+    """
+    t = cfg.get("tax", {})
+    exemption = t.get("ltcg_exemption", 125000)
+    lt_rate = t.get("ltcg_rate_pct", 12.5) / 100
+
+    total_lt_gain = sum(max(s.get("lt_gain", 0.0), 0.0) for s in sells)
+    used = min(total_lt_gain, exemption)
+    saved = used * lt_rate
+
+    naive = sum(s.get("estimated_tax", 0.0) for s in sells)
+    return {
+        "long_term_gain": total_lt_gain,
+        "exemption": exemption,
+        "exemption_used": used,
+        "exemption_left": max(exemption - total_lt_gain, 0.0),
+        "tax_before_exemption": naive,
+        "tax_after_exemption": max(naive - saved, 0.0),
+        "saved_by_exemption": saved,
+        "fully_covered": total_lt_gain <= exemption,
+    }
+
+
 def trim_timing(tax: TaxView, price: float, sma50: float | None,
                 sma20: float | None, drift_pct: float, cfg: dict) -> tuple[str, list[str]]:
     """Return (timing, reasons) for a trim. Never for an exit."""

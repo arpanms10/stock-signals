@@ -201,6 +201,70 @@ def lender_metrics(symbol: str) -> dict:
     return {}
 
 
+def results_history(symbol: str, quarters: int = 6,
+                    consolidated_first: bool = True) -> list[dict]:
+    """Several quarters of results, newest first.
+
+    Growth needs a series, not a snapshot. With one quarter on file the quality
+    score reports profitability and leverage but silently drops growth
+    entirely -- so a company earning well on shrinking revenue scores the same
+    as one earning well on rising revenue.
+    """
+    rows = nse.get(RESULTS_URL, params={"index": "equities", "symbol": symbol,
+                                        "period": "Quarterly"}).json()
+    if not rows:
+        return []
+    want_consolidated = consolidated_first
+    picked, seen = [], set()
+    ordered = sorted(rows, key=lambda r: -_date_key(r.get("toDate", "")))
+    for rec in ordered:
+        if len(picked) >= quarters:
+            break
+        end = rec.get("toDate")
+        if not end or end in seen or not rec.get("xbrl"):
+            continue
+        is_cons = str(rec.get("consolidated", "")).lower().startswith("consolidated")
+        if want_consolidated and not is_cons:
+            continue
+        try:
+            nums = _parse_xbrl_numbers(nse.get(rec["xbrl"], tries=1, timeout=45).text,
+                                       RESULT_TAGS)
+        except Exception:
+            continue
+        if not nums:
+            continue
+        pat = nums.get("pat") or nums.get("pat_continuing")
+        seen.add(end)
+        picked.append({
+            "to_date": end, "quarter": _quarter_label(end),
+            "revenue": round(nums["revenue"] / CRORE, 1) if "revenue" in nums else None,
+            "pat": round(pat / CRORE, 1) if pat else None,
+            "pbt": round(nums["pbt"] / CRORE, 1) if "pbt" in nums else None,
+            "finance_costs": (round(nums["finance_costs"] / CRORE, 1)
+                              if "finance_costs" in nums else None),
+        })
+    # Some companies file only standalone. Fall back rather than return nothing.
+    if not picked and want_consolidated:
+        return results_history(symbol, quarters, consolidated_first=False)
+    return picked
+
+
+def _quarter_label(to_date: str) -> str:
+    d = None
+    for fmt in ("%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            d = dt.datetime.strptime(to_date, fmt).date()
+            break
+        except (ValueError, TypeError):
+            continue
+    if not d:
+        return to_date
+    # Indian fiscal year runs April-March: Jun = Q1, Sep = Q2, Dec = Q3, Mar = Q4.
+    fy = d.year + 1 if d.month > 3 else d.year
+    q = {6: 1, 9: 2, 12: 3, 3: 4}.get(d.month, (d.month - 1) // 3 + 1)
+    return f"FY{str(fy)[-2:]}Q{q}"
+
+
 def _date_key(s: str) -> float:
     for fmt in ("%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d"):
         try:

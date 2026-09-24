@@ -93,6 +93,44 @@ def rank_on(panel: pd.DataFrame, on_date, cfg: dict) -> pd.DataFrame:
     return snap
 
 
+def portfolio_vol(returns: pd.Series, window: int = 60) -> float | None:
+    """Annualised realised volatility of a return series."""
+    r = returns.dropna().tail(window)
+    if len(r) < max(window // 2, 20):
+        return None
+    sd = float(r.std())
+    return sd * np.sqrt(252) if sd == sd and sd > 0 else None
+
+
+def exposure_for_vol(realised: float | None, cfg: dict) -> tuple[float, str]:
+    """Fraction of capital to deploy so the book runs at its target vol.
+
+    The insight volatility targeting rests on: momentum's worst drawdowns
+    arrive when volatility has already risen, and volatility is far more
+    persistent than return. Scaling exposure down as vol rises therefore cuts
+    the drawdown without needing to predict anything.
+
+    Capped at fully invested -- this framework does not borrow -- and floored
+    well above zero, because a portfolio that goes to cash on every vol spike
+    misses the rebound that usually follows.
+    """
+    m = cfg.get("momentum_strategy", {})
+    if not m.get("vol_target") or not realised:
+        return 1.0, "volatility targeting off -- fully invested"
+    target = m.get("vol_target_pct", 15.0) / 100
+    raw = target / realised
+    lo, hi = m.get("vol_min_exposure", 0.3), m.get("vol_max_leverage", 1.0)
+    exposure = max(lo, min(hi, raw))
+    note = (f"realised vol {100 * realised:.0f}% against a {100 * target:.0f}% "
+            f"target -> {100 * exposure:.0f}% invested")
+    if raw > hi:
+        note += " (capped at fully invested; no borrowing)"
+    elif raw < lo:
+        note += f" (floored at {100 * lo:.0f}%; a vol spike is not a reason "
+        note += "to hold only cash)"
+    return exposure, note
+
+
 def rebalance_dates(dates: list[dt.date], freq_days: int = 21) -> list[dt.date]:
     """Month-end-ish rebalance points.
 

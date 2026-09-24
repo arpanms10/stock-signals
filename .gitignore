@@ -39,3 +39,5 @@ __pycache__/
 .DS_Store
 logs_*.txt
 nohup.out
+reports/
+data/last_weekly_run.txt

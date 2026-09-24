@@ -202,7 +202,8 @@ def ingest_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
 
 
 def universe_on(con, on_date: dt.date, top_n: int = 200,
-                lookback_days: int = 60, min_days: int = 30) -> list[str]:
+                lookback_days: int = 60, min_days: int = 30,
+                min_price: float = 0.0, min_turnover_cr: float = 0.0) -> list[str]:
     """The N most liquid stocks actually trading as of a date.
 
     Liquidity, not index membership, defines the universe -- and it is measured
@@ -211,12 +212,18 @@ def universe_on(con, on_date: dt.date, top_n: int = 200,
     which drops the illiquid and the freshly listed without needing a separate
     listing-date table.
     """
+    # Turnover alone is not enough of a filter. Risk-adjusted momentum divides
+    # return by volatility, so a thinly-held stock that doubles on a month of
+    # promotion ranks above every real business -- and a price floor plus a
+    # turnover floor is the cheapest guard against buying one.
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
     cur = con.execute(
-        "SELECT symbol, AVG(turnover) t, COUNT(*) n FROM market "
+        "SELECT symbol, AVG(turnover) t, COUNT(*) n, AVG(close) p FROM market "
         "WHERE date <= ? AND date > ? AND turnover IS NOT NULL "
-        "GROUP BY symbol HAVING n >= ? ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, min_days, top_n * 2))
+        "GROUP BY symbol HAVING n >= ? AND p >= ? AND t >= ? "
+        "ORDER BY t DESC LIMIT ?",
+        (on_date.isoformat(), frm, min_days, min_price,
+         min_turnover_cr * 1e7, top_n * 2))
     syms = [r[0] for r in cur.fetchall()]
     equities = equity_symbols(con)
     if equities:

@@ -10,6 +10,8 @@ BADGES = {
     "EXIT": ("S", "#c0392b", "#ffffff", "Sell the whole holding -- thesis broken"),
     "TRIM": ("T", "#d98324", "#ffffff", "Trim part of the holding -- sizing only"),
     "HOLD": ("H", "#6b7280", "#ffffff", "No action"),
+    "WATCH": ("W", "#4b5563", "#ffffff",
+              "Worth buying, but this plan cannot fund it"),
 }
 
 
@@ -146,3 +148,63 @@ def legend() -> None:
         f"red flag, not a judgement call</span>"
         f"<span>{badge('HOLD')} &nbsp;hold</span>"
         f"</div>", unsafe_allow_html=True)
+
+
+# Status of a target against how long it normally takes. Semantic, not accent:
+# these say "how is this going", not "look here".
+HORIZON_TONE = {"early": "info", "due": "neutral", "late": "warn",
+                "stalled": "bad", "fast": "good", "normal": "good",
+                "slow": "warn"}
+
+
+def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> str:
+    """The observation list as plain HTML.
+
+    Deliberately not st.dataframe: Streamlit's virtualised grid computes a
+    width of zero when it renders inside a tab that is not the active one, so
+    the columns exist but have nowhere to draw. This list is a handful of names
+    by design, so a static table is both more robust and easier to read.
+    """
+    # The typical session count lives in the header, where it is stated once,
+    # rather than repeated as prose under every row.
+    t1_n = horizon_sessions.get("t1", "") if horizon_sessions else ""
+    t2_n = horizon_sessions.get("t2", "") if horizon_sessions else ""
+    head = ("<tr>" + "".join(
+        f'<th style="text-align:{a};padding:6px 10px;border-bottom:1px solid '
+        f'var(--secondary-background-color,#3336);font-weight:600;'
+        f'font-size:12px;letter-spacing:.03em;text-transform:uppercase;'
+        f'opacity:.7;white-space:nowrap;">{h}</th>'
+        for h, a in (("Stock", "left"), ("Flagged", "left"), ("Then", "right"),
+                     ("Now", "right"), ("Move", "right"),
+                     (f"T1:{t1_n}" if t1_n else "T1", "right"),
+                     (f"T2:{t2_n}" if t2_n else "T2", "right"),
+                     ("Status", "left"), ("Days", "right")))
+        + "</tr>")
+
+    body = []
+    for r in rows:
+        move = r.get("move_pct")
+        move_col = ("#12854a" if (move or 0) > 0 else
+                    "#c0392b" if (move or 0) < 0 else "inherit")
+        state = r.get("t1_hit_on") and "hit" or r.get("t1_state") or ""
+        tone = "good" if state == "hit" else HORIZON_TONE.get(state, "neutral")
+        cells = [
+            f'<b>{r["symbol"]}</b>',
+            r.get("baseline_date") or "--",
+            money(r.get("baseline_price")),
+            money(r.get("price")),
+            f'<span style="color:{move_col}">'
+            f'{pct(move, signed=True) if move is not None else "--"}</span>',
+            money(r.get("t1")), money(r.get("t2")),
+            pill(state, tone) if state else "",
+            str(r.get("days") if r.get("days") is not None else "--"),
+        ]
+        aligns = ["left", "left", "right", "right", "right", "right", "right",
+                  "left", "right"]
+        body.append("<tr>" + "".join(
+            f'<td style="text-align:{a};padding:7px 10px;border-bottom:1px '
+            f'solid var(--secondary-background-color,#3334);font-size:13px;'
+            f'font-variant-numeric:tabular-nums;white-space:nowrap;">{c}</td>'
+            for c, a in zip(cells, aligns)) + "</tr>")
+    return (f'<div style="overflow-x:auto;"><table style="width:100%;'
+            f'border-collapse:collapse;">{head}{"".join(body)}</table></div>')

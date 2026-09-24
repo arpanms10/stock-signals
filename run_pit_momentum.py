@@ -27,10 +27,15 @@ def main() -> None:
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)
     ap.add_argument("--shuffle", type=int, default=0)
+    ap.add_argument("--vol-target", action="store_true",
+                    help="scale exposure to a target portfolio volatility")
     args = ap.parse_args()
 
     con = bc.connect(args.db)
     cfg = timing.load_config()
+    if args.vol_target:
+        cfg = dict(cfg)
+        cfg["momentum_strategy"] = {**cfg["momentum_strategy"], "vol_target": True}
     days = sorted(bc.have_days(con))
     if len(days) < 400:
         print(f"Only {len(days)} market days ingested. Run run_market_ingest.py first.")

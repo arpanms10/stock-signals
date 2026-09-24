@@ -10,6 +10,7 @@ import datetime as dt
 
 import pandas as pd
 
+import watching as wg
 import watchlist as wl
 from data import ingest, quality, store
 from scoring import pipeline, timing
@@ -154,11 +155,30 @@ def main() -> None:
     ap.add_argument("--as-of", type=str, default=None, help="evaluate as of YYYY-MM-DD")
     ap.add_argument("--symbols", nargs="+", default=None,
                     help="evaluate only these symbols (need not be on the watchlist)")
+    ap.add_argument("--watch-add", nargs="+", default=None,
+                    help="add symbols to the close-observation list and exit")
+    ap.add_argument("--watch-remove", nargs="+", default=None,
+                    help="stop watching these symbols and exit")
+    ap.add_argument("--no-watching", action="store_true",
+                    help="skip the observation list this run")
     args = ap.parse_args()
+
+    if args.watch_add or args.watch_remove:
+        for sym in args.watch_add or []:
+            print(" ", wg.add(sym, source="manual")[1])
+        for sym in args.watch_remove or []:
+            print(" ", wg.remove(sym)[1])
+        return
 
     con = store.connect()
     cfg = timing.load_config()
     symbols = [x.upper() for x in args.symbols] if args.symbols else wl.active_symbols()
+
+    # Watched names are fetched and scored alongside the watchlist, so the
+    # observation list keeps its own price history without a separate job.
+    watched = [] if args.no_watching else wg.symbols()
+    if watched and not args.symbols:
+        symbols = sorted(set(symbols) | set(watched))
 
     # A symbol named on the command line need not be on the watchlist, so it may
     # have no cached history at all. Fetch it rather than silently reporting
@@ -189,6 +209,44 @@ def main() -> None:
     bench = store.load_index(con, cfg["signals"]["regime_index"])
     regime = engine.regime_ok(bench, on_date or dt.date.today(), cfg) if not bench.empty else True
     scores = pipeline.latest_scores(con, symbols, cfg)
+
+    if watched:
+        prices = {}
+        for sym in watched:
+            f = pipeline.scored_frame(con, sym, cfg, usable_from=cuts.get(sym))
+            if not f.empty:
+                prices[sym] = float(f["close"].iloc[-1])
+        filled = wg.fill_missing_baselines(prices)
+        newly_hit = wg.mark_target_hits(prices)
+        rows = wg.report(prices)
+        print("\n" + "=" * 68)
+        print("WATCHING -- suggestions under close observation")
+        print("=" * 68)
+        print("Measured from the date the framework flagged each name, not from")
+        print("when it was added here. This is the record that says whether the")
+        print("suggestions were worth anything.\n")
+        print(f"  {'symbol':<12}{'flagged':<12}{'then':>10}{'now':>10}"
+              f"{'move':>9}{'days':>6}  source")
+        for r in rows:
+            now = f"{r['price']:,.2f}" if r["price"] else "--"
+            then = f"{r['baseline_price']:,.2f}" if r["baseline_price"] else "--"
+            move = f"{r['move_pct']:+.1f}%" if r["move_pct"] is not None else "--"
+            days = str(r["days"]) if r["days"] is not None else "--"
+            print(f"  {r['symbol']:<12}{r['baseline_date']:<12}{then:>10}"
+                  f"{now:>10}{move:>9}{days:>6}  {r['source']}")
+            if r.get("t1"):
+                mark = "hit" if r["t1_hit_on"] else r["t1_state"]
+                print(f"        T1 {r['t1']:,.2f} [{mark}] {r['t1_note']}")
+            if r["notes"]:
+                print(f"        {r['notes'][:76]}")
+        for h in newly_hit:
+            print(f"\n  *** {h}")
+        if filled:
+            print(f"\n  Filled {filled} missing baseline price(s) with today's close.")
+        young = [r for r in rows if (r["days"] or 0) < 21]
+        if young:
+            print(f"\n  {len(young)} of these are under 21 days old. Too early to "
+                  f"read anything into the move.")
 
     levels = {}
     held = set(st.load_positions(con))

@@ -176,6 +176,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", default=str(fu.FUNDAMENTALS_PATH))
     ap.add_argument("--symbols", nargs="*", default=None)
+    ap.add_argument("--quarters", type=int, default=6,
+                    help="quarters of results to fetch per symbol; growth "
+                         "needs at least 5 to compute year on year")
     ap.add_argument("--yahoo-only", action="store_true",
                     help="skip NSE (much faster; loses pledge and promoter data)")
     args = ap.parse_args()
@@ -197,6 +200,23 @@ def main() -> None:
                       _nse_fields=[], _nse_abs=False)
                  if args.yahoo_only else merge(sym))
             r.setdefault("_is_lender", False)
+
+            # Prior quarters carry only revenue and profit -- enough for growth,
+            # which is what they are for. Ratios live on the current row.
+            history = []
+            if not args.yahoo_only and args.quarters > 1:
+                try:
+                    for h in nsef.results_history(sym, args.quarters)[1:]:
+                        if h.get("revenue") is None:
+                            continue
+                        history.append({
+                            "symbol": sym, "quarter": h["quarter"],
+                            "period": "quarterly", "revenue": h["revenue"],
+                            "pat": h["pat"], "notes": f"nse-history({h['to_date']})",
+                        })
+                except Exception:
+                    pass
+            r["_history"] = history
             data_fields = [k for k in r if not k.startswith("_") and k != "symbol"]
             if not data_fields:
                 failed.append(f"{sym} (no data from any source)")
@@ -209,6 +229,7 @@ def main() -> None:
             nsef_used = r.pop("_nse_fields")
             lender = r.pop("_is_lender", False)
             rows.append(r)
+            rows.extend(r.pop("_history", []))
             print(f"  [{i}/{len(symbols)}] {sym}: {len(data_fields)} fields"
                   f"{'  [LENDER]' if lender else ''}"
                   f"{'  NSE: ' + ','.join(nsef_used) if nsef_used else ''}")

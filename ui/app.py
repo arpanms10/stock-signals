@@ -60,10 +60,16 @@ st.sidebar.caption(
 # ------------------------------------------------------------------- header
 st.title("📈 Stock Signals")
 st.caption(snap.regime_detail)
+for f in snap.freshness:
+    if f["label"] == "stale":
+        st.error(f"⚠️ {f['message']}")
+    elif f["label"] == "ageing":
+        st.info(f["message"])
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market = st.tabs(["  My Holdings  ", "  Market  "])
+tab_hold, tab_market, tab_watch = st.tabs(
+    ["  My Holdings  ", "  Market  ", "  Watching  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -134,9 +140,17 @@ with tab_hold:
 
         st.divider()
         st.subheader("What to do")
-        order = {"EXIT": 0, "TRIM": 1, "ADD": 2, "HOLD": 3}
-        show = st.multiselect("Show", ["EXIT", "TRIM", "ADD", "HOLD"],
-                              default=["EXIT", "TRIM", "ADD"])
+        order = {"EXIT": 0, "TRIM": 1, "ADD": 2, "WATCH": 3, "HOLD": 4}
+        show = st.multiselect("Show", ["EXIT", "TRIM", "ADD", "WATCH", "HOLD"],
+                              default=["EXIT", "TRIM", "ADD", "WATCH"])
+        if snap.cash:
+            cc = snap.cash
+            cols = st.columns(4)
+            cols[0].metric("Sells raise", c.money(cc["raised"]))
+            cols[1].metric("Adds cost", c.money(cc["spent"]))
+            cols[2].metric("Left over", c.money(cc["unspent"]))
+            cols[3].metric("Unfunded", f"{len(cc['deferred'])}",
+                           help="Worth buying, but the sells do not raise enough")
         # Urgency sorts ahead of value, so rows actually sit under the heading
         # that describes them. Printing an "urgent" heading and then listing a
         # calm row beneath it makes the grouping decorative rather than true.
@@ -331,7 +345,87 @@ with tab_market:
                                          e.get("t2"), f"Needs: {e['note']}"),
                             unsafe_allow_html=True)
 
+        import watching as wg
+        already = set(wg.symbols())
+        if row["symbol"] in already:
+            st.caption(f"✓ {row['symbol']} is on your watch list.")
+        elif st.button(f"Watch {row['symbol']}", key=f"watch_{row['symbol']}"):
+            ok, msg = wg.add(row["symbol"], source="rank")
+            (st.success if ok else st.info)(msg)
+            load.clear()
+
         if row["flags"]:
             with st.expander("Fundamental flags"):
                 for f_ in row["flags"]:
                     st.markdown(f"- {f_}")
+
+
+# ==================================================================== WATCHING
+with tab_watch:
+    st.subheader("Suggestions under close observation")
+    st.caption(
+        "Measured from the date the framework **flagged** each name, not from "
+        "when you added it here. A watchlist that resets the baseline on add "
+        "would flatter every late addition, and you would never notice.")
+
+    w = pd.DataFrame(snap.watching)
+    if w.empty:
+        st.info("Nothing being watched yet. Add candidates from the Market tab, "
+                "or run `run_daily.py --watch-add SYMBOL`.")
+    else:
+        settled = w[w["days"].fillna(0) >= 21]
+        cols = st.columns(4)
+        cols[0].metric("Watching", f"{len(w)}")
+        cols[1].metric("Old enough to judge", f"{len(settled)}",
+                       help="21+ days since the framework flagged it")
+        if not settled.empty:
+            cols[2].metric("Average move", c.pct(settled["move_pct"].mean(),
+                                                 signed=True))
+            cols[3].metric("Went up", f"{int((settled['move_pct'] > 0).sum())}"
+                                      f" of {len(settled)}")
+        else:
+            cols[2].metric("Average move", "--")
+            cols[3].metric("Went up", "--")
+
+        from scoring import timing as _timing
+        _h = (_timing.load_config().get("targets", {})
+              .get("horizon_sessions") or {})
+        st.markdown(
+            c.watching_table(snap.watching,
+                             {k: v.get("median") for k, v in _h.items()}),
+            unsafe_allow_html=True)
+        st.caption(
+            "**T1:17** and **T2:37** are how many sessions each target normally "
+            "takes — measured across 9,650 real paths, not forecast. "
+            "**Status** compares this position against that: *early*, *due*, "
+            "*late*, *stalled*, or how fast it was reached. Calibration, not a "
+            "rule: slow positions returned 7.4% over the next six months "
+            "against 9.6% for fast ones, too small a gap to trade on.")
+
+        young = w[w["days"].fillna(0) < 21]
+        if len(young):
+            st.caption(f"{len(young)} of these are under 21 days old — too "
+                       f"early to read anything into the move.")
+
+        for r in snap.watching:
+            if r["notes"]:
+                st.markdown(f"**{r['symbol']}** — {r['notes']}")
+
+    st.divider()
+    left, right = st.columns(2)
+    with left:
+        add_sym = st.text_input("Add a symbol", placeholder="e.g. CUPID",
+                                key="watch_add_input")
+        if st.button("Add to watch list") and add_sym.strip():
+            import watching as wg
+            ok, msg = wg.add(add_sym.strip().upper(), source="manual")
+            (st.success if ok else st.info)(msg)
+            load.clear()
+    with right:
+        if not w.empty:
+            drop = st.selectbox("Stop watching", [""] + list(w["symbol"]),
+                                key="watch_drop")
+            if st.button("Remove") and drop:
+                import watching as wg
+                st.info(wg.remove(drop)[1])
+                load.clear()

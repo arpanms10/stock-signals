@@ -1,0 +1,17 @@
+# Stocks you are watching closely. Opens in Excel.
+#
+#   added_on        when you started watching
+#   baseline_date   when the framework first flagged it -- taken from the
+#                   decision log where possible, so performance is measured
+#                   from the call, not from when you noticed it
+#   baseline_price  price on that date
+#   t1, t2          target prices set when the name was flagged
+#   t1_hit_on       first session the price closed at or above T1 (blank until)
+#   t2_hit_on       same for T2
+#   source          why it is here: rank | advisor | manual
+#   conviction      your own note: watch | interested | avoid
+#   notes           yours
+symbol,added_on,baseline_date,baseline_price,t1,t2,t1_hit_on,t2_hit_on,source,conviction,notes
+ATHERENERG,2026-09-07,2026-09-04,1584.0,1785.0,1986.0,,,rank,watch,
+BHARATFORG,2026-09-07,2026-09-04,1956.0,2116.78,2277.57,,,rank,watch,
+CUPID,2026-09-07,2026-09-04,283.15,318.56,353.98,,,rank,watch,"rank 1, +662% momentum, no fundamentals -- the most extreme claim the ranking makes"

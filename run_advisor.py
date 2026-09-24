@@ -10,10 +10,12 @@ import datetime as dt
 import numpy as np
 import pandas as pd
 
+import decision_log as dlog
 import fundamentals as fu
 import instruments as ins
 import portfolio as pf
 from data import bhavcopy as bc
+from data import freshness as fr
 from data import quality as dq
 from data import store
 from data.sources import universe as uni
@@ -23,6 +25,7 @@ from strategy import allocation as al
 from strategy import buckets as bk
 from strategy import momentum as mom
 from strategy import risk_monitor as rm
+from strategy import tax as tx
 
 RULE = "=" * 74
 
@@ -36,6 +39,10 @@ def main() -> None:
     ap.add_argument("--universe-size", type=int, default=200)
     ap.add_argument("--total-capital", type=float, default=None,
                     help="whole portfolio incl. index funds, for the framing note")
+    ap.add_argument("--cash", type=float, default=0.0,
+                    help="cash on hand to fund adds, beyond what the sells raise")
+    ap.add_argument("--no-log", action="store_true",
+                    help="do not record this run in the decision log")
     args = ap.parse_args()
 
     cfg = timing.load_config()
@@ -89,7 +96,12 @@ def main() -> None:
         tradeable[sym] = h
     book = sum(values.values())
 
+    checks = [fr.assess(mkt), fr.assess_prices(con, []), fr.assess_fundamentals()]
+    stale = [c for c in checks if c.label != "fresh"]
     print(f"Portfolio advisor -- {dt.date.today():%d %b %Y}")
+    for c in stale:
+        marker = "!!" if c.is_stale else " *"
+        print(f"  {marker} {c.message}")
     print(f"  {len(tradeable)} equity holdings worth {book:,.0f} "
           f"({len(untradeable)} instruments not covered)")
 
@@ -139,6 +151,11 @@ def main() -> None:
     over_cap = {sec for sec, v in sector_value.items()
                 if book and 100 * v / book > cfg["risk"]["max_sector_pct"]}
 
+    # How much of each holding a sector trim would take, computed across the
+    # whole book before any single holding is advised on.
+    sector_trims = adv.plan_sector_trims(tradeable, values, sectors, qual,
+                                         book, cfg)
+
     advices = []
     for sym, h in tradeable.items():
         risk = rm.holding_status(sym, frames[sym], h, cfg)
@@ -146,8 +163,11 @@ def main() -> None:
         advices.append(adv.advise(
             sym, bucket_of[sym], h, prices[sym], values[sym], book,
             qual.get(sym), rank_of.get(sym), len(ranked), risk, cfg,
-            sector_over_cap=sectors.get(sym) in over_cap,
-            row={"sma20": last.get("sma20"), "sma50": last.get("sma50")}))
+            sector_over_cap=sym in sector_trims,
+            row={"sma20": last.get("sma20"), "sma50": last.get("sma50")},
+            sector_trim_fraction=sector_trims.get(sym, 0.33)))
+
+    cash = adv.apply_cash_constraint(advices, prices, qual, args.cash)
 
     summary = adv.summarise(advices)
     warnings = adv.sanity_warnings(advices, len(ranked), args.universe_size)
@@ -161,7 +181,15 @@ def main() -> None:
     print("  EXIT = the reason to own it is gone (thesis). No size is correct")
     print("         for a broken thesis, so exits are always the whole holding.\n")
 
-    for action in ("EXIT", "TRIM", "ADD", "HOLD"):
+    print(f"  Sells raise about {cash['raised']:,.0f}"
+          + (f" plus {cash['cash_available']:,.0f} cash on hand" if cash['cash_available'] else "")
+          + f"; adds are funded from that, best first.")
+    if cash["deferred"]:
+        print(f"  {len(cash['deferred'])} add(s) could not be funded and are "
+              f"listed as WATCH.")
+    print()
+
+    for action in ("EXIT", "TRIM", "ADD", "WATCH", "HOLD"):
         group = summary["by_action"].get(action) or []
         if not group:
             continue
@@ -205,6 +233,77 @@ def main() -> None:
             print(f"  {sym:<14} {why}")
         print("\n  These are excluded from every calculation above -- they are")
         print("  not scored, ranked or advised on. Judge them separately.")
+
+    if not args.no_log:
+        rows = [{"symbol": a.symbol, "action": a.action, "bucket": a.bucket,
+                 "urgency": a.urgency, "price": prices.get(a.symbol, 0.0),
+                 "qty_action": a.qty, "pct_of_book": a.current_pct,
+                 "pnl_pct": a.pnl_pct,
+                 "quality": (qual[a.symbol].score if a.symbol in qual else None),
+                 "rank": rank_of.get(a.symbol),
+                 "timing_score": None, "stop": None, "reasons": a.reasons}
+                for a in advices]
+        log = dlog.connect()
+        # Prices come from the newest session on file, which on a weekend run
+        # is not today.
+        price_date = max((frames[s]["date"].iloc[-1] for s in frames), default=None)
+        n = dlog.record(log, rows, price_date=price_date)
+        # Also log the top-ranked names you do not own -- that is what the
+        # ranking is asserting, and it was going unrecorded.
+        market_rows = [{"symbol": r.symbol, "price": float(frames[r.symbol]["close"].iloc[-1]),
+                        "rank": int(r.rank), "quality": (qual[r.symbol].score
+                                                         if r.symbol in qual else None),
+                        "momentum": float(r.mom), "vol": 100 * float(r.vol),
+                        "held": r.symbol in tradeable}
+                       for r in ranked.head(20).itertuples() if r.symbol in frames]
+        c = dlog.record_candidates(log, market_rows, price_date=price_date)
+        scored = dlog.score_past_advice(log, prices)
+        stats = dlog.summary(scored)
+        print(section("DECISION LOG"))
+        print(f"  {n} holding decisions and {c} ranked candidates recorded.")
+        if stats:
+            o = stats["_overall"]
+            print(f"  {o['n']} past directional calls old enough to judge "
+                  f"(21+ days): {o['hit_rate_pct']:.0f}% went the right way, "
+                  f"average {o['avg_outcome_pct']:+.1f}%.")
+            if not o["enough_to_judge"]:
+                print("  Too few to mean anything yet -- 30 is the point at "
+                      "which this stops being a story about luck.")
+        else:
+            print("  Nothing old enough to score yet. Come back in a month.")
+
+    sells = [{"symbol": a.symbol,
+              "lt_gain": max(a.realised_gain, 0.0) if a.tax_saved or a.estimated_tax else 0.0,
+              "estimated_tax": a.estimated_tax}
+             for a in advices if a.is_sell and a.qty]
+    if sells:
+        ex = tx.apply_ltcg_exemption(sells, cfg)
+        print(section("TAX ON THIS PLAN"))
+        print(f"  long-term gains realised   {ex['long_term_gain']:>12,.0f}")
+        print(f"  annual LTCG exemption      {ex['exemption']:>12,.0f}")
+        print(f"  tax at the flat rate       {ex['tax_before_exemption']:>12,.0f}")
+        print(f"  tax after the exemption    {ex['tax_after_exemption']:>12,.0f}")
+        if ex["fully_covered"]:
+            print(f"\n  The exemption covers this plan entirely -- "
+                  f"{ex['exemption_left']:,.0f} of it is still unused this "
+                  f"financial year.")
+        else:
+            print(f"\n  The exemption is exhausted by this plan. Gains beyond "
+                  f"it are taxed at {cfg['tax']['ltcg_rate_pct']}%.")
+        print("  Per-holding figures above apply the rate flat, so they are an "
+              "upper bound.")
+
+    print(section("CASH"))
+    print(f"  raised by sells      {cash['raised']:>12,.0f}")
+    if cash["cash_available"]:
+        print(f"  cash on hand         {cash['cash_available']:>12,.0f}")
+    print(f"  available            {cash['budget']:>12,.0f}")
+    print(f"  allocated to adds    {cash['spent']:>12,.0f}")
+    print(f"  left over            {cash['unspent']:>12,.0f}")
+    if cash["wanted"] > cash["budget"]:
+        print(f"\n  Adds worth {cash['wanted']:,.0f} were wanted against "
+              f"{cash['budget']:,.0f} available. The shortfall is shown rather "
+              f"than hidden -- the WATCH list is what did not fit.")
 
     if args.total_capital:
         print(section("FRAMING"))

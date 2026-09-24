@@ -131,7 +131,8 @@ def _attach_plan(a: Advice, holding: dict, price: float, cfg: dict,
 def advise(symbol: str, bucket: str, holding: dict, price: float,
            value: float, book_value: float, quality, rank: int | None,
            rank_universe: int, risk: dict, cfg: dict,
-           sector_over_cap: bool = False, row: dict | None = None) -> Advice:
+           sector_over_cap: bool = False, row: dict | None = None,
+           sector_trim_fraction: float = 0.33) -> Advice:
     """One holding, one recommendation."""
     r = cfg["risk"]
     m = cfg.get("momentum_strategy", {})
@@ -173,14 +174,6 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
     if rank_universe and rank_universe < full:
         exit_rank = max(int(exit_rank * rank_universe / full),
                         m.get("n_hold", 15) + 5)
-    if bucket == "legacy" and rank is not None and rank > exit_rank:
-        a.action, a.urgency = "HOLD", "review"
-        a.reasons.append(f"rank {rank} of {rank_universe} would trigger a "
-                         f"satellite exit, but this is unclassified")
-        a.reasons.append("it was not bought on momentum, so it is not sold on "
-                         "momentum -- set bucket=satellite in "
-                         "config/holdings.csv if you want it rotated")
-        return a
     if bucket == "satellite" and rank is not None and rank > exit_rank:
         a.action, a.urgency = "EXIT", "review"
         a.qty = qty
@@ -189,11 +182,6 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
         a.reasons.append("satellites are owned for the trend; the trend is over")
         return a
 
-    if bucket == "legacy" and rank is None:
-        a.action, a.urgency = "HOLD", "review"
-        a.reasons.append("outside the momentum universe, but unclassified -- "
-                         "no rank-based action taken")
-        return a
     if bucket == "satellite" and rank is None:
         # Absence from the ranking has two very different causes: the stock is
         # genuinely in a downtrend, or we simply have no data for it. Only the
@@ -228,12 +216,41 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
             a.reasons.append("core holding: trimming to size, still owned")
         return _attach_plan(a, holding, price, cfg, row)
 
-    if sector_over_cap and bucket == "satellite":
+    if sector_over_cap:
+        # Applies to core and legacy too, not just satellite. Concentration is
+        # a property of the book, not of a bucket: eight financials that each
+        # look like a fine business are still one bet on Indian credit. An
+        # earlier version only trimmed satellites, so the single largest risk
+        # the framework could identify produced no action at all.
         a.action = "TRIM"
-        a.qty = max(qty * 0.33, 1)
-        a.reasons.append("its sector is over the concentration cap; several "
-                         "holdings here are one bet, not several")
+        a.qty = max(round(qty * sector_trim_fraction), 1)
+        a.reasons.append(
+            f"its sector is over the {cfg['risk']['max_sector_pct']:.0f}% "
+            f"concentration cap -- several holdings here are one bet, not "
+            f"several")
+        if bucket == "core":
+            a.reasons.append("core holding: trimmed for concentration, with no "
+                             "view on the business -- you keep owning it")
         return _attach_plan(a, holding, price, cfg, row)
+
+    # ---- rank verdicts for unclassified holdings -----------------------
+    # Deliberately after the sizing checks above. A legacy holding still gets
+    # trimmed for concentration -- that is a property of the book, not a view
+    # on the stock -- and only then falls through to "no rank-based action".
+    if bucket == "legacy" and rank is not None and rank > exit_rank:
+        a.action, a.urgency = "HOLD", "review"
+        a.reasons.append(f"rank {rank} of {rank_universe} would trigger a "
+                         f"satellite exit, but this is unclassified")
+        a.reasons.append("it was not bought on momentum, so it is not sold on "
+                         "momentum -- set bucket=satellite in "
+                         "config/holdings.csv if you want it rotated")
+        return a
+
+    if bucket == "legacy" and rank is None:
+        a.action, a.urgency = "HOLD", "review"
+        a.reasons.append("outside the momentum universe, but unclassified -- "
+                         "no rank-based action taken")
+        return a
 
     # ---- ADD / HOLD ---------------------------------------------------
     if risk.get("stop_breached") and bucket == "satellite":
@@ -307,9 +324,104 @@ def sanity_warnings(advices: list[Advice], ranked_universe: int,
     return out
 
 
+def plan_sector_trims(holdings: dict[str, dict], values: dict[str, float],
+                      sectors: dict[str, str], quality: dict, book: float,
+                      cfg: dict) -> dict[str, float]:
+    """How much of each holding to sell to bring its sector under the cap.
+
+    Trims the weakest names in the sector first -- lowest quality, then
+    smallest -- and stops the moment the sector is compliant. Trimming every
+    holding proportionally would take a slice out of the best business in the
+    sector to fix a problem the worst ones caused.
+    """
+    cap = cfg["risk"]["max_sector_pct"]
+    by_sector: dict[str, list[str]] = {}
+    for sym, val in values.items():
+        by_sector.setdefault(sectors.get(sym, "Unknown"), []).append(sym)
+
+    fractions: dict[str, float] = {}
+    for sector, syms in by_sector.items():
+        total = sum(values[s] for s in syms)
+        if not book or 100 * total / book <= cap:
+            continue
+        excess = total - book * cap / 100
+
+        def weakness(sym):
+            q = quality.get(sym)
+            score = q.score if q and q.score is not None else 50.0
+            return (score, values[sym])
+
+        for sym in sorted(syms, key=weakness):
+            if excess <= 0:
+                break
+            # At most half a position for a sector reason, and spread across
+            # as many names as it takes. Concentration is a sizing problem;
+            # taking 84% of one holding to fix it is an exit wearing a trim's
+            # clothes, and it puts the whole correction on a single stock's
+            # execution risk.
+            take = min(values[sym] * 0.5, excess)
+            if take <= 0:
+                continue
+            fractions[sym] = take / values[sym]
+            excess -= take
+    return fractions
+
+
+def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
+                          quality: dict, cash_available: float = 0.0) -> dict:
+    """Fund the adds from the sells, best first, and stop when money runs out.
+
+    Without this the advisor emits every under-weight position as an ADD and
+    leaves the arithmetic to the reader -- roughly four times more buying than
+    the sells release. A plan you cannot execute is a ranked wish-list, so the
+    ranking is made explicit and the cutoff is drawn where the money ends.
+    """
+    raised = sum(a.qty * prices.get(a.symbol, 0.0)
+                 for a in advices if a.is_sell and a.qty)
+    budget = raised + cash_available
+
+    adds = [a for a in advices if a.action in ("ADD", "BUY") and a.qty]
+
+    def conviction(a: Advice):
+        q = quality.get(a.symbol)
+        score = q.score if q and q.score is not None else 0.0
+        # Quality first, then the size of the gap to target -- a high-quality
+        # holding at 0.5% of the book is a bigger miss than one at 4%.
+        return (-score, a.current_pct)
+
+    remaining, funded, deferred = budget, [], []
+    for a in sorted(adds, key=conviction):
+        cost = a.qty * prices.get(a.symbol, 0.0)
+        if cost <= remaining:
+            remaining -= cost
+            funded.append(a)
+            continue
+        # Part-fund rather than skip: half a position in the best business you
+        # own beats a full position in the fourth best.
+        px = prices.get(a.symbol, 0.0)
+        affordable = int(remaining / px) if px else 0
+        if affordable >= 1:
+            a.qty = affordable
+            a.reasons.append(f"part-funded: only {remaining:,.0f} of the "
+                             f"{cost:,.0f} needed is available")
+            remaining -= affordable * px
+            funded.append(a)
+        else:
+            a.action = "WATCH"
+            a.qty = 0
+            a.reasons.append("no cash left in this plan -- worth buying, but "
+                             "the sells above do not raise enough")
+            deferred.append(a)
+
+    return {"raised": raised, "cash_available": cash_available,
+            "budget": budget, "spent": budget - remaining,
+            "unspent": remaining, "funded": funded, "deferred": deferred,
+            "wanted": sum(a.qty * prices.get(a.symbol, 0.0) for a in adds)}
+
+
 def summarise(advices: list[Advice]) -> dict:
     """Counts and cash impact, so the plan can be read at a glance."""
-    out = {"EXIT": [], "TRIM": [], "ADD": [], "HOLD": [], "BUY": []}
+    out = {"EXIT": [], "TRIM": [], "ADD": [], "HOLD": [], "BUY": [], "WATCH": []}
     for a in advices:
         out.setdefault(a.action, []).append(a)
     raised = sum(a.qty * (a.value / a.qty if a.qty else 0)

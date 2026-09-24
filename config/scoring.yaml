@@ -77,6 +77,19 @@ targets:
   t1_book_pct: 50.0                # percent of the position sold at T1
   breakeven_after_t1: true         # move the stop to entry once T1 is hit
 
+  # How long a target normally takes, measured from 9,650 sampled paths across
+  # 193 liquid NSE stocks, 2018-2026. These are OBSERVED percentiles, not a
+  # forecast -- a volatility-based formula was tested and had essentially no
+  # predictive power (correlation -0.03 with actual time to target).
+  #
+  # Reported so you can tell normal from unusual. NOT an exit rule: positions
+  # slow to reach T1 went on to return 7.4% over the following six months
+  # against 9.6% for fast ones, with identical hit rates. A 2.2-point median
+  # gap does not survive transaction costs.
+  horizon_sessions:
+    t1: {median: 17, typical: 45, slow: 103, never_pct: 12}
+    t2: {median: 37, typical: 81, slow: 157, never_pct: 21}
+
 # ---------------------------------------------------------------------------
 # Cross-sectional momentum (Tier 1a). A different strategy class from the
 # signal rules above: it always holds a slice of the universe and rotates by
@@ -96,7 +109,32 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
   exit_rank: 30                    # ... and only sell after falling past 30
                                    # (the gap stops boundary names churning)
   rebalance_days: 21               # monthly
-  risk_off_scale: 0.5              # hold half as many names below the 200 DMA
+  risk_off_scale: 0.5
+  # Volatility targeting: scale gross exposure so the PORTFOLIO runs at a
+  # target volatility rather than whatever the holdings happen to give.
+  # The best-evidenced improvement to momentum's Sharpe, and a structural
+  # change rather than a threshold tweak -- it attacks the -44% drawdown,
+  # which is the real problem, not the return.
+  vol_target: false                # off by default until it clears a holdout
+  vol_target_pct: 15.0             # annualised portfolio volatility to aim at
+  vol_lookback: 60                 # sessions used to estimate realised vol
+  vol_max_leverage: 1.0            # never above fully invested -- no borrowing
+  vol_min_exposure: 0.3            # floor, so a vol spike does not go to cash              # hold half as many names below the 200 DMA
+  min_price: 20.0                  # rupees. Momentum divided by volatility
+                                   # ranks a pumped penny stock first; a price
+                                   # floor is the cheapest guard against it
+  min_turnover_cr: 5.0             # average daily traded value, crores
+  # A stock trading far above its own 200 DMA has already made the move the
+  # ranking is trying to catch. CUPID ranked first on +662% 12-1 momentum while
+  # sitting 109% above its 200 DMA -- liquid and not cheap, so the price and
+  # turnover floors above did nothing about it.
+  #
+  # TESTED AND LEFT OFF. On 2018-2022 the results were non-monotonic: a 40%
+  # cap gave Sharpe 0.64, 60% gave 0.36, 80% gave 0.59, 120% gave 0.48. A real
+  # effect trends as the cap tightens; this jumps around, which is noise.
+  # Choosing 40% because it scored best is the curve-fitting the harness
+  # exists to prevent. 0 disables the check.
+  max_extension_pct: 0.0
   quality_floor: 50.0              # fundamentals gate for the combined rank
   allow_unknown_quality: true      # unscored stocks stay eligible, but every
                                    # run names them -- so "unknown" never

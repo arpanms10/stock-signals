@@ -23,6 +23,7 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
+from strategy import momentum as mom
 
 TRADING_DAYS_MONTH = 21
 
@@ -40,14 +41,17 @@ def load_wide(con, start: dt.date, end: dt.date) -> pd.DataFrame:
 
 
 def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
-                    min_days: int = 40) -> list[str]:
+                    min_days: int = 40, min_price: float = 0.0,
+                    min_turnover_cr: float = 0.0) -> list[str]:
     """Most liquid names as of a date, computed only from prior data."""
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
     cur = con.execute(
-        "SELECT symbol, AVG(turnover) t, COUNT(*) n FROM market "
+        "SELECT symbol, AVG(turnover) t, COUNT(*) n, AVG(close) p FROM market "
         "WHERE date <= ? AND date > ? AND turnover > 0 "
-        "GROUP BY symbol HAVING n >= ? ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, min_days, top_n * 2))
+        "GROUP BY symbol HAVING n >= ? AND p >= ? AND t >= ? "
+        "ORDER BY t DESC LIMIT ?",
+        (on_date.isoformat(), frm, min_days, min_price,
+         min_turnover_cr * 1e7, top_n * 2))
     syms = [r[0] for r in cur.fetchall()]
     # ETFs pass any liquidity filter and, being low-volatility, dominate a
     # risk-adjusted ranking -- a liquid-fund ETF is effectively cash with an
@@ -76,9 +80,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         return PortfolioResult(pd.Series(dtype=float), pd.Series(dtype=float))
 
     rets = px.pct_change()
-    mom = px.shift(sk) / px.shift(lb) - 1
+    mom_matrix = px.shift(sk) / px.shift(lb) - 1
     vol = rets.rolling(vol_w, min_periods=vol_w // 2).std() * np.sqrt(252)
-    ram = mom / vol.replace(0, np.nan)
+    ram = mom_matrix / vol.replace(0, np.nan)
     sma200 = px.rolling(200, min_periods=200).mean()
 
     dates = [d for d in px.index if d.date() >= start]
@@ -92,6 +96,7 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     cash = start_capital
     shares: dict[str, float] = {}
     pending: list[str] | None = None
+    exposure = 1.0
     equity_rows, turnover, holdings_log = [], [], []
     total_costs = 0.0
     last_rebal: dt.date | None = None
@@ -107,7 +112,7 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             prices_now = {s: float(row[s]) for s in set(list(shares) + target)
                           if s in row.index and not pd.isna(row[s]) and row[s] > 0}
             portfolio = cash + sum(q * prices_now.get(s, 0.0) for s, q in shares.items())
-            weight = portfolio / len(target) if target else 0.0
+            weight = (portfolio * exposure / len(target)) if target else 0.0
             traded = 0.0
 
             for s in list(shares):
@@ -163,12 +168,24 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         due = last_rebal is None or (today - last_rebal).days >= rebal_days * 7 / 5
         if due and i + 1 < len(dates):
             last_rebal = today
-            eligible = set(liquid_universe(con, today, universe_size))
+            eligible = set(liquid_universe(
+                con, today, universe_size,
+                min_price=m.get("min_price", 0.0),
+                min_turnover_cr=m.get("min_turnover_cr", 0.0)))
             snap = ram.loc[ts]
-            cand = [s for s in snap.index
-                    if s in eligible and not pd.isna(snap[s])
-                    and not pd.isna(sma200.loc[ts].get(s, np.nan))
-                    and row.get(s, np.nan) > sma200.loc[ts][s]]
+            max_ext = m.get("max_extension_pct", 0.0)
+            cand = []
+            for s in snap.index:
+                if s not in eligible or pd.isna(snap[s]):
+                    continue
+                ma = sma200.loc[ts].get(s, np.nan)
+                px_s = row.get(s, np.nan)
+                if pd.isna(ma) or pd.isna(px_s) or px_s <= ma:
+                    continue
+                # Reject names that have already run far past their own trend.
+                if max_ext and 100 * (px_s / ma - 1) > max_ext:
+                    continue
+                cand.append(s)
             if not cand:
                 continue
             ranked = sorted(cand, key=lambda s: -snap[s])
@@ -179,6 +196,17 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 if len(hist) >= regime_n:
                     risk_on = float(hist.iloc[-1]) > float(hist.tail(regime_n).mean())
             n = n_hold if risk_on else max(1, int(n_hold * m.get("risk_off_scale", 0.5)))
+
+            # Volatility targeting scales how much capital is deployed, which
+            # is separate from how many names are held. Cutting positions and
+            # cutting exposure are different levers: one changes concentration,
+            # the other changes total risk.
+            eq = pd.Series(dict(equity_rows))
+            target_exposure = 1.0
+            if len(eq) > 30:
+                target_exposure, _ = mom.exposure_for_vol(
+                    mom.portfolio_vol(eq.pct_change(),
+                                      m.get("vol_lookback", 60)), cfg)
 
             if rng is not None:
                 pending = list(rng.choice(ranked, size=min(n, len(ranked)),
@@ -195,6 +223,10 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                     if s not in keep and order[s] <= m.get("enter_rank", n):
                         keep.append(s)
                 pending = keep[:n]
+
+            # Carried to the execution block at the top of the next session,
+            # which is where the weights are actually sized.
+            exposure = target_exposure
 
     equity = pd.Series(dict(equity_rows))
     equity.index = pd.to_datetime(equity.index)

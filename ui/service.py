@@ -26,7 +26,9 @@ if str(ROOT) not in sys.path:
 import fundamentals as fu           # noqa: E402
 import instruments as ins           # noqa: E402
 import portfolio as pf              # noqa: E402
+import watching as wg               # noqa: E402
 from data import bhavcopy as bc     # noqa: E402
+from data import freshness as fr    # noqa: E402
 from data import quality as dq      # noqa: E402
 from data import store              # noqa: E402
 from data.sources import universe as uni  # noqa: E402
@@ -51,6 +53,9 @@ class Snapshot:
     uncovered: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     sector_exposure: list[dict] = field(default_factory=list)
+    freshness: list[dict] = field(default_factory=list)
+    watching: list[dict] = field(default_factory=list)
+    cash: dict = field(default_factory=dict)
 
 
 def _levels(row, cfg) -> dict:
@@ -138,6 +143,8 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
         buckets[sym] = bk.classify(sym, q.score if q else None, vol,
                                    liq.get(sym), tradeable[sym].get("bucket", ""))
 
+    sector_trims = adv.plan_sector_trims(tradeable, values, sectors, qual,
+                                         book, cfg)
     rows, advices = [], []
     for sym, h in tradeable.items():
         q = qual.get(sym)
@@ -145,8 +152,9 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
         last = frames[sym].iloc[-1]
         a = adv.advise(sym, buckets[sym][0], h, prices[sym], values[sym], book,
                        q, rank_of.get(sym), len(ranked), risk, cfg,
-                       sectors.get(sym) in over,
-                       row={"sma20": last.get("sma20"), "sma50": last.get("sma50")})
+                       sym in sector_trims,
+                       row={"sma20": last.get("sma20"), "sma50": last.get("sma50")},
+                       sector_trim_fraction=sector_trims.get(sym, 0.33))
         advices.append(a)
         rows.append({
             "symbol": sym, "bucket": buckets[sym][0],
@@ -204,7 +212,31 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "levels": _levels(last, cfg),
         })
 
+    # Watched names carry their own price history, fetched by run_daily.py.
+    watch_prices = {}
+    for sym in wg.symbols():
+        f = frames.get(sym)
+        if f is None:
+            f = pipeline.scored_frame(con, sym, cfg, usable_from=cuts.get(sym))
+        if f is not None and not f.empty:
+            watch_prices[sym] = float(f["close"].iloc[-1])
+    wg.fill_missing_baselines(watch_prices)
+    watching = wg.report(watch_prices)
+
+    checks = [fr.assess(mkt), fr.assess_prices(con, []), fr.assess_fundamentals()]
+    freshness = [{"label": c.label, "message": c.message} for c in checks]
+    cash = adv.apply_cash_constraint(advices, prices, qual, 0.0)
+    # apply_cash_constraint can downgrade an ADD to WATCH, so rebuild the rows
+    # it touched rather than reporting an action the plan cannot fund.
+    by_symbol = {a.symbol: a for a in advices}
+    for r in rows:
+        a = by_symbol.get(r["symbol"])
+        if a:
+            r["action"], r["qty_action"] = a.action, a.qty
+            r["reasons"] = a.reasons
+
     return Snapshot(as_of=as_of, holdings=rows, market=market, book_value=book,
+                    freshness=freshness, cash=cash, watching=watching,
                     regime=regime, regime_detail=detail, split=split,
                     uncovered=uncovered, warnings=warnings,
                     sector_exposure=sector_exposure)
