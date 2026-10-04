@@ -56,6 +56,12 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     return con
 
 
+def _isin_column(df: pd.DataFrame, col: str) -> pd.Series:
+    if col not in df.columns:
+        return pd.Series([None] * len(df), index=df.index, dtype=object)
+    return df[col].astype(str).str.strip().str.upper().replace({"NAN": None, "": None})
+
+
 def _normalise_old(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [c.strip().upper() for c in df.columns]
     df = df[df["SERIES"].astype(str).str.strip() == "EQ"]
@@ -64,6 +70,7 @@ def _normalise_old(df: pd.DataFrame) -> pd.DataFrame:
         "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
         "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
         "turnover": pd.to_numeric(df.get("TOTTRDVAL"), errors="coerce"),
+        "isin": _isin_column(df, "ISIN"),
     })
     return out
 
@@ -76,6 +83,7 @@ def _normalise_udiff(df: pd.DataFrame) -> pd.DataFrame:
         "close": pd.to_numeric(df.get("ClsPric"), errors="coerce"),
         "volume": pd.to_numeric(df.get("TtlTradgVol"), errors="coerce"),
         "turnover": pd.to_numeric(df.get("TtlTrfVal"), errors="coerce"),
+        "isin": _isin_column(df, "ISIN"),
     })
     return out
 
@@ -114,6 +122,12 @@ def save_day(con, d: dt.date, df: pd.DataFrame) -> int:
             for r in df.itertuples()]
     con.executemany("INSERT OR REPLACE INTO market (date, symbol, close, volume,"
                     " turnover) VALUES (?,?,?,?,?)", rows)
+    # The ISIN rides along in every bhavcopy, and it is the only reliable way
+    # to tell a company from an ETF (both trade in the EQ series). Discarding
+    # it here is what once left the instrument map empty and let LIQUIDCASE
+    # into the backtest.
+    if "isin" in df.columns:
+        record_isins(con, zip(df["symbol"], df["isin"]))
     con.execute("INSERT OR REPLACE INTO market_days (date, rows, fetched_at)"
                 " VALUES (?,?,?)",
                 (d.isoformat(), len(rows),
@@ -129,6 +143,20 @@ def save_day(con, d: dt.date, df: pd.DataFrame) -> int:
 # a cash equivalent at the top of the ranking. LIQUIDCASE appeared in a
 # backtest's holdings exactly this way.
 EQUITY_ISIN_PREFIX = "INE"
+
+
+class InstrumentMapMissing(RuntimeError):
+    """The symbol -> ISIN map is empty, so equities cannot be told from ETFs."""
+
+
+def record_isins(con, pairs) -> int:
+    rows = [(str(sym).strip().upper(), str(isin).strip().upper())
+            for sym, isin in pairs
+            if sym and isin and str(isin).strip().lower() not in ("", "nan", "none")]
+    if rows:
+        con.executemany("INSERT OR REPLACE INTO instruments (symbol, isin) "
+                        "VALUES (?,?)", rows)
+    return len(rows)
 
 
 def build_instrument_map(con, dates: list[dt.date], verbose: bool = True) -> int:
@@ -179,6 +207,73 @@ def equity_symbols(con) -> set[str]:
         (EQUITY_ISIN_PREFIX + "%",))}
 
 
+def non_equity_symbols(con) -> set[str]:
+    """Symbols whose ISIN says fund/ETF, DVR or anything else not INE."""
+    return {r[0] for r in con.execute(
+        "SELECT symbol FROM instruments WHERE isin NOT LIKE ?",
+        (EQUITY_ISIN_PREFIX + "%",))}
+
+
+def require_equity_symbols(con) -> set[str]:
+    """equity_symbols(), but refuse to proceed without a map.
+
+    Anything that ranks must fail closed. An empty map used to mean "skip the
+    filter", and with the map never built every ETF in the EQ series -- and a
+    liquid-fund ETF with near-zero volatility above all -- competed with
+    stocks. A symbol missing from a non-empty map is likewise treated as not
+    equity: an unknown is excluded, never assumed.
+    """
+    eq = equity_symbols(con)
+    if not eq:
+        raise InstrumentMapMissing(
+            "instrument map (symbol -> ISIN) is empty, so ETFs cannot be told "
+            "from stocks. Run: PYTHONPATH=. .venv/bin/python run_market_ingest.py")
+    return eq
+
+
+def unmapped_symbols(con) -> set[str]:
+    return {r[0] for r in con.execute(
+        "SELECT DISTINCT m.symbol FROM market m "
+        "LEFT JOIN instruments i ON i.symbol = m.symbol WHERE i.symbol IS NULL")}
+
+
+def backfill_isins(con, max_days: int = 400, pause: float = 0.3,
+                   verbose: bool = True) -> int:
+    """Map every symbol in `market` to an ISIN, downloading as few days as possible.
+
+    Greedy: repeatedly fetch the trading day on which the most still-unmapped
+    symbols traded. A handful of recent days covers the live market; the long
+    tail of delisted names needs one day each from their own era.
+    """
+    tried: set[str] = set()
+    fetched = 0
+    while fetched < max_days:
+        if not unmapped_symbols(con):
+            break
+        skip = ("AND m.date NOT IN (" + ",".join("?" * len(tried)) + ") "
+                if tried else "")
+        row = con.execute(
+            "SELECT m.date, COUNT(*) n FROM market m "
+            "LEFT JOIN instruments i ON i.symbol = m.symbol "
+            f"WHERE i.symbol IS NULL {skip}"
+            "GROUP BY m.date ORDER BY n DESC, m.date DESC LIMIT 1",
+            sorted(tried)).fetchone()
+        if not row:
+            break
+        day = row[0]
+        tried.add(day)
+        df = fetch_day(dt.date.fromisoformat(day))
+        fetched += 1
+        if not df.empty and "isin" in df.columns:
+            got = record_isins(con, zip(df["symbol"], df["isin"]))
+            con.commit()
+            if verbose:
+                print(f"  isin {day}: {got} symbols, "
+                      f"{len(unmapped_symbols(con))} still unmapped", flush=True)
+        time.sleep(pause)
+    return len(unmapped_symbols(con))
+
+
 def have_days(con) -> set[str]:
     return {r[0] for r in con.execute("SELECT date FROM market_days")}
 
@@ -217,15 +312,16 @@ def universe_on(con, on_date: dt.date, top_n: int = 200,
     # promotion ranks above every real business -- and a price floor plus a
     # turnover floor is the cheapest guard against buying one.
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
+    require_equity_symbols(con)
+    # Equity-only inside the query, so ETFs crowding the top of the turnover
+    # table cannot push real stocks out of the LIMIT.
     cur = con.execute(
-        "SELECT symbol, AVG(turnover) t, COUNT(*) n, AVG(close) p FROM market "
-        "WHERE date <= ? AND date > ? AND turnover IS NOT NULL "
-        "GROUP BY symbol HAVING n >= ? AND p >= ? AND t >= ? "
+        "SELECT m.symbol, AVG(m.turnover) t, COUNT(*) n, AVG(m.close) p "
+        "FROM market m JOIN instruments i ON i.symbol = m.symbol "
+        "WHERE m.date <= ? AND m.date > ? AND m.turnover IS NOT NULL "
+        "AND i.isin LIKE ? "
+        "GROUP BY m.symbol HAVING n >= ? AND p >= ? AND t >= ? "
         "ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, min_days, min_price,
-         min_turnover_cr * 1e7, top_n * 2))
-    syms = [r[0] for r in cur.fetchall()]
-    equities = equity_symbols(con)
-    if equities:
-        syms = [s for s in syms if s in equities]
-    return syms[:top_n]
+        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%", min_days,
+         min_price, min_turnover_cr * 1e7, top_n))
+    return [r[0] for r in cur.fetchall()]

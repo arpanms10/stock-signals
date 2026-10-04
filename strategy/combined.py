@@ -19,9 +19,12 @@ from strategy import momentum as mom
 
 
 def combined_rank(panel: pd.DataFrame, on_date, cfg: dict,
-                  quality: dict[str, fu.Quality] | None = None) -> pd.DataFrame:
-    """Momentum ranking with a quality gate applied. Best first."""
-    ranked = mom.rank_on(panel, on_date, cfg)
+                  quality: dict[str, fu.Quality] | None = None,
+                  eligible: set[str] | None = None) -> pd.DataFrame:
+    """Momentum ranking with a quality gate applied. Best first.
+
+    `eligible` restricts ranking to ISIN-confirmed equities; see rank_on."""
+    ranked = mom.rank_on(panel, on_date, cfg, eligible=eligible)
     if ranked.empty or not quality:
         if not ranked.empty:
             ranked["quality"] = None

@@ -219,8 +219,9 @@ def test_universe_floor_excludes_penny_stocks(tmp_path):
         if d.weekday() >= 5:
             continue
         bc.save_day(con, d, pd.DataFrame(
-            [("REAL", 500.0, 1e6, 5e9), ("PENNY", 7.0, 1e8, 7e8)],
-            columns=["symbol", "close", "volume", "turnover"]))
+            [("REAL", 500.0, 1e6, 5e9, "INE001A01001"),
+             ("PENNY", 7.0, 1e8, 7e8, "INE002A01001")],
+            columns=["symbol", "close", "volume", "turnover", "isin"]))
     assert "PENNY" in bc.universe_on(con, dt.date(2026, 2, 20), 10, min_days=10)
     kept = bc.universe_on(con, dt.date(2026, 2, 20), 10, min_days=10,
                           min_price=20.0)

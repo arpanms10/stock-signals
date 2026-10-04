@@ -10,6 +10,7 @@ import argparse
 import datetime as dt
 import socket
 
+import instruments as ins
 from data import bhavcopy as bc
 
 
@@ -34,6 +35,19 @@ def main() -> None:
     rows = con.execute("SELECT COUNT(*) FROM market").fetchone()[0]
     print(f"done: +{n:,} rows | {days} days | {syms:,} distinct symbols | "
           f"{rows:,} total rows")
+
+    # New days carry their ISINs; this catches symbols from days ingested
+    # before that, so the equity filter never runs against a partial map.
+    missing = len(bc.unmapped_symbols(con))
+    if missing:
+        print(f"Mapping {missing:,} symbols without an ISIN")
+        left = bc.backfill_isins(con, verbose=False)
+        if left:
+            print(f"  !! {left:,} symbols still unmapped -- they are treated "
+                  f"as non-equity and never ranked")
+    snap = ins.snapshot(con)
+    print(f"instruments: {snap['equities']:,} equities, {snap['funds']:,} "
+          f"excluded (config/etfs.csv), {snap['funds_active']:,} still trading")
 
 
 if __name__ == "__main__":

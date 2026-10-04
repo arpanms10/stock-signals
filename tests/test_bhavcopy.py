@@ -16,6 +16,7 @@ def old_format():
         "TOTTRDQTY": [1e6, 5e5, 100.0, 900.0],
         "TOTTRDVAL": [1.2e9, 1.7e9, 98500.0, 10800.0],
         "OPEN": [1190.0, 3390.0, 985.0, 12.0],
+        "ISIN": ["INE002A01018", "INE467B01029", "INE000X00000", "INE999Z01011"],
     })
 
 
@@ -27,6 +28,7 @@ def udiff_format():
         "ClsPric": [1300.0, 3500.0, 990.0],
         "TtlTradgVol": [2e6, 6e5, 50.0],
         "TtlTrfVal": [2.6e9, 2.1e9, 49500.0],
+        "ISIN": ["INE002A01018", "INE467B01029", "INE000X00000"],
     })
 
 
@@ -44,7 +46,14 @@ def test_both_formats_produce_identical_columns():
     """NSE switched format mid-history; nothing downstream should notice."""
     a = bc._normalise_old(old_format())
     b = bc._normalise_udiff(udiff_format())
-    assert list(a.columns) == list(b.columns) == ["symbol", "close", "volume", "turnover"]
+    assert list(a.columns) == list(b.columns) == ["symbol", "close", "volume", "turnover",
+                                               "isin"]
+
+
+def test_isin_survives_normalisation():
+    """The ISIN is the only thing that tells a stock from an ETF; keep it."""
+    out = bc._normalise_udiff(udiff_format())
+    assert dict(zip(out["symbol"], out["isin"]))["RELIANCE"] == "INE002A01018"
 
 
 # ------------------------------------------------------------------ universe
@@ -65,6 +74,7 @@ def market(tmp_path):
         if i > 80:
             rows.append(("NEWLIST", 30.0, 4e5, 1.2e7))  # lists at day 80
         df = pd.DataFrame(rows, columns=["symbol", "close", "volume", "turnover"])
+        df["isin"] = [f"INE{n:03d}A01001" for n in range(len(df))]
         bc.save_day(con, d, df)
     return con
 
@@ -126,8 +136,15 @@ def test_etfs_are_excluded_from_the_universe(market):
     assert u[0] == "BIG"
 
 
-def test_universe_unfiltered_when_instrument_map_is_empty(market):
-    """No map means no filtering -- degrade to including everything rather
-    than silently returning an empty universe."""
-    assert bc.equity_symbols(market) == set()
-    assert bc.universe_on(market, dt.date(2020, 2, 20), top_n=2, min_days=10)
+def test_universe_refuses_to_run_without_an_instrument_map(tmp_path):
+    """An empty map once meant "skip the filter", and with the map never built
+    LIQUIDCASE reached the backtest's holdings. It must fail closed."""
+    con = bc.connect(tmp_path / "m.db")
+    for i in range(20):
+        d = dt.date(2020, 1, 1) + dt.timedelta(days=i)
+        bc.save_day(con, d, pd.DataFrame(
+            [("BIG", 100.0, 1e6, 1e9)],
+            columns=["symbol", "close", "volume", "turnover"]))
+    assert bc.equity_symbols(con) == set()
+    with pytest.raises(bc.InstrumentMapMissing):
+        bc.universe_on(con, dt.date(2020, 1, 25), top_n=2, min_days=5)

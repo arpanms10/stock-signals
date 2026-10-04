@@ -7,6 +7,11 @@
 # need to live in the repo at all.
 config/holdings.csv
 config/holdings.csv.bak
+# Broker downloads dropped in for import_kite_holdings.py.
+config/*.xlsx
+config/*.xls
+config/holdings*.csv
+!config/holdings.example.csv
 data/holdings.json
 .env
 

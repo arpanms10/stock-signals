@@ -18,6 +18,7 @@ watchlist.py               read/write/validate the watchlist
 portfolio.py               holdings from CSV or Kite snapshot
 fundamentals.py            quality score, incl. the lender rubric
 instruments.py             equity vs fund vs DVR classification
+import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.csv, buckets kept
 set_buckets.py             pre-fill the core/satellite/legacy column
 
 data/sources/prices.py     OHLCV via jugaad-data

@@ -13,6 +13,8 @@ dependencies = [
     # unattended. Pinned to a minor floor because its NSE scraping breaks when
     # NSE changes its site.
     "jugaad-data>=0.35",
+    # Reads the Console .xlsx holdings statement (import_kite_holdings.py).
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]

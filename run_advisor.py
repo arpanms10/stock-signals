@@ -66,6 +66,8 @@ def main() -> None:
 
     # Rank the live universe once; holdings are then looked up in it.
     today = dt.date.fromisoformat(sorted(bc.have_days(mkt))[-1])
+    equities = bc.require_equity_symbols(mkt)
+    excluded |= {h for h in holdings if h in bc.non_equity_symbols(mkt)}
     pool = bc.universe_on(mkt, today, top_n=args.universe_size)
     frames, cuts = {}, dq.report(con, sorted(set(pool) | set(holdings)))
     for s in set(pool) | set(holdings):
@@ -75,7 +77,7 @@ def main() -> None:
     panel = mom.build_panel(frames, cfg)
     ranked = pd.DataFrame()
     if not panel.empty:
-        ranked = mom.rank_on(panel, max(panel["date"]), cfg)
+        ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities)
     rank_of = dict(zip(ranked.get("symbol", []), ranked.get("rank", [])))
     vol_of = dict(zip(ranked.get("symbol", []), ranked.get("vol", [])))
     liq_rank = {s: i + 1 for i, s in enumerate(pool)}

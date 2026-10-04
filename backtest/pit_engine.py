@@ -23,6 +23,7 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
+from data.bhavcopy import EQUITY_ISIN_PREFIX, require_equity_symbols
 from strategy import momentum as mom
 
 TRADING_DAYS_MONTH = 21
@@ -45,22 +46,21 @@ def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
                     min_turnover_cr: float = 0.0) -> list[str]:
     """Most liquid names as of a date, computed only from prior data."""
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
-    cur = con.execute(
-        "SELECT symbol, AVG(turnover) t, COUNT(*) n, AVG(close) p FROM market "
-        "WHERE date <= ? AND date > ? AND turnover > 0 "
-        "GROUP BY symbol HAVING n >= ? AND p >= ? AND t >= ? "
-        "ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, min_days, min_price,
-         min_turnover_cr * 1e7, top_n * 2))
-    syms = [r[0] for r in cur.fetchall()]
     # ETFs pass any liquidity filter and, being low-volatility, dominate a
     # risk-adjusted ranking -- a liquid-fund ETF is effectively cash with an
-    # infinite Sharpe. Exclude anything that is not company equity.
-    from data.bhavcopy import equity_symbols
-    equities = equity_symbols(con)
-    if equities:
-        syms = [s for s in syms if s in equities]
-    return syms[:top_n]
+    # infinite Sharpe. Only ISIN-confirmed company equity is eligible, and an
+    # unbuilt instrument map is an error, not a reason to skip the filter.
+    require_equity_symbols(con)
+    cur = con.execute(
+        "SELECT m.symbol, AVG(m.turnover) t, COUNT(*) n, AVG(m.close) p "
+        "FROM market m JOIN instruments i ON i.symbol = m.symbol "
+        "WHERE m.date <= ? AND m.date > ? AND m.turnover > 0 "
+        "AND i.isin LIKE ? "
+        "GROUP BY m.symbol HAVING n >= ? AND p >= ? AND t >= ? "
+        "ORDER BY t DESC LIMIT ?",
+        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%", min_days,
+         min_price, min_turnover_cr * 1e7, top_n))
+    return [r[0] for r in cur.fetchall()]
 
 
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
@@ -83,6 +83,19 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     mom_matrix = px.shift(sk) / px.shift(lb) - 1
     vol = rets.rolling(vol_w, min_periods=vol_w // 2).std() * np.sqrt(252)
     ram = mom_matrix / vol.replace(0, np.nan)
+    # NSE's Nifty200 Momentum 30 scores on BOTH 6- and 12-month return over
+    # volatility, z-scored across the eligible names and averaged 50/50.
+    # The z-scoring has to happen at rank time, over the candidates only.
+    nse_blend = m.get("score", "ram") == "nse_blend"
+    if nse_blend:
+        ram6 = (px.shift(sk) / px.shift(6 * TRADING_DAYS_MONTH) - 1) / vol.replace(0, np.nan)
+    # selection: overlap holds only names in the top band on BOTH the primary
+    # and the comparison lookback -- the same agreement the live views show.
+    alt_lb = (m.get("compare_lookback_months")
+              if m.get("selection", "primary") == "overlap" else None)
+    if alt_lb:
+        ram_alt = (px.shift(sk) / px.shift(alt_lb * TRADING_DAYS_MONTH) - 1) \
+            / vol.replace(0, np.nan)
     sma200 = px.rolling(200, min_periods=200).mean()
 
     dates = [d for d in px.index if d.date() >= start]
@@ -186,9 +199,20 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 if max_ext and 100 * (px_s / ma - 1) > max_ext:
                     continue
                 cand.append(s)
+            if nse_blend:
+                cand = [s for s in cand if not pd.isna(ram6.loc[ts].get(s, np.nan))]
+            if alt_lb:
+                cand = [s for s in cand if not pd.isna(ram_alt.loc[ts].get(s, np.nan))]
             if not cand:
                 continue
-            ranked = sorted(cand, key=lambda s: -snap[s])
+            if nse_blend:
+                def z(x: pd.Series) -> pd.Series:
+                    sd = x.std()
+                    return (x - x.mean()) / sd if sd else x * 0
+                score = 0.5 * z(snap[cand]) + 0.5 * z(ram6.loc[ts, cand])
+                ranked = sorted(cand, key=lambda s: -score[s])
+            else:
+                ranked = sorted(cand, key=lambda s: -snap[s])
 
             risk_on = True
             if not bench_idx.empty:
@@ -214,13 +238,27 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             else:
                 # Hysteresis: keep a holding until it falls past exit_rank.
                 order = {s: k + 1 for k, s in enumerate(ranked)}
+                if alt_lb:
+                    # A name's standing is its WORSE rank of the two, so it
+                    # enters only when top-band on both and leaves when it
+                    # falls past exit_rank on either.
+                    alt_snap = ram_alt.loc[ts]
+                    order2 = {s: k + 1 for k, s in
+                              enumerate(sorted(cand, key=lambda s: -alt_snap[s]))}
+
+                    def standing(s):
+                        return (max(order.get(s, 10**6), order2.get(s, 10**6)),
+                                order.get(s, 10**6))
+                else:
+                    def standing(s):
+                        return (order.get(s, 10**6), 0)
                 keep = sorted([s for s in shares
-                               if order.get(s, 10**6) <= m.get("exit_rank", n * 2)],
-                              key=lambda s: order[s])
-                for s in ranked:
+                               if standing(s)[0] <= m.get("exit_rank", n * 2)],
+                              key=standing)
+                for s in sorted(ranked, key=standing):
                     if len(keep) >= n:
                         break
-                    if s not in keep and order[s] <= m.get("enter_rank", n):
+                    if s not in keep and standing(s)[0] <= m.get("enter_rank", n):
                         keep.append(s)
                 pending = keep[:n]
 

@@ -87,3 +87,42 @@ def test_rebalance_dates_are_roughly_monthly():
     assert 11 <= len(r) <= 14
     gaps = [(b - a).days for a, b in zip(r, r[1:])]
     assert all(25 <= g <= 40 for g in gaps)
+
+
+def test_trailing_return_ends_today_unlike_12_1():
+    """The display figure includes the latest month; the ranking's does not."""
+    close = pd.Series([100.0] * 231 + [150.0] * 21 + [130.0])  # 253 bars
+    assert mom.trailing_return(close, 12) == pytest.approx(30.0)
+    assert mom.trailing_return(close, 1) == pytest.approx(130 / 150 * 100 - 100)
+    assert mom.momentum_score(close).iloc[-1] == pytest.approx(50.0)
+    assert mom.trailing_return(close.head(100), 12) is None
+
+
+# ------------------------------------------------------- dual lookback
+
+def test_lookbacks_puts_primary_first(cfg):
+    c = mom.with_lookback(cfg, 12)
+    c["momentum_strategy"]["compare_lookback_months"] = 9
+    assert mom.lookbacks(c) == [12, 9]
+    c["momentum_strategy"]["compare_lookback_months"] = None
+    assert mom.lookbacks(c) == [12]
+
+
+def test_with_lookback_does_not_mutate_the_original(cfg):
+    before = cfg["momentum_strategy"]["lookback_months"]
+    assert mom.with_lookback(cfg, 9)["momentum_strategy"]["lookback_months"] == 9
+    assert cfg["momentum_strategy"]["lookback_months"] == before
+
+
+def test_common_top_is_the_overlap_ordered_by_combined_rank():
+    def r(syms):
+        return pd.DataFrame({"symbol": syms, "rank": range(1, len(syms) + 1)})
+    rankings = {12: r(["A", "B", "C", "D", "E"]), 9: r(["C", "A", "X", "B", "Y"])}
+    # Top 3 of each: {A,B,C} and {C,A,X}. B is 4th on 9 months, so out.
+    assert mom.common_top(rankings, 3) == ["A", "C"]
+    assert mom.common_top(rankings, 4) == ["A", "C", "B"]
+
+
+def test_common_top_is_empty_when_a_ranking_is_missing():
+    full = pd.DataFrame({"symbol": ["A"], "rank": [1]})
+    assert mom.common_top({12: full, 9: pd.DataFrame()}, 15) == []
