@@ -18,8 +18,11 @@ watchlist.py               read/write/validate the watchlist
 portfolio.py               holdings from CSV or Kite snapshot
 fundamentals.py            quality score, incl. the lender rubric
 instruments.py             equity vs fund vs DVR classification
-import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.csv, buckets kept
+import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.csv, buckets kept;
+                           --satellite SYMBOL... marks momentum buys
 set_buckets.py             pre-fill the core/satellite/legacy column
+record_momentum.py         monthly momentum picks -> history/momentum_picks.xlsx
+history/                   records kept in git (monthly momentum picks)
 
 data/sources/prices.py     OHLCV via jugaad-data
 data/sources/nse_fundamentals.py   results, shareholding and pledge from XBRL

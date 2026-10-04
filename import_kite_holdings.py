@@ -18,6 +18,7 @@ own something.
 
     PYTHONPATH=. .venv/bin/python import_kite_holdings.py            # newest Kite file in config/
     PYTHONPATH=. .venv/bin/python import_kite_holdings.py path/to/holdings.xlsx
+    PYTHONPATH=. .venv/bin/python import_kite_holdings.py --satellite CPPLUS SANSERA
 """
 from __future__ import annotations
 
@@ -241,6 +242,22 @@ def _source_kind(path: Path) -> str:
     return "ours"
 
 
+def mark_satellite(rows: list[dict], symbols) -> tuple[list[str], list[str]]:
+    """Set bucket=satellite on the named holdings. Returns (marked, missing).
+
+    A new holding otherwise arrives with a blank bucket, and the framework
+    never suggests satellite on its own -- so a momentum buy would be treated
+    as legacy and never rotated, which defeats the reason it was bought.
+    """
+    wanted = {clean_symbol(s) for s in symbols}
+    marked = []
+    for r in rows:
+        if r["symbol"] in wanted:
+            r["bucket"] = "satellite"
+            marked.append(r["symbol"])
+    return sorted(marked), sorted(wanted - set(marked))
+
+
 def _fmt(v) -> str:
     if v is None or v == "":
         return ""
@@ -263,6 +280,9 @@ def main() -> None:
     ap.add_argument("source", nargs="?", type=Path,
                     help="Kite export (.csv or .xlsx); default: newest in config/")
     ap.add_argument("--out", type=Path, default=pf.HOLDINGS_CSV)
+    ap.add_argument("--satellite", nargs="+", metavar="SYMBOL", default=[],
+                    help="mark these holdings as satellite (momentum buys to be "
+                         "rotated on rank); overrides any existing bucket")
     args = ap.parse_args()
 
     src = args.source or find_export()
@@ -281,6 +301,7 @@ def main() -> None:
         for k in KEPT:
             r[k] = old.get(k, "")
     rows.sort(key=lambda r: r["symbol"])
+    marked, missing = mark_satellite(rows, args.satellite)
 
     if out.exists():
         shutil.copy2(out, out.with_name(out.name + ".bak"))
@@ -298,8 +319,17 @@ def main() -> None:
               f"bucket kept for {kept} position(s)")
         if new:
             print(f"  new:     {', '.join(new)}")
+            unmarked = [s for s in new if s not in marked]
+            if unmarked and not args.satellite:
+                print("           a new holding with a blank bucket is NOT "
+                      "satellite -- if these\n           were momentum buys, "
+                      "re-run with --satellite " + " ".join(unmarked))
         if gone:
             print(f"  removed: {', '.join(gone)}")
+    if marked:
+        print(f"  marked satellite: {', '.join(marked)}")
+    if missing:
+        print(f"  !! not in this Kite file, so not marked: {', '.join(missing)}")
     if skipped:
         print(f"  skipped {len(skipped)} non-equity holding(s) -- not in holdings.csv:")
         for sym, why in skipped:

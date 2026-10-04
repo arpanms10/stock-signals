@@ -92,6 +92,11 @@ def main() -> int:
             advisor += ["--total-capital", str(args.portfolio)]
         if not step("Portfolio advisor", advisor, log, timeout=1800):
             failures.append("advisor")
+        # Once per month: the first run of a month records its picks, later
+        # runs that month leave them alone (record_momentum.py).
+        if not step("Record momentum picks", ["record_momentum.py"], log,
+                    timeout=1800):
+            failures.append("momentum record")
 
     STATE.write_text(f"{dt.datetime.now().isoformat(timespec='seconds')}\n"
                      f"{'FAILED: ' + ', '.join(failures) if failures else 'ok'}\n")
