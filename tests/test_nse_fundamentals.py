@@ -86,3 +86,67 @@ def test_results_parser_takes_first_context_per_tag():
     out = nf._parse_xbrl_numbers(xml, nf.RESULT_TAGS)
     assert out["revenue"] == pytest.approx(153910600000.0)
     assert out["pbt"] == pytest.approx(15440800000.0)
+
+
+# ------------------------------------------------- integrated filing (2025+)
+
+OLD_ROWS = [  # corporates-financial-results: stops at the Dec 2024 quarter
+    {"toDate": "31-Dec-2024", "fromDate": "01-Oct-2024",
+     "consolidated": "Consolidated", "xbrl": "old-dec24-c"},
+    {"toDate": "31-Dec-2024", "fromDate": "01-Oct-2024",
+     "consolidated": "Non-Consolidated", "xbrl": "old-dec24-s"},
+    {"toDate": "31-Mar-2025", "fromDate": "01-Jan-2025",
+     "consolidated": "Consolidated", "xbrl": "old-mar25-c"},
+]
+INTEGRATED = {"data": [  # integrated-filing-results, shape as NSE returns it
+    {"qe_Date": "30-JUN-2026", "consolidated": "Consolidated",
+     "broadcast_Date": "24-Jul-2026 17:40:11", "revised_Date": None,
+     "xbrl": "int-jun26-c"},
+    {"qe_Date": "30-JUN-2026", "consolidated": "Standalone",
+     "broadcast_Date": "24-Jul-2026 17:40:11", "revised_Date": None,
+     "xbrl": "int-jun26-s"},
+    {"qe_Date": "31-MAR-2025", "consolidated": "Consolidated",
+     "broadcast_Date": "28-May-2025 09:31:37", "revised_Date": None,
+     "xbrl": "int-mar25-c"},
+    {"qe_Date": "31-MAR-2025", "consolidated": "Consolidated",
+     "broadcast_Date": "28-May-2025 09:31:37", "revised_Date": "02-Jun-2025 10:00:00",
+     "xbrl": "int-mar25-c-revised"},
+], "totalCount": 4}
+
+
+def patch_endpoints(monkeypatch, old=OLD_ROWS, new=INTEGRATED, fail=()):
+    class R:
+        def __init__(self, j): self._j = j
+        def json(self): return self._j
+    def get(url, **k):
+        if url in fail:
+            raise RuntimeError("NSE down")
+        return R(new if url == nf.INTEGRATED_URL else old)
+    monkeypatch.setattr(nf.nse, "get", get)
+
+
+def test_result_filings_reach_past_the_old_endpoint(monkeypatch):
+    """The old endpoint stops at Dec 2024; reading it alone scored every
+    company on results two years stale."""
+    patch_endpoints(monkeypatch)
+    rows = nf.result_filings("X")
+    assert rows[0]["toDate"] == "30-Jun-2026"
+    assert [r["toDate"] for r in rows] == sorted(
+        [r["toDate"] for r in rows], key=lambda d: -nf._date_key(d))
+    assert {r["consolidated"] for r in rows if r["toDate"] == "30-Jun-2026"} == \
+        {"Consolidated", "Non-Consolidated"}        # "Standalone" normalised
+
+
+def test_integrated_wins_overlap_and_latest_revision_wins(monkeypatch):
+    patch_endpoints(monkeypatch)
+    mar = [r for r in nf.result_filings("X")
+           if r["toDate"] == "31-Mar-2025" and r["consolidated"] == "Consolidated"]
+    assert [r["xbrl"] for r in mar] == ["int-mar25-c-revised"]
+
+
+def test_one_endpoint_down_is_a_gap_not_nothing(monkeypatch):
+    patch_endpoints(monkeypatch, fail=(nf.INTEGRATED_URL,))
+    assert nf.result_filings("X")[0]["toDate"] == "31-Mar-2025"
+    patch_endpoints(monkeypatch, fail=(nf.INTEGRATED_URL, nf.RESULTS_URL))
+    with pytest.raises(RuntimeError):
+        nf.result_filings("X")

@@ -24,6 +24,12 @@ import xml.etree.ElementTree as ET
 from . import nse_client as nse
 
 RESULTS_URL = "https://www.nseindia.com/api/corporates-financial-results"
+# Since the quarter ended March 2025, SEBI's "Integrated Filing" carries the
+# quarterly results, and NSE publishes them on a separate endpoint. The old one
+# simply stops at the December 2024 quarter -- no error, just no new rows -- so
+# reading it alone scored every company on results nearly two years old.
+INTEGRATED_URL = "https://www.nseindia.com/api/integrated-filing-results"
+INTEGRATED_TYPE = "Integrated Filing- Financials"
 SHP_URL = "https://www.nseindia.com/api/corporate-share-holdings-master"
 
 CRORE = 1e7
@@ -63,10 +69,76 @@ def _parse_xbrl_numbers(xml_text: str, wanted: dict[str, str]) -> dict:
     return out
 
 
+def _normalise_integrated(rec: dict) -> dict | None:
+    """An integrated-filing record in the old endpoint's shape."""
+    end = rec.get("qe_Date")
+    if not end or not rec.get("xbrl"):
+        return None
+    try:
+        end = dt.datetime.strptime(end.strip(), "%d-%b-%Y").strftime("%d-%b-%Y")
+    except ValueError:
+        return None
+    cons = str(rec.get("consolidated", "")).strip().lower()
+    return {
+        "toDate": end, "fromDate": None, "xbrl": rec["xbrl"],
+        "consolidated": "Consolidated" if cons.startswith("consolidated")
+        else "Non-Consolidated",
+        # A revision replaces the original filing for the same quarter.
+        "_stamp": _date_key((rec.get("revised_Date") or rec.get("broadcast_Date")
+                             or "")[:11]),
+        "_source": "integrated",
+    }
+
+
+def result_filings(symbol: str) -> list[dict]:
+    """Quarterly result filings from both NSE endpoints, newest first.
+
+    One row per (quarter, consolidated/standalone), in the old endpoint's
+    shape (toDate, fromDate, consolidated, xbrl). Where both endpoints cover a
+    quarter the integrated filing wins, and among integrated filings the latest
+    revision wins. Raises only when BOTH endpoints fail: one source down is a
+    gap, not a reason to report nothing.
+    """
+    errors: list[Exception] = []
+    try:
+        old = nse.get(RESULTS_URL, params={"index": "equities", "symbol": symbol,
+                                           "period": "Quarterly"}).json() or []
+    except Exception as exc:
+        old, errors = [], errors + [exc]
+    try:
+        payload = nse.get(INTEGRATED_URL, params={
+            "index": "equities", "symbol": symbol, "type": INTEGRATED_TYPE,
+            # Default page is 20 rows -- two per quarter, so ten quarters.
+            "size": 200, "page": 1}).json() or {}
+        new = payload.get("data", []) if isinstance(payload, dict) else payload
+    except Exception as exc:
+        new, errors = [], errors + [exc]
+    if len(errors) == 2:
+        raise errors[-1]
+
+    def key(r: dict) -> tuple[float, bool]:
+        return (_date_key(r.get("toDate", "")),
+                str(r.get("consolidated", "")).lower().startswith("consolidated"))
+
+    merged: dict[tuple[float, bool], dict] = {}
+    for r in old:
+        if r.get("toDate"):
+            merged[key(r)] = r
+    for raw in new:
+        r = _normalise_integrated(raw)
+        if r is None:
+            continue
+        k = key(r)
+        prev = merged.get(k)
+        if prev is None or prev.get("_source") != "integrated" \
+                or r["_stamp"] >= prev["_stamp"]:
+            merged[k] = r
+    return sorted(merged.values(), key=lambda r: -_date_key(r.get("toDate", "")))
+
+
 def latest_results(symbol: str, consolidated_first: bool = True) -> dict:
     """Most recent quarterly results for one symbol, in crores."""
-    rows = nse.get(RESULTS_URL, params={"index": "equities", "symbol": symbol,
-                                        "period": "Quarterly"}).json()
+    rows = result_filings(symbol)
     if not rows:
         return {}
     # Prefer consolidated: it includes subsidiaries, which is what the business
@@ -133,8 +205,7 @@ def lender_metrics(symbol: str) -> dict:
     a value of 0.00. Reading the consolidated one gives a bank with apparently
     zero bad loans, which is the most flattering possible error.
     """
-    rows = nse.get(RESULTS_URL, params={"index": "equities", "symbol": symbol,
-                                        "period": "Quarterly"}).json()
+    rows = result_filings(symbol)
     if not rows:
         return {}
     standalone = [r for r in rows
@@ -210,8 +281,7 @@ def results_history(symbol: str, quarters: int = 6,
     entirely -- so a company earning well on shrinking revenue scores the same
     as one earning well on rising revenue.
     """
-    rows = nse.get(RESULTS_URL, params={"index": "equities", "symbol": symbol,
-                                        "period": "Quarterly"}).json()
+    rows = result_filings(symbol)
     if not rows:
         return []
     want_consolidated = consolidated_first

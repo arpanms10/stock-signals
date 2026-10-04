@@ -1,12 +1,12 @@
 # Data
 
-Sources, the five NSE traps that fail silently, and staleness detection.
+Sources, the NSE traps that fail silently, and staleness detection.
 
 [← back to the README](../README.md)
 
 ---
 
-Four NSE traps handled here, all of which fail silently rather than raising:
+Five NSE traps handled here, all of which fail silently rather than raising:
 
 1. **Multiple series per symbol.** NSE returns bonds and other series alongside
    the equity under one symbol — NTPC comes back at ~1360 on 100 shares of
@@ -21,6 +21,15 @@ Four NSE traps handled here, all of which fail silently rather than raising:
    absent; demergers cannot be adjusted without the ratio. Factors are never
    inferred from gap size — an unadjusted split and a real crash look identical —
    so affected history is quarantined and reported instead.
+5. **Quarterly results moved endpoints.** From the quarter ended March 2025,
+   results are filed as SEBI's "Integrated Filing" and NSE publishes them on
+   `/api/integrated-filing-results`. The old `/api/corporates-financial-results`
+   still answers, but stops at the December 2024 quarter -- no error, no new
+   rows. Found 2026-10-04, when every quality score turned out to rest on
+   results nearly two years old. `result_filings()` in
+   `data/sources/nse_fundamentals.py` reads both and merges them: integrated
+   filings win where both cover a quarter, and a revised filing replaces its
+   original.
 
 Ingestion flags any unexplained move above 35% as a suspect bar.
 
