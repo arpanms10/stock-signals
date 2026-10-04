@@ -406,7 +406,11 @@ def advise_book(inputs: dict[str, dict], values: dict[str, float],
 
 
 def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
-                          quality: dict, cash_available: float = 0.0) -> dict:
+                          quality: dict, cash_available: float = 0.0,
+                          sectors: dict[str, str] | None = None,
+                          values: dict[str, float] | None = None,
+                          book: float = 0.0,
+                          max_sector_pct: float | None = None) -> dict:
     """Fund the adds from the sells, best first, and stop when money runs out.
 
     Without this the advisor emits every under-weight position as an ADD and
@@ -427,16 +431,50 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
         # holding at 0.5% of the book is a bigger miss than one at 4%.
         return (-score, a.current_pct)
 
+    # Sector room left AFTER this plan's sells. Without it the plan trimmed
+    # financials for concentration and then bought three more financials,
+    # ending at 32% against a 25% cap.
+    room: dict[str, float] | None = None
+    if sectors and values and book and max_sector_pct:
+        held: dict[str, float] = {}
+        for sym, v in values.items():
+            sec = sectors.get(sym, "Unknown")
+            held[sec] = held.get(sec, 0.0) + v
+        for a in advices:
+            if a.is_sell and a.qty:
+                sec = sectors.get(a.symbol, "Unknown")
+                held[sec] -= min(a.qty * prices.get(a.symbol, 0.0),
+                                 values.get(a.symbol, 0.0))
+        cap_value = book * max_sector_pct / 100
+        room = {sec: cap_value - v for sec, v in held.items()}
+
     remaining, funded, deferred = budget, [], []
     for a in sorted(adds, key=conviction):
-        cost = a.qty * prices.get(a.symbol, 0.0)
+        px = prices.get(a.symbol, 0.0)
+        if room is not None and px:
+            sec = sectors.get(a.symbol, "Unknown")
+            left = room.get(sec, book * max_sector_pct / 100)
+            if left < px:
+                a.action, a.qty = "WATCH", 0
+                a.reasons.append(f"its sector would be over the "
+                                 f"{max_sector_pct:.0f}% cap after this plan -- "
+                                 f"no room to add")
+                deferred.append(a)
+                continue
+            if a.qty * px > left:
+                a.qty = int(left / px)
+                a.reasons.append(f"cut to fit the {max_sector_pct:.0f}% sector "
+                                 f"cap: {left:,.0f} of room left after this plan")
+        cost = a.qty * px
         if cost <= remaining:
             remaining -= cost
             funded.append(a)
+            if room is not None:
+                sec = sectors.get(a.symbol, "Unknown")
+                room[sec] = room.get(sec, book * max_sector_pct / 100) - cost
             continue
         # Part-fund rather than skip: half a position in the best business you
         # own beats a full position in the fourth best.
-        px = prices.get(a.symbol, 0.0)
         affordable = int(remaining / px) if px else 0
         if affordable >= 1:
             a.qty = affordable
@@ -444,6 +482,10 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
                              f"{cost:,.0f} needed is available")
             remaining -= affordable * px
             funded.append(a)
+            if room is not None:
+                sec = sectors.get(a.symbol, "Unknown")
+                room[sec] = room.get(sec, book * max_sector_pct / 100) \
+                    - affordable * px
         else:
             a.action = "WATCH"
             a.qty = 0

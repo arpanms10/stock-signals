@@ -500,3 +500,25 @@ def test_oversized_stock_also_carries_its_sector_trim(cfg):
     assert any("sector is also over" in r for r in advice["BIG"].reasons)
     left = sum(values.values()) - sum(sold.values())
     assert 100 * left / 100000.0 <= cfg["risk"]["max_sector_pct"] + 1e-6
+
+
+def test_adds_do_not_refill_a_sector_past_its_cap():
+    """The plan trimmed financials for concentration, then funded three
+    financial adds, ending at 32% against a 25% cap."""
+    prices = dict.fromkeys(["BIG", "F1", "F2", "IT1", "OTHER"], 100.0)
+    values = {"BIG": 30000.0, "F1": 1000.0, "F2": 1000.0, "IT1": 1000.0,
+              "OTHER": 67000.0}                       # book 100,000
+    sectors = {"BIG": "Fin", "F1": "Fin", "F2": "Fin", "IT1": "IT",
+               "OTHER": "Misc"}
+    advices = [make_sell("BIG", 100, 30000.0),         # Fin 32% -> 22%
+               make_add("F1", 40), make_add("F2", 40), make_add("IT1", 40)]
+    quality = {"F1": q(95.0), "F2": q(90.0), "IT1": q(80.0)}
+    adv.apply_cash_constraint(advices, prices, quality, sectors=sectors,
+                              values=values, book=100000.0, max_sector_pct=25.0)
+    a = {x.symbol: x for x in advices}
+    fin_after = 22000.0 + sum(a[s].qty * 100 for s in ("F1", "F2")
+                              if a[s].action == "ADD")
+    assert fin_after <= 25000.0 + 1e-6
+    assert a["F1"].action == "ADD" and a["F1"].qty == 30   # cut to the room
+    assert a["F2"].action == "WATCH"                       # no room left
+    assert a["IT1"].action == "ADD" and a["IT1"].qty == 40 # other sectors fine

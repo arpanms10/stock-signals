@@ -167,7 +167,9 @@ def main() -> None:
     advices = list(adv.advise_book(inputs, values, sectors, qual, book,
                                    cfg).values())
 
-    cash = adv.apply_cash_constraint(advices, prices, qual, args.cash)
+    cash = adv.apply_cash_constraint(
+        advices, prices, qual, args.cash, sectors=sectors, values=values,
+        book=book, max_sector_pct=cfg["risk"]["max_sector_pct"])
 
     summary = adv.summarise(advices)
     warnings = adv.sanity_warnings(advices, len(ranked), args.universe_size)
@@ -185,8 +187,8 @@ def main() -> None:
           + (f" plus {cash['cash_available']:,.0f} cash on hand" if cash['cash_available'] else "")
           + f"; adds are funded from that, best first.")
     if cash["deferred"]:
-        print(f"  {len(cash['deferred'])} add(s) could not be funded and are "
-              f"listed as WATCH.")
+        print(f"  {len(cash['deferred'])} add(s) held back -- no cash left, or "
+              f"their sector would go over its cap -- and listed as WATCH.")
     print()
 
     for action in ("EXIT", "TRIM", "ADD", "WATCH", "HOLD"):
