@@ -196,6 +196,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "avg_price": float(h.get("average_price") or 0),
             "lt_qty": h.get("lt_quantity"), "st_qty": h.get("st_quantity"),
             "pnl_pct": a.pnl_pct, "quality": q.score if q else None,
+            "quality_note": fu.quality_note(q),
             "flags": q.flags if q else [], "rank": rank_of.get(sym),
             "momentum": mom_of.get(sym), "sector": sectors.get(sym, "Unknown"),
             "stop": risk.get("stop"), "stop_breached": risk.get("stop_breached"),
@@ -235,6 +236,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "timing_score": None if pd.isna(last.get("timing_score"))
             else float(last["timing_score"]),
             "quality": q.score if q else None,
+            "quality_note": fu.quality_note(q),
             "flags": q.flags if q else [],
             "sector": sectors.get(sym, "Unknown"),
             "held": sym in tradeable,
@@ -282,6 +284,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "ret_main": ret(lbs[0]), "ret_cmp": ret(lbs[-1]), "ret_1m": ret(1),
             "vol": 100 * float(vol_of[sym]) if sym in vol_of else None,
             "quality": q.score if q else None,
+            "quality_note": fu.quality_note(q),
             "sector": sectors.get(sym, "Unknown"),
             "held": sym in holdings,
         })

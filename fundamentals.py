@@ -387,6 +387,20 @@ def score_nbfc(symbol: str, rows: pd.DataFrame, flags: list[str]) -> Quality:
     return Quality(symbol, score, components, flags, str(cur.get("quarter", "")))
 
 
+def quality_note(q: "Quality | None") -> str | None:
+    """Why a stock has no quality score, for display; None when it has one.
+
+    A blank cell read as "scored badly" or "broken". The two real causes need
+    different fixes: nothing fetched yet (Refresh fundamentals), or fetched
+    but too few fields to score.
+    """
+    if q is not None and q.score is not None:
+        return None
+    if q is None or "no fundamentals on file" in q.flags:
+        return "Not fetched"
+    return "Too little data"
+
+
 def score_all(symbols: list[str], sectors: dict[str, str] | None = None,
               path: Path | str = FUNDAMENTALS_PATH) -> dict[str, Quality]:
     df = load(path)

@@ -210,3 +210,12 @@ def test_score_reads_the_newest_row_not_the_last_by_text():
             df[c] = float("nan")
     q = fu.score_symbol(df, "X")
     assert q.components["balance sheet"] is not None   # read the 2026Q4 row
+
+
+def test_quality_note_explains_a_missing_score():
+    """A blank Quality cell read as "scored badly"; say why it is blank."""
+    assert fu.quality_note(fu.Quality("X", 72.0, {}, [])) is None
+    assert fu.quality_note(None) == "Not fetched"
+    assert fu.quality_note(
+        fu.Quality("X", None, {}, ["no fundamentals on file"])) == "Not fetched"
+    assert fu.quality_note(fu.Quality("X", None, {}, [])) == "Too little data"

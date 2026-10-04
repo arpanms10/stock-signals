@@ -28,6 +28,30 @@ def load(universe_size: int):
     return service.build(universe_size=universe_size)
 
 
+# Shown next to the Quality bar, filled only when there is no score -- a blank
+# bar on its own reads as "scored badly" or "broken".
+QUALITY_NOTE = st.column_config.TextColumn(
+    "Quality note",
+    help="Why there is no quality score. Not fetched: no fundamentals on file "
+         "yet -- use 'Refresh fundamentals'. Too little data: fetched, but too "
+         "few figures came back to score.")
+
+
+def with_quality_note(df: pd.DataFrame) -> pd.DataFrame:
+    """The note column, empty where there is a score.
+
+    Empty rather than None, which Streamlit renders as a grey "None" on every
+    scored row. Snapshots cached by an older version lack the column."""
+    if df.empty:
+        return df
+    df = df.copy()
+    if "quality_note" not in df:
+        df["quality_note"] = [None if q == q and q is not None else "Not fetched"
+                              for q in df["quality"]]
+    df["quality_note"] = df["quality_note"].fillna("")
+    return df
+
+
 # ------------------------------------------------------------------ sidebar
 st.sidebar.title("Stock Signals")
 size = st.sidebar.slider("Universe size (by liquidity)", 50, 500, 500, 50,
@@ -109,8 +133,9 @@ with tab_hold:
                             f"{c.money(val)} "
                             f"({100 * val / snap.book_value:.0f}% of book)")
                 st.dataframe(
-                    grp[["symbol", "value", "pct_of_book", "pnl_pct",
-                         "quality", "rank"]]
+                    with_quality_note(grp)[["symbol", "value", "pct_of_book",
+                                            "pnl_pct", "quality", "quality_note",
+                                            "rank"]]
                     .rename(columns={"pct_of_book": "% book", "pnl_pct": "P&L %",
                                      "quality": "Quality", "rank": "Rank"})
                     .sort_values("value", ascending=False),
@@ -121,6 +146,7 @@ with tab_hold:
                         "P&L %": st.column_config.NumberColumn(format="%+.1f%%"),
                         "Quality": st.column_config.ProgressColumn(
                             min_value=0, max_value=100, format="%d"),
+                        "quality_note": QUALITY_NOTE,
                     })
         with right:
             st.subheader("Sector exposure")
@@ -193,8 +219,10 @@ with tab_hold:
                 unsafe_allow_html=True)
             head[3].markdown(
                 f"P&L {c.pct(r['pnl_pct'], signed=True)}", unsafe_allow_html=True)
-            qt = "" if r["quality"] is None else \
-                c.pill(f"quality {r['quality']:.0f}", c.quality_tone(r["quality"]))
+            qt = c.pill(f"quality {r['quality']:.0f}", c.quality_tone(r["quality"])) \
+                if r["quality"] is not None else \
+                c.pill(f"quality: {(r.get('quality_note') or 'not fetched').lower()}",
+                       "warn")
             head[4].markdown(qt, unsafe_allow_html=True)
 
             with st.expander(
@@ -260,7 +288,7 @@ with tab_hold:
 
 # ===================================================================== MARKET
 with tab_market:
-    m = pd.DataFrame(snap.market)
+    m = with_quality_note(pd.DataFrame(snap.market))
     # A snapshot cached by an older version lacks newer columns; show them
     # blank until the next Recompute rather than failing the whole tab.
     for col in ("ret_12m", "ret_1m", "rank_alt"):
@@ -311,8 +339,8 @@ with tab_market:
 
         st.dataframe(
             view[["rank", "rank_alt", "in_both", "symbol", "price", "ret_12m",
-                  "ret_1m", "vol", "ram", "timing_score", "quality", "sector",
-                  "held"]]
+                  "ret_1m", "vol", "ram", "timing_score", "quality",
+                  "quality_note", "sector", "held"]]
             .rename(columns={"rank": "#", "rank_alt": alt_label,
                              "in_both": "Both", "symbol": "Stock",
                              "price": "Price",
@@ -342,6 +370,7 @@ with tab_market:
                     min_value=0, max_value=100, format="%d"),
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
+                "quality_note": QUALITY_NOTE,
                 "Held": st.column_config.CheckboxColumn(),
                 alt_label: st.column_config.NumberColumn(
                     format="%d",
@@ -406,7 +435,7 @@ with tab_market:
 # ================================================================= MOMENTUM
 with tab_mom:
     lbs = getattr(snap, "lookbacks", None) or []
-    t = pd.DataFrame(getattr(snap, "momentum_table", None) or [])
+    t = with_quality_note(pd.DataFrame(getattr(snap, "momentum_table", None) or []))
     if len(lbs) < 2 or t.empty:
         st.info("Needs a ranked universe and `compare_lookback_months` in "
                 "config/scoring.yaml. Press Recompute after a data refresh.")
@@ -443,7 +472,7 @@ with tab_mom:
         st.dataframe(
             view[["symbol", "status", "rank_main", "score_main", "rank_cmp",
                   "score_cmp", "price", "ret_main", "ret_cmp", "ret_1m", "vol",
-                  "quality", "sector", "held"]]
+                  "quality", "quality_note", "sector", "held"]]
             .rename(columns={
                 "symbol": "Stock", "status": "On list",
                 "rank_main": f"{a}M rank", "score_main": f"{a}M score",
@@ -477,6 +506,7 @@ with tab_mom:
                     format="%.0f%%", help="Annualised volatility, last year"),
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
+                "quality_note": QUALITY_NOTE,
                 "Held": st.column_config.CheckboxColumn(),
             })
         st.caption("Scores are only comparable within one column: a 9M and a "
