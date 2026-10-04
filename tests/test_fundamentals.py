@@ -1,4 +1,6 @@
 """Quality score correctness."""
+import datetime as dt
+
 import pandas as pd
 import pytest
 
@@ -185,3 +187,26 @@ def test_quarterly_row_without_annual_pat_still_refuses():
     q = fu.score_symbol(d, "X")
     assert q.components["cash quality"] is None
     assert any("4x" in f for f in q.flags)
+
+
+def test_quarter_key_orders_mixed_labels_chronologically():
+    labels = ["2026Q4", "FY25Q2", "2026-06-30", "FY27Q2", "FY24Q4"]
+    ordered = sorted(labels, key=fu.quarter_key)
+    # 2026Q4 is calendar Oct-Dec 2026 = FY27Q3; 2026-06-30 = FY27Q1.
+    assert ordered == ["FY24Q4", "FY25Q2", "2026-06-30", "FY27Q2", "2026Q4"]
+    assert fu.fiscal_quarter(dt.date(2026, 10, 4)) == "FY27Q3"
+    assert fu.fiscal_quarter(dt.date(2027, 2, 1)) == "FY27Q4"
+
+
+def test_score_reads_the_newest_row_not_the_last_by_text():
+    df = pd.DataFrame([
+        {"symbol": "X", "quarter": "FY25Q2", "revenue": 100.0, "pat": 10.0},
+        {"symbol": "X", "quarter": "2026Q4", "revenue": 120.0, "pat": 12.0,
+         "roce": 30.0, "debt_equity": 0.1, "interest_cover": 12.0,
+         "promoter_pct": 60.0, "pledge_pct": 0.0},
+    ])
+    for c in fu.COLUMNS:
+        if c not in df:
+            df[c] = float("nan")
+    q = fu.score_symbol(df, "X")
+    assert q.components["balance sheet"] is not None   # read the 2026Q4 row

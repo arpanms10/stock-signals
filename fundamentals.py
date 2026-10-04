@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -148,10 +149,44 @@ def _mean(values: list[float | None]) -> float | None:
     return float(np.mean(vals)) if vals else None
 
 
+def fiscal_quarter(d: dt.date) -> str:
+    """FY27Q3 style: Indian fiscal year April-March, Apr-Jun = Q1."""
+    fy = d.year + 1 if d.month > 3 else d.year
+    return f"FY{str(fy)[-2:]}Q{(d.month - 4) % 12 // 3 + 1}"
+
+
+def quarter_key(label) -> tuple[int, int]:
+    """(fiscal year, quarter) for any label the sheet allows, for sorting.
+
+    The sheet mixes FY25Q2 (NSE history), 2026-06-30 (hand-entered) and, from
+    older fetches, 2026Q4 (a CALENDAR quarter). Sorted as text, "2026Q4" and
+    "2026-..." come before every "FY..." label, so the newest row was read as
+    the oldest and quality was scored on two-year-old history.
+    Unparseable labels sort first.
+    """
+    s = str(label).strip().upper()
+    m = re.fullmatch(r"FY(\d{2}|\d{4})Q([1-4])", s)
+    if m:
+        fy = int(m.group(1))
+        return (fy + 2000 if fy < 100 else fy, int(m.group(2)))
+    m = re.fullmatch(r"(\d{4})Q([1-4])", s)
+    if m:
+        y, n = int(m.group(1)), int(m.group(2))
+        return (y + 1 if n >= 2 else y, (n - 2) % 4 + 1)
+    try:
+        d = dt.date.fromisoformat(s[:10])
+    except ValueError:
+        return (0, 0)
+    fq = fiscal_quarter(d)
+    return (int("20" + fq[2:4]), int(fq[-1]))
+
+
 def score_symbol(df: pd.DataFrame, symbol: str, sector: str = "") -> Quality:
     """Quality Score from whatever is on file. Missing inputs are dropped,
     not treated as zero -- absent data must not read as bad data."""
-    rows = df[df["symbol"] == symbol.upper()].sort_values("quarter")
+    rows = df[df["symbol"] == symbol.upper()]
+    rows = rows.iloc[sorted(range(len(rows)),
+                            key=lambda i: quarter_key(rows["quarter"].iloc[i]))]
     if rows.empty:
         return Quality(symbol, None, {}, ["no fundamentals on file"])
     cur = rows.iloc[-1]

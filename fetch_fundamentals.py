@@ -183,10 +183,21 @@ def main() -> None:
                     help="skip NSE (much faster; loses pledge and promoter data)")
     args = ap.parse_args()
 
+    try:
+        import yfinance  # noqa: F401
+    except ImportError:
+        # merge() swallows per-symbol Yahoo errors, so without this check a
+        # missing package silently drops ROE, ROCE, debt/equity, P/E and cash
+        # flow for every stock.
+        raise SystemExit("yfinance is not installed, so Yahoo ratios would be "
+                         "skipped for every stock. Run: uv pip install -r "
+                         "requirements.txt")
+
     path = Path(args.path)
     existing = fu.load(path)
     symbols = args.symbols or sorted(existing["symbol"].unique())
-    quarter = f"{dt.date.today().year}Q{(dt.date.today().month - 1) // 3 + 1}"
+    # Fiscal, like NSE's history rows, so the snapshot sorts as the newest.
+    quarter = fu.fiscal_quarter(dt.date.today())
 
     print(f"Fetching fundamentals for {len(symbols)} symbols "
           f"({'Yahoo only' if args.yahoo_only else 'NSE primary, Yahoo fallback'})")
