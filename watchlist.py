@@ -1,7 +1,7 @@
 """Watchlist: the one file you maintain. Plain CSV so it opens in Excel.
 
 Source of truth is config/watchlist.csv. Every interface (Excel, the Streamlit
-grid, Telegram commands) reads and writes through this module so validation and
+grid, the command line) reads and writes through this module so validation and
 formatting stay identical whichever way a stock gets added.
 """
 from __future__ import annotations

@@ -159,47 +159,6 @@ def record_isins(con, pairs) -> int:
     return len(rows)
 
 
-def build_instrument_map(con, dates: list[dt.date], verbose: bool = True) -> int:
-    """Symbol -> ISIN, sampled across history.
-
-    Sampled rather than collected during ingestion because the mapping is
-    stable, so a few dozen days spread over the period cover essentially every
-    symbol that ever traded -- far cheaper than re-downloading everything.
-    """
-    from jugaad_data.nse import bhavcopy_raw, bhavcopy_udiff_raw
-    import io as _io
-
-    seen: dict[str, str] = {}
-    for d in dates:
-        fn = bhavcopy_udiff_raw if d >= UDIFF_SWITCH else bhavcopy_raw
-        try:
-            raw = fn(d)
-            text = raw.decode(errors="ignore") if isinstance(raw, bytes) else raw
-            df = pd.read_csv(_io.StringIO(text))
-        except Exception:
-            continue
-        df.columns = [c.strip() for c in df.columns]
-        sym_col = "TckrSymb" if "TckrSymb" in df.columns else "SYMBOL"
-        ser_col = "SctySrs" if "SctySrs" in df.columns else "SERIES"
-        if "ISIN" not in df.columns or sym_col not in df.columns:
-            continue
-        df = df[df[ser_col].astype(str).str.strip() == "EQ"]
-        for sym, isin in zip(df[sym_col].astype(str).str.strip().str.upper(),
-                             df["ISIN"].astype(str).str.strip()):
-            if sym and isin and isin.lower() != "nan":
-                seen.setdefault(sym, isin)
-        time.sleep(0.3)
-    if seen:
-        con.executemany("INSERT OR REPLACE INTO instruments (symbol, isin) VALUES (?,?)",
-                        list(seen.items()))
-        con.commit()
-    if verbose:
-        eq = sum(1 for v in seen.values() if v.startswith(EQUITY_ISIN_PREFIX))
-        print(f"  instrument map: {len(seen)} symbols, {eq} equities, "
-              f"{len(seen) - eq} funds/ETFs")
-    return len(seen)
-
-
 def equity_symbols(con) -> set[str]:
     """Symbols known to be company equity. Empty set means the map is unbuilt."""
     return {r[0] for r in con.execute(

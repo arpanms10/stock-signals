@@ -19,18 +19,5 @@ OUTPUT=$(PYTHONPATH="$PROJECT" "$PROJECT/.venv/bin/python" run_daily.py \
            --portfolio "${PORTFOLIO_VALUE:-1000000}" 2>&1)
 STATUS=$?
 echo "$OUTPUT"
-
-if [ $STATUS -ne 0 ]; then
-  MSG="Stock signals FAILED at $(date '+%F %T'):
-$(echo "$OUTPUT" | tail -20)"
-else
-  MSG="$OUTPUT"
-fi
-
-if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
-  PYTHONPATH="$PROJECT" "$PROJECT/.venv/bin/python" - <<PY
-from delivery.telegram_bot import send
-send("""$MSG""")
-PY
-fi
+[ $STATUS -ne 0 ] && echo "Stock signals FAILED at $(date '+%F %T')"
 exit $STATUS

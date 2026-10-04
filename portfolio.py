@@ -138,20 +138,6 @@ def read_csv_holdings(path: Path | str = HOLDINGS_CSV) -> list[dict]:
     return out
 
 
-def write_csv_template(symbols: list[str], path: Path | str = HOLDINGS_CSV) -> Path:
-    import csv
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        fh.write(HOLDINGS_HELP)
-        w = csv.DictWriter(fh, fieldnames=HOLDINGS_COLUMNS)
-        w.writeheader()
-        for s in symbols:
-            w.writerow({"symbol": s})
-    return path
-
-
 def load_holdings() -> list[dict]:
     """CSV first, then the Kite JSON snapshot.
 

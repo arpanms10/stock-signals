@@ -127,10 +127,6 @@ def trend_note(row) -> str:
     return " · ".join(parts)
 
 
-def header_metric(label: str, value: str, help_text: str = "") -> None:
-    st.metric(label, value, help=help_text or None)
-
-
 def legend() -> None:
     """Every badge variant shown explicitly.
 

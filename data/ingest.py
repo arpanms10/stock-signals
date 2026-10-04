@@ -109,31 +109,6 @@ def backfill_index(con, index: str = BENCHMARK, years: int = 10,
     return rows
 
 
-def sanity_check(con, symbol: str) -> list[str]:
-    """Flag day-over-day moves too large to be real and not explained by a
-    corporate action.
-
-    This exists because a data bug is invisible downstream: bad bars do not
-    raise, they just quietly produce confident, wrong indicators. A NIFTY 50
-    stock does not move 35% in a session without a split, a bonus, or a broken
-    feed -- and the first two we already know about.
-    """
-    df = store.load_prices(con, symbol, adjusted=True)
-    if len(df) < 2:
-        return []
-    ex_dates = {a.ex_date for a in store.load_actions(con, symbol)}
-    move = df["close"].pct_change().abs() * 100
-    flags = []
-    for i in move[move > MAX_UNEXPLAINED_JUMP_PCT].index:
-        d = df.loc[i, "date"]
-        if d in ex_dates:
-            continue
-        flags.append(f"{symbol} {d}: close moved "
-                     f"{df['close'].pct_change().iloc[i] * 100:+.1f}% "
-                     f"({df['close'].iloc[i-1]:.2f} -> {df['close'].iloc[i]:.2f})")
-    return flags
-
-
 def backfill(con, symbols: list[str], years: int = 10, verbose: bool = True) -> None:
     backfill_index(con, BENCHMARK, years, verbose=verbose)
     for i, sym in enumerate(symbols, 1):
