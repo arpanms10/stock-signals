@@ -30,9 +30,9 @@ def load(universe_size: int):
 
 # ------------------------------------------------------------------ sidebar
 st.sidebar.title("Stock Signals")
-size = st.sidebar.slider("Universe size (by liquidity)", 50, 500, 200, 50,
+size = st.sidebar.slider("Universe size (by liquidity)", 50, 500, 500, 50,
                          help="How many of the most liquid NSE stocks to rank. "
-                              "NIFTY 200 is roughly the top 200.")
+                              "NIFTY 500 is roughly the top 500.")
 if st.sidebar.button("Recompute", width='stretch'):
     load.clear()
     st.rerun()
