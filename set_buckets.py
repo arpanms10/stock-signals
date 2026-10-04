@@ -48,7 +48,7 @@ def main() -> None:
     mkt = bc.connect("data/market.db")
     import datetime as dt
     today = dt.date.fromisoformat(sorted(bc.have_days(mkt))[-1])
-    liq = {s: i + 1 for i, s in enumerate(bc.universe_on(mkt, today, top_n=400))}
+    liq = bc.liquidity_ranks(mkt, today)
 
     suggestions: dict[str, tuple[str, str]] = {}
     for sym in holdings:

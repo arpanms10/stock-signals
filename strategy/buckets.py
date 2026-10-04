@@ -74,14 +74,24 @@ def classify(symbol: str, quality_score: float | None, volatility: float | None,
                 f"not a business to hold through a bad year")
     reasons.append(f"quality {quality_score:.0f}")
 
-    if volatility is not None and not np.isnan(volatility):
-        if volatility > CORE_MAX_VOLATILITY:
-            return (default_unknown,
-                    f"volatility {100 * volatility:.0f}% is too high for a "
-                    f"hold-through-anything position")
-        reasons.append(f"volatility {100 * volatility:.0f}%")
+    # Core needs evidence on every test, as it already does for quality: an
+    # unknown volatility or liquidity is not a pass. Treating "no data" as
+    # "no objection" made illiquid and price-less holdings look like core.
+    if volatility is None or np.isnan(volatility):
+        return (default_unknown,
+                "no price history to measure volatility -- not enough to call "
+                "it core; set the bucket yourself")
+    if volatility > CORE_MAX_VOLATILITY:
+        return (default_unknown,
+                f"volatility {100 * volatility:.0f}% is too high for a "
+                f"hold-through-anything position")
+    reasons.append(f"volatility {100 * volatility:.0f}%")
 
-    if liquidity_rank is not None and liquidity_rank > CORE_MIN_LIQUIDITY_RANK:
+    if liquidity_rank is None:
+        return (default_unknown,
+                "not in the liquidity ranking (too few recent trading days or "
+                "below the price floor) -- too thin to be a core holding")
+    if liquidity_rank > CORE_MIN_LIQUIDITY_RANK:
         return (default_unknown,
                 f"liquidity rank {liquidity_rank} -- too thin to be a core holding")
 

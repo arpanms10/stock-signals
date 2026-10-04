@@ -388,3 +388,32 @@ def test_urgent_rows_sort_ahead_of_calm_ones_within_an_action():
     assert names[:2] == ["JUBLFOOD", "JSWCEMENT"]     # both urgent, by value
     assert names[2:4] == ["TATAPOWER", "AEROPLANE"]   # then calm, by value
     assert names[-1] == "TCS"                          # trims after exits
+
+
+def test_core_needs_known_liquidity_and_volatility():
+    """A missing rank meant "outside the top 400", and was read as no
+    objection: IRCTC, liquidity rank 562, was suggested as core."""
+    from strategy import buckets as bk
+    assert bk.classify("X", 90.0, 0.20, 10)[0] == "core"
+    assert bk.classify("X", 90.0, 0.20, None)[0] == "legacy"
+    assert bk.classify("X", 90.0, None, 10)[0] == "legacy"
+    assert bk.classify("X", 90.0, 0.20, 562)[0] == "legacy"
+
+
+def test_liquidity_ranks_cover_beyond_any_top_n(tmp_path):
+    import datetime as dt
+    import pandas as pd
+    from data import bhavcopy as bc
+    con = bc.connect(tmp_path / "m.db")
+    for i in range(90):                      # needs 30 sessions in 60 days
+        d = dt.date(2026, 1, 1) + dt.timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        bc.save_day(con, d, pd.DataFrame(
+            [(f"S{k}", 100.0, 1e5, (k + 1) * 1e8, f"INE{k:03d}A01001")
+             for k in range(5)],
+            columns=["symbol", "close", "volume", "turnover", "isin"]))
+    on = dt.date(2026, 3, 31)
+    ranks = bc.liquidity_ranks(con, on)
+    assert len(ranks) == 5 and ranks["S4"] == 1 and ranks["S0"] == 5
+    assert bc.universe_on(con, on, top_n=2) == ["S4", "S3"]

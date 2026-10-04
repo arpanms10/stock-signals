@@ -125,7 +125,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
                                      cfg["momentum_strategy"]["n_hold"]))
     rank_of = dict(zip(ranked.get("symbol", []), ranked.get("rank", [])))
     mom_of = dict(zip(ranked.get("symbol", []), ranked.get("mom", [])))
-    liq = {s: i + 1 for i, s in enumerate(pool)}
+    liq = bc.liquidity_ranks(mkt, as_of) if days else {}
     qual = fu.score_all(sorted(set(allsyms)), sectors)
 
     bench = store.load_index(con, cfg["signals"]["regime_index"])

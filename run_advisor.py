@@ -80,7 +80,7 @@ def main() -> None:
         ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities)
     rank_of = dict(zip(ranked.get("symbol", []), ranked.get("rank", [])))
     vol_of = dict(zip(ranked.get("symbol", []), ranked.get("vol", [])))
-    liq_rank = {s: i + 1 for i, s in enumerate(pool)}
+    liq_rank = bc.liquidity_ranks(mkt, today)
 
     # ---------------------------------------------------------- valuation
     prices, values, tradeable = {}, {}, {}

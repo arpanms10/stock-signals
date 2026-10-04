@@ -296,6 +296,18 @@ def ingest_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
     return total
 
 
+def liquidity_ranks(con, on_date: dt.date) -> dict[str, int]:
+    """Liquidity rank of EVERY eligible equity, 1 = most traded.
+
+    Built from universe_on with no top-n cut. Ranking only the top 200 or 400
+    left everything beyond it with no rank at all, and classify() read a
+    missing rank as "no objection" -- so IRCTC, rank 562, was suggested as
+    core against a top-150 requirement.
+    """
+    return {s: i + 1 for i, s in
+            enumerate(universe_on(con, on_date, top_n=1_000_000))}
+
+
 def universe_on(con, on_date: dt.date, top_n: int = 200,
                 lookback_days: int = 60, min_days: int = 30,
                 min_price: float = 0.0, min_turnover_cr: float = 0.0) -> list[str]:
