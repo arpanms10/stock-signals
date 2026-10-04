@@ -21,16 +21,16 @@ uv venv && uv pip install -r requirements.txt
 PYTHONPATH=. .venv/bin/python import_kite_holdings.py   # Kite .csv/.xlsx dropped in config/
 
 PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10   # ~70 min, once
-PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty200 --years 10
+PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty500 --years 10
 PYTHONPATH=. .venv/bin/python fetch_fundamentals.py
 
-.venv/bin/python run_ui.py                            # dashboard on :8501
+PYTHONPATH=. .venv/bin/python run_ui.py                            # dashboard on :8501
 ```
 
 Optional — a report every Saturday, on this machine:
 
 ```bash
-.venv/bin/python install_schedule.py --day saturday --portfolio 2000000
+PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 2000000
 ```
 
 ## Commands
@@ -45,9 +45,52 @@ Optional — a report every Saturday, on this machine:
 | `install_schedule.py` | Install / check / remove the Saturday job |
 | `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
 | `set_buckets.py` | Pre-fill core / satellite / legacy |
+| `record_momentum.py` | Save this month's momentum picks to `history/` |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
+
+## Recording what you buy
+
+After buying, download your holdings from Kite (Console's `.xlsx` carries the
+long/short-term split; the web `.csv` also works), put the file in `config/`,
+and import it. Name the momentum buys with `--satellite` so they are rotated on
+rank:
+
+```bash
+PYTHONPATH=. .venv/bin/python import_kite_holdings.py --satellite CPPLUS SANSERA
+```
+
+- Quantities and average prices come from Kite; your `bucket`, `notes` and
+  `purchase_date` are kept for every stock you still hold. The old file is
+  backed up to `config/holdings.csv.bak`.
+- **A new holding imported without `--satellite` has a blank bucket, and blank
+  is not satellite** -- the framework only ever suggests core or legacy. The
+  importer lists new holdings and reminds you.
+- `--satellite` overrides any existing bucket, and warns about any symbol that
+  is not in the Kite file.
+- Optionally add `purchase_date` (YYYY-MM-DD) to the new rows in
+  `config/holdings.csv`: Kite does not export it, and the trailing stop is
+  measured from it. It is kept on later imports.
+- A stock has one bucket. Buying more of a core holding keeps the whole
+  position core.
+
+Then re-run the advisor, so sizing, sector caps and the decision log include
+the new positions.
+
+## Momentum history
+
+`record_momentum.py` saves the month's picks -- every stock in the top 15 on
+either lookback, with ranks, scores, the price on the day and the NIFTY 500
+level -- to `history/momentum_picks.xlsx`, one tab per month named like
+`Oct 2026`. Each new month is a new tab at the end. It records once per month
+(the first run of the month is kept; `--force` replaces that tab), and the
+Saturday job runs it. Started October 2026.
+
+The point is to measure later how the picks actually did against the backtest,
+from the prices on the day they were suggested -- recomputing old months with
+today's code would measure today's code instead. The file is meant for git;
+what you held is deliberately not in it.
 
 ## Documentation
 
