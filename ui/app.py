@@ -284,7 +284,7 @@ with tab_market:
         cols[4].metric("Top band on both", f"{int(m['in_both'].sum())}",
                        help="In the top band on BOTH lookbacks "
                             f"({' and '.join(f'{x}-month' for x in lbs)}). "
-                            "Not backtested as a portfolio on its own.")
+                            "Holding only these did worse than either list in the backtest.")
 
         st.caption(f"Ranked by **Score**: the return from {main_lb} months ago "
                    "to 1 month ago, divided by volatility, for names above their "
@@ -427,8 +427,9 @@ with tab_mom:
         m2.metric(f"{a}M only", f"{int((t['status'] == f'{a}M only').sum())}")
         m3.metric(f"{b}M only", f"{int((t['status'] == f'{b}M only').sum())}")
         m4.metric("Market regime", snap.regime,
-                  help="In RISK-OFF the backtested strategy holds half as many "
-                       "names. This table shows the full top band regardless.")
+                  help="Shown for context only. Neither the advice nor the "
+                       "backtest changes in RISK-OFF: holding fewer names then "
+                       "did not reduce drawdowns when tested.")
 
         f1, f2 = st.columns([3, 2])
         pick = f1.segmented_control(
@@ -488,14 +489,16 @@ with tab_mom:
                 "CAGR % across four start dates (the rebalance day alone "
                 "moves it):\n\n"
                 "| | CAGR range | average | worst fall |\n|---|---|---|---|\n"
-                "| 9-month (main) | 11.9 – 17.3 | 15.6 | −40 to −52% |\n"
-                "| 12-month | 11.8 – 14.4 | 13.1 | −41 to −46% |\n"
-                "| Both only (~11 names) | 11.4 – 15.5 | 13.8 | −42 to −54% |\n"
+                "| 9-month (main) | 10.9 – 15.9 | 12.5 | −39 to −43% |\n"
+                "| 12-month | 11.6 – 13.4 | 12.5 | −43 to −45% |\n"
+                "| Both only (~11 names) | 10.0 – 12.1 | 11.1 | −46 to −47% |\n"
                 "| NIFTY 500 | ≈ 10.4 | | −37% |\n\n"
-                "9 months beat 12 in five of six runs, but was chosen on the "
-                "same data, so expect some of the gap to shrink. Holding only "
-                "the *Both* names did not beat the 9-month list on any start "
-                "date. Details in `docs/validation.md`.")
+                "The two lookbacks tie: neither is proven better, which is "
+                "why both are shown. Holding only the *Both* names did worse "
+                "than either list. Momentum beat random picks from the same "
+                "universe by about 3 standard deviations on both lookbacks, "
+                "but beats the index by only about 2 points a year, with "
+                "deeper falls. Details in `docs/validation.md`.")
 
 # ==================================================================== WATCHING
 with tab_watch:

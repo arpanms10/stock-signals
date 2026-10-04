@@ -99,9 +99,10 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
                                    # scoring bucket above -- same word, very
                                    # different thing. Do not merge them.
   lookback_months: 9               # main ranking: 9-1 momentum. Beat 12 in
-                                   # 5 of 6 runs (docs/validation.md), but was
-                                   # picked on the same data -- expect some of
-                                   # the gain to shrink.
+                                   # 5 of 6 runs with risk_off_scale 0.5, but
+                                   # TIES with 12 at 1.0 (12.5% average CAGR
+                                   # each; docs/validation.md). Kept, with 12
+                                   # alongside -- neither is proven better.
   compare_lookback_months: 12      # also rank on 12-1 and show both side by
                                    # side, with the names top-n on BOTH.
   skip_months: 1                   # exclude the latest month -- short-horizon
@@ -116,7 +117,13 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
   exit_rank: 30                    # ... and only sell after falling past 30
                                    # (the gap stops boundary names churning)
   rebalance_days: 21               # monthly
-  risk_off_scale: 0.5
+  risk_off_scale: 1.0              # names held when the index is below its
+                                   # 200 DMA, as a fraction of n_hold. Was 0.5;
+                                   # tested 2026-10-04 (docs/validation.md): it
+                                   # did not reduce drawdowns, and only paid off
+                                   # with the 9-month lookback chosen on the
+                                   # same data. The live advisor never applied
+                                   # it, so 1.0 also makes backtest = advice.
   # Volatility targeting: scale gross exposure so the PORTFOLIO runs at a
   # target volatility rather than whatever the holdings happen to give.
   # The best-evidenced improvement to momentum's Sharpe, and a structural
@@ -126,7 +133,7 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
   vol_target_pct: 15.0             # annualised portfolio volatility to aim at
   vol_lookback: 60                 # sessions used to estimate realised vol
   vol_max_leverage: 1.0            # never above fully invested -- no borrowing
-  vol_min_exposure: 0.3            # floor, so a vol spike does not go to cash              # hold half as many names below the 200 DMA
+  vol_min_exposure: 0.3            # floor, so a vol spike does not go to cash
   min_price: 20.0                  # rupees. Momentum divided by volatility
                                    # ranks a pumped penny stock first; a price
                                    # floor is the cheapest guard against it

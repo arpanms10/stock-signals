@@ -70,7 +70,7 @@ def main() -> None:
     cfg = timing.load_config()
 
     holdings = {(h.get("tradingsymbol") or h.get("symbol", "")).upper(): h
-                for h in pf.read_snapshot()}
+                for h in pf.load_holdings()}
     pool = (list(getattr(uni, args.universe)()["symbol"])
             if args.universe else wl.active_symbols())
     symbols = sorted(set(pool) | set(holdings))
@@ -200,8 +200,8 @@ def main() -> None:
             print("    " + ", ".join(
                 f"{s}{' (held)' if s in holdings else ''}" for s in both))
         print("\n  Overlap names are strong on both windows, so less likely to "
-              "be an\n  artefact of one. The overlap alone has NOT been "
-              "backtested as a portfolio.")
+              "be an\n  artefact of one. But holding ONLY the overlap was "
+              "backtested and did\n  worse than either list (docs/validation.md).")
 
     # ------------------------------------------------- 4. what to change
     if args.rebalance and not ranked.empty:

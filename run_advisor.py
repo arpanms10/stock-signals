@@ -256,6 +256,7 @@ def main() -> None:
                         "rank": int(r.rank), "quality": (qual[r.symbol].score
                                                          if r.symbol in qual else None),
                         "momentum": float(r.mom), "vol": 100 * float(r.vol),
+                        "lookback": cfg["momentum_strategy"]["lookback_months"],
                         "held": r.symbol in tradeable}
                        for r in ranked.head(20).itertuples() if r.symbol in frames]
         c = dlog.record_candidates(log, market_rows, price_date=price_date)

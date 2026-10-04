@@ -63,7 +63,7 @@ def main() -> None:
     print(f"Momentum:    {ms['lookback_months']}-month lookback, "
           f"skipping the latest {ms['skip_months']}, score {ms.get('score', 'ram')}, "
           f"rebalance every {ms['rebalance_days']} sessions, "
-          f"risk-off scale {ms.get('risk_off_scale', 0.5)}")
+          f"risk-off scale {ms.get('risk_off_scale', 1.0)}")
     if ms.get("selection") == "overlap":
         print(f"Selection:   overlap -- top {ms.get('enter_rank', ms['n_hold'])} on "
               f"BOTH {ms['lookback_months']}- and "

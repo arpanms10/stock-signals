@@ -109,7 +109,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities) \
         if not panel.empty \
         else pd.DataFrame()
-    # The comparison lookback (9 months by default), and which names are top-n
+    # The comparison lookback (12 months by default), and which names are top-n
     # on both. Shown alongside the primary rank, never instead of it.
     lbs = mom.lookbacks(cfg)
     alt_rank_of: dict[str, int] = {}

@@ -33,9 +33,11 @@ alternatives; see [validation](validation.md).
 
 *Superseded.* An early NIFTY 50 run showed 15.19% CAGR, but that universe was
 today's index members applied backwards -- survivorship bias worth roughly 14
-points. The survivorship-free figure is **16.9%** on the 9-month ranking
-(11.9% to 17.3% depending on which days the rebalance falls; 11.8% on the
-previous 12-month ranking); see [validation](validation.md).
+points. The survivorship-free figure is **11.7%** on the 9-month ranking
+(10.9% to 15.9% depending on which days the rebalance falls, 12.5% on
+average; the 12-month ranking averages the same), against 10.4% for the
+NIFTY 500; see [validation](validation.md). No market-regime rule: holding
+fewer stocks in RISK-OFF was tested and dropped.
 
 ## Fundamentals: NSE primary, Yahoo for the gaps
 

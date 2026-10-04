@@ -219,7 +219,7 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 hist = bench_idx[bench_idx.index <= today]
                 if len(hist) >= regime_n:
                     risk_on = float(hist.iloc[-1]) > float(hist.tail(regime_n).mean())
-            n = n_hold if risk_on else max(1, int(n_hold * m.get("risk_off_scale", 0.5)))
+            n = n_hold if risk_on else max(1, int(n_hold * m.get("risk_off_scale", 1.0)))
 
             # Volatility targeting scales how much capital is deployed, which
             # is separate from how many names are held. Cutting positions and

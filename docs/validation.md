@@ -156,13 +156,75 @@ half it returned 7.2%, below the index's 11.7%. Requiring agreement between
 the two windows sounds safer, but it held fewer stocks and had deeper falls.
 
 **Adopted 2026-10-04: 9 months is now the main ranking**, with 12 months
-kept alongside for comparison. The daily guide (section 3b) and the dashboard
+kept alongside for comparison. *Same day, later:* every run in this section
+held half as many stocks in RISK-OFF (`risk_off_scale: 0.5`). With that rule
+removed, 9 and 12 months tie; see the next section. Both are kept. The daily guide (section 3b) and the dashboard
 (Momentum tab) show both ranks and scores and mark the names in the top 15 on
 both.
 
 At 10 stocks the 9-month lookback is worse: 6.1% to 18.2% across the four
 starts, with falls of -53% to -58% on three of them. Fewer stocks and a
 shorter window together are too jumpy.
+
+### Market regime filter: fewer stocks in RISK-OFF (2026-10-04)
+
+When the NIFTY 500 was below its 200-day average, the backtest held half as
+many stocks (7 instead of 15), with **all** the money split across those 7 --
+not half in cash. It made the book more concentrated, not safer. The live advisor
+never did this, so the backtest behind the advice was not testing what the
+advice actually tells you to do. Tested by switching it off (`risk_off_scale: 1.0`):
+
+```bash
+PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 0.5
+PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 1.0
+```
+
+**CAGR %, half the stocks in RISK-OFF (0.5) vs no change (1.0):**
+
+| start | 12-month: 0.5 | 12-month: 1.0 | 9-month: 0.5 | 9-month: 1.0 |
+|---|---|---|---|---|
+| 2017-12-07 (default) | 11.8 | **12.4** | **16.9** | 11.7 |
+| 2017-12-14 | **14.4** | 12.5 | **17.3** | 15.9 |
+| 2017-12-21 | **13.4** | 11.6 | **11.9** | 11.6 |
+| 2017-12-28 | 12.8 | **13.4** | **16.4** | 10.9 |
+| first half, to 2022-04 | 9.1 | **10.5** | **13.9** | 12.7 |
+| second half, from 2022-05 | 12.8 | **13.2** | **18.9** | 11.0 |
+| 0.5 wins | 2 of 6 | | 6 of 6 | |
+
+With 12 months the rule wins 2 of 6. With 9 months it wins all six, but
+that lookback was itself chosen on this data, with the rule switched on.
+In neither case did it do what a regime filter is for, which is no surprise
+once you see it never held cash: the worst falls are no shallower (12-month: -43% either way, and in the second half -38.5% with the
+rule against -34.0% without; 9-month: -52% with it on one start date, -43%
+without). Two settings tuned together on the same nine years can look good
+together by chance.
+
+**Adopted 2026-10-04: `risk_off_scale: 1.0`.** The regime is still shown on
+the dashboard, as information. Backtest and live advice now behave the same
+in a falling market.
+
+With the rule off, across the four start dates:
+
+| | CAGR range | average | worst fall | vs random picks |
+|---|---|---|---|---|
+| 9-month (main) | 10.9 - 15.9 | 12.5 | -39 to -43% | 3.0 sd |
+| 12-month | 11.6 - 13.4 | 12.5 | -43 to -45% | 3.1 sd |
+| overlap of both | 10.0 - 12.1 | 11.1 | -46 to -47% | |
+| NIFTY 500 | 10.4 | | -37% | |
+
+The two lookbacks tie: 9 months has the shallower falls, 12 months the
+steadier returns across start dates. Neither is proven better, so both stay,
+9 as the main ranking and 12 alongside. The overlap is worse than either.
+
+**The honest headline:** the ranking clearly carries information (it beats
+random picks from the same universe by about 3 standard deviations), but the
+edge over simply holding the index is about 2 points a year, with deeper falls.
+The earlier 16.9% depended on the regime rule paired with the 9-month
+lookback, and did not survive removing the rule.
+
+The skip-month table above and the NSE-blend table below were run with the
+rule on. Their comparisons stand, since both sides of each comparison used the
+same settings, but their absolute CAGRs are not current.
 
 ### NSE's Nifty200 Momentum 30 scoring, tested here
 

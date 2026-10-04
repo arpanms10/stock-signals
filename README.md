@@ -82,29 +82,32 @@ rank ignored; the safe default for anything bought before this existed).
 
 | | 9-year CAGR |
 |---|---|
-| Momentum rotation, 9-1 (current) | **16.9%** |
-| Momentum rotation, 12-1 (previous) | 11.8% |
+| Momentum rotation, 9-1 (main) | **11.7%** |
+| Momentum rotation, 12-1 (alongside) | 12.4% |
 | NIFTY 500 index | 10.4% |
-| Random-pick control | 5.0% |
+| Random-pick control | 4.0% |
 | v1 signal rules *(retired)* | 1.3% |
 
 After realistic Indian costs — STT, stamp duty, exchange fees, GST, slippage.
-Momentum beat all 10 random controls drawn from the same universe, by 11.9
-points on average (3.3 standard deviations), so the ranking carries real
-information. It beats the index by 6.5 points, but with a **−43% drawdown
-against the index's −37%**, and a Sharpe of 0.70. The rebalance dates alone
-move the CAGR between 11.9% and 17.3% (15.6% on average). The 9-month lookback
-was chosen over 12 months on this same data, so expect some of that edge to
-shrink.
+Momentum beat all 10 random controls drawn from the same universe, by 7.6
+points on average (3.0 standard deviations), so the ranking carries real
+information. **But it beats the index by only about 2 points a year**, with a
+**−43% drawdown against the index's −37%**, and a Sharpe of 0.55. The rebalance
+dates alone move the CAGR between 10.9% and 15.9% (12.5% on average); the
+12-month lookback averages the same 12.5%, so neither lookback is proven
+better and both are shown.
 
-Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%) and
-dropped the random control from 17.2% to 5.0% — that collapse is the bias
-measured directly.
+Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%,
+measured with the old regime rule on) and dropped the random control from
+17.2% to 5.0% — that collapse is the bias measured directly.
 
 *Corrected 2026-10-04:* the earlier 14.5% was run with ETFs leaking into the
 universe; see [validation](docs/validation.md). The earlier "8.4 standard
 deviations" did not reproduce even with the ETFs left in (2.6 with 10 seeds).
-The main ranking moved from 12 to 9 months the same day.
+The main ranking moved from 12 to 9 months the same day. Later that day the
+16.9% headline was also withdrawn: it depended on holding half as many stocks
+in RISK-OFF, a rule that did not reduce drawdowns and was switched off; see
+[validation](docs/validation.md).
 
 **Honest split: roughly 70% of this framework's value is monitoring and
 discipline; perhaps 30% is momentum alpha.** Two ideas that sounded good and

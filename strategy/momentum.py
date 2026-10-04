@@ -41,8 +41,8 @@ def trailing_return(close: pd.Series, months: int) -> float | None:
     """Plain price return over the last `months`, ending today, in percent.
 
     For display. It is the number you can check against your broker, unlike
-    the 12-1 figure the ranking uses, which deliberately ignores the latest
-    month.
+    the 9-1 / 12-1 figures the ranking uses, which deliberately ignore the
+    latest month.
     """
     n = months * TRADING_DAYS_MONTH
     c = close.dropna()

@@ -173,7 +173,7 @@ def run(frames: dict[str, pd.DataFrame], bench: pd.DataFrame, cfg: dict,
                     risk_on = float(hist.iloc[-1]) > float(hist.tail(regime_n).mean())
             n_hold = m.get("n_hold", 15)
             if not risk_on:
-                n_hold = max(1, int(n_hold * m.get("risk_off_scale", 0.5)))
+                n_hold = max(1, int(n_hold * m.get("risk_off_scale", 1.0)))
             sub = dict(cfg)
             sub["momentum_strategy"] = {**m, "n_hold": n_hold}
             if rng is not None:

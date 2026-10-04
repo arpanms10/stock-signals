@@ -120,7 +120,8 @@ def record_candidates(con, market_rows: list[dict], top_n: int = 15,
             float(r.get("price") or 0), 0.0, 0.0, 0.0,
             r.get("quality"), r.get("rank"), r.get("timing_score"), None,
             (price_date or run_date).isoformat(),
-            f"rank {r.get('rank')} | 12-1 momentum {r.get('momentum', 0):.0f}% "
+            f"rank {r.get('rank')} | {r.get('lookback', 12)}-1 momentum "
+            f"{r.get('momentum', 0):.0f}% "
             f"| vol {r.get('vol', 0):.0f}%"[:600],
         ))
     if not payload:
