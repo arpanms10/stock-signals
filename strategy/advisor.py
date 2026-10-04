@@ -209,9 +209,18 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
         # not a decision to exit -- and silently selling out on it would turn
         # "this is too big" into "sell everything".
         want = max(excess_value / price, 0) if price else 0
+        if sector_over_cap:
+            # The sector plan already counts this sizing trim; whatever it
+            # assigns here is the extra still needed after it. Returning
+            # early used to drop that extra and leave the sector over cap.
+            want += qty * sector_trim_fraction
         a.qty = min(want, qty * 0.9)
         a.reasons.append(f"{cur_pct:.1f}% of the book, above the {max_pct:.0f}% "
                          f"single-stock cap -- sizing, not a view on the stock")
+        if sector_over_cap:
+            a.reasons.append(
+                f"its sector is also over the {cfg['risk']['max_sector_pct']:.0f}% "
+                f"cap, so the trim goes further than size alone would")
         if bucket == "core":
             a.reasons.append("core holding: trimming to size, still owned")
         return _attach_plan(a, holding, price, cfg, row)
@@ -326,14 +335,23 @@ def sanity_warnings(advices: list[Advice], ranked_universe: int,
 
 def plan_sector_trims(holdings: dict[str, dict], values: dict[str, float],
                       sectors: dict[str, str], quality: dict, book: float,
-                      cfg: dict) -> dict[str, float]:
-    """How much of each holding to sell to bring its sector under the cap.
+                      cfg: dict,
+                      already_selling: dict[str, float] | None = None
+                      ) -> dict[str, float]:
+    """How much MORE of each holding to sell to bring its sector under the cap.
 
     Trims the weakest names in the sector first -- lowest quality, then
     smallest -- and stops the moment the sector is compliant. Trimming every
     holding proportionally would take a slice out of the best business in the
     sector to fix a problem the worst ones caused.
+
+    `already_selling` is the rupee value of exits and sizing trims planned
+    regardless of sector. Without it the sector looked as over-cap as before
+    those sales, so small holdings were trimmed to fix a sector the big trims
+    had already fixed. Fractions returned are of the whole position, on top
+    of what is already being sold.
     """
+    already = already_selling or {}
     cap = cfg["risk"]["max_sector_pct"]
     by_sector: dict[str, list[str]] = {}
     for sym, val in values.items():
@@ -341,7 +359,7 @@ def plan_sector_trims(holdings: dict[str, dict], values: dict[str, float],
 
     fractions: dict[str, float] = {}
     for sector, syms in by_sector.items():
-        total = sum(values[s] for s in syms)
+        total = sum(values[s] - already.get(s, 0.0) for s in syms)
         if not book or 100 * total / book <= cap:
             continue
         excess = total - book * cap / 100
@@ -359,12 +377,32 @@ def plan_sector_trims(holdings: dict[str, dict], values: dict[str, float],
             # taking 84% of one holding to fix it is an exit wearing a trim's
             # clothes, and it puts the whole correction on a single stock's
             # execution risk.
-            take = min(values[sym] * 0.5, excess)
+            left = values[sym] - already.get(sym, 0.0)
+            take = min(left * 0.5, excess)
             if take <= 0:
                 continue
             fractions[sym] = take / values[sym]
             excess -= take
     return fractions
+
+
+def advise_book(inputs: dict[str, dict], values: dict[str, float],
+                sectors: dict[str, str], quality: dict, book: float,
+                cfg: dict) -> dict[str, Advice]:
+    """Advise every holding, with sector trims planned after the other sells.
+
+    `inputs[sym]` holds advise()'s arguments apart from the two sector ones.
+    Pass one finds what is being sold anyway (exits, sizing trims); the sector
+    plan then covers only what is left over the cap; pass two is the advice.
+    """
+    first = {sym: advise(**kw) for sym, kw in inputs.items()}
+    selling = {sym: min(a.qty * inputs[sym]["price"], values[sym])
+               for sym, a in first.items() if a.is_sell and a.qty}
+    trims = plan_sector_trims({}, values, sectors, quality, book, cfg,
+                              already_selling=selling)
+    return {sym: advise(**kw, sector_over_cap=sym in trims,
+                        sector_trim_fraction=trims.get(sym, 0.33))
+            for sym, kw in inputs.items()}
 
 
 def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],

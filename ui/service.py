@@ -166,18 +166,25 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
         buckets[sym] = bk.classify(sym, q.score if q else None, vol,
                                    liq.get(sym), tradeable[sym].get("bucket", ""))
 
-    sector_trims = adv.plan_sector_trims(tradeable, values, sectors, qual,
-                                         book, cfg)
+    risks = {sym: rm.holding_status(sym, frames[sym], h, cfg)
+             for sym, h in tradeable.items()}
+    inputs = {}
+    for sym, h in tradeable.items():
+        last = frames[sym].iloc[-1]
+        inputs[sym] = dict(
+            symbol=sym, bucket=buckets[sym][0], holding=h, price=prices[sym],
+            value=values[sym], book_value=book, quality=qual.get(sym),
+            rank=rank_of.get(sym), rank_universe=len(ranked), risk=risks[sym],
+            cfg=cfg,
+            row={"sma20": last.get("sma20"), "sma50": last.get("sma50")})
+    # Sector trims planned after the exits and sizing trims (two passes).
+    advised = adv.advise_book(inputs, values, sectors, qual, book, cfg)
     rows, advices = [], []
     for sym, h in tradeable.items():
         q = qual.get(sym)
-        risk = rm.holding_status(sym, frames[sym], h, cfg)
+        risk = risks[sym]
         last = frames[sym].iloc[-1]
-        a = adv.advise(sym, buckets[sym][0], h, prices[sym], values[sym], book,
-                       q, rank_of.get(sym), len(ranked), risk, cfg,
-                       sym in sector_trims,
-                       row={"sma20": last.get("sma20"), "sma50": last.get("sma50")},
-                       sector_trim_fraction=sector_trims.get(sym, 0.33))
+        a = advised[sym]
         advices.append(a)
         rows.append({
             "symbol": sym, "bucket": buckets[sym][0],

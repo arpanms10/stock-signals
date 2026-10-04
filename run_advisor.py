@@ -153,21 +153,19 @@ def main() -> None:
     over_cap = {sec for sec, v in sector_value.items()
                 if book and 100 * v / book > cfg["risk"]["max_sector_pct"]}
 
-    # How much of each holding a sector trim would take, computed across the
-    # whole book before any single holding is advised on.
-    sector_trims = adv.plan_sector_trims(tradeable, values, sectors, qual,
-                                         book, cfg)
-
-    advices = []
+    # Sector trims are planned across the whole book, after the exits and
+    # sizing trims that happen anyway (advise_book runs two passes).
+    inputs = {}
     for sym, h in tradeable.items():
-        risk = rm.holding_status(sym, frames[sym], h, cfg)
         last = frames[sym].iloc[-1]
-        advices.append(adv.advise(
-            sym, bucket_of[sym], h, prices[sym], values[sym], book,
-            qual.get(sym), rank_of.get(sym), len(ranked), risk, cfg,
-            sector_over_cap=sym in sector_trims,
-            row={"sma20": last.get("sma20"), "sma50": last.get("sma50")},
-            sector_trim_fraction=sector_trims.get(sym, 0.33)))
+        inputs[sym] = dict(
+            symbol=sym, bucket=bucket_of[sym], holding=h, price=prices[sym],
+            value=values[sym], book_value=book, quality=qual.get(sym),
+            rank=rank_of.get(sym), rank_universe=len(ranked),
+            risk=rm.holding_status(sym, frames[sym], h, cfg), cfg=cfg,
+            row={"sma20": last.get("sma20"), "sma50": last.get("sma50")})
+    advices = list(adv.advise_book(inputs, values, sectors, qual, book,
+                                   cfg).values())
 
     cash = adv.apply_cash_constraint(advices, prices, qual, args.cash)
 

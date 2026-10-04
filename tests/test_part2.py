@@ -450,3 +450,53 @@ def test_target_not_marked_below_the_level(tmp_path, monkeypatch):
     t1 = wg.load(path)[0].t1
     assert wg.mark_target_hits({"X": t1 - 0.01}, dt.date(2026, 9, 10), path) == []
     assert wg.load(path)[0].t1_hit_on == ""
+
+
+def _book(values, scores):
+    """advise_book inputs at a flat price of 100, book of 100,000."""
+    inputs = {s: dict(symbol=s, bucket="legacy",
+                      holding={"quantity": v / 100, "average_price": 100.0,
+                               "lt_quantity": v / 100, "st_quantity": 0.0},
+                      price=100.0, value=v, book_value=100000.0,
+                      quality=fu.Quality(s, scores[s], {}, []), rank=None,
+                      rank_universe=200, risk={}, cfg=None)
+              for s, v in values.items()}
+    return inputs, {s: fu.Quality(s, scores[s], {}, []) for s in values}
+
+
+def _sold(advice):
+    return {s: a.qty * 100 for s, a in advice.items() if a.is_sell}
+
+
+def test_sector_trim_counts_the_sizing_trims_already_planned(cfg):
+    """Trimming the oversized bank already brings the sector under the cap.
+    Planning the sector on pre-trim values used to trim the small names too."""
+    # BIG is 12% (cap 5%); the others sit under the 6% trim trigger.
+    values = {"BIG": 12000.0, "S1": 6000.0, "S2": 6000.0, "S3": 5000.0}
+    inputs, quality = _book(values, {"BIG": 90, "S1": 60, "S2": 70, "S3": 80})
+    for kw in inputs.values():
+        kw["cfg"] = cfg
+    advice = adv.advise_book(inputs, values, dict.fromkeys(values, "Fin"),
+                             quality, 100000.0, cfg)
+    assert set(_sold(advice)) == {"BIG"}
+    assert _sold(advice)["BIG"] == pytest.approx(7000.0)
+
+
+def test_oversized_stock_also_carries_its_sector_trim(cfg):
+    """When the sector plan picks a stock that is also oversized, its extra
+    must be added to the sizing trim -- returning early used to drop it and
+    leave the sector over cap."""
+    # 34% financials; BIG's sizing trim alone leaves 29%, still over 25%.
+    values = {"BIG": 10000.0, "S1": 6000.0, "S2": 6000.0, "S3": 6000.0,
+              "S4": 6000.0}
+    inputs, quality = _book(values, {"BIG": 55, "S1": 60, "S2": 70, "S3": 80,
+                                     "S4": 85})
+    for kw in inputs.values():
+        kw["cfg"] = cfg
+    advice = adv.advise_book(inputs, values, dict.fromkeys(values, "Fin"),
+                             quality, 100000.0, cfg)
+    sold = _sold(advice)
+    assert sold["BIG"] > 5000.0                      # more than sizing alone
+    assert any("sector is also over" in r for r in advice["BIG"].reasons)
+    left = sum(values.values()) - sum(sold.values())
+    assert 100 * left / 100000.0 <= cfg["risk"]["max_sector_pct"] + 1e-6
