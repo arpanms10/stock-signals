@@ -56,6 +56,9 @@ class Snapshot:
     freshness: list[dict] = field(default_factory=list)
     watching: list[dict] = field(default_factory=list)
     cash: dict = field(default_factory=dict)
+    lookbacks: list[int] = field(default_factory=list)
+    # Every name top-n on either lookback, with rank and score on both.
+    momentum_table: list[dict] = field(default_factory=list)
 
 
 def _levels(row, cfg) -> dict:
@@ -87,6 +90,11 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
 
     days = sorted(bc.have_days(mkt))
     as_of = dt.date.fromisoformat(days[-1]) if days else dt.date.today()
+    equities = bc.require_equity_symbols(mkt)
+    # The exclusion file is a human-readable record; the ISIN map is the
+    # authority. A holding with a fund ISIN is not equity even if etfs.csv is
+    # stale or was never written.
+    excluded |= {h for h in holdings if h in bc.non_equity_symbols(mkt)}
     pool = bc.universe_on(mkt, as_of, top_n=universe_size) if days else []
     allsyms = sorted(set(pool) | set(holdings))
     cuts = dq.report(con, allsyms) if allsyms else {}
@@ -98,8 +106,23 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             frames[s] = f
 
     panel = mom.build_panel(frames, cfg)
-    ranked = mom.rank_on(panel, max(panel["date"]), cfg) if not panel.empty \
+    ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities) \
+        if not panel.empty \
         else pd.DataFrame()
+    # The comparison lookback (9 months by default), and which names are top-n
+    # on both. Shown alongside the primary rank, never instead of it.
+    lbs = mom.lookbacks(cfg)
+    alt_rank_of: dict[str, int] = {}
+    in_both: set[str] = set()
+    alt = pd.DataFrame()
+    if len(lbs) > 1 and not ranked.empty:
+        c = mom.with_lookback(cfg, lbs[1])
+        p = mom.build_panel(frames, c)
+        alt = mom.rank_on(p, max(p["date"]), c, eligible=equities) \
+            if not p.empty else pd.DataFrame()
+        alt_rank_of = dict(zip(alt.get("symbol", []), alt.get("rank", [])))
+        in_both = set(mom.common_top({lbs[0]: ranked, lbs[1]: alt},
+                                     cfg["momentum_strategy"]["n_hold"]))
     rank_of = dict(zip(ranked.get("symbol", []), ranked.get("rank", [])))
     mom_of = dict(zip(ranked.get("symbol", []), ranked.get("mom", [])))
     liq = {s: i + 1 for i, s in enumerate(pool)}
@@ -200,6 +223,8 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "rank": int(r.rank), "symbol": sym, "price": float(last["close"]),
             "momentum": float(r.mom), "vol": 100 * float(r.vol),
             "ram": float(r.ram),
+            "ret_12m": mom.trailing_return(f["close"], 12),
+            "ret_1m": mom.trailing_return(f["close"], 1),
             "timing_score": None if pd.isna(last.get("timing_score"))
             else float(last["timing_score"]),
             "quality": q.score if q else None,
@@ -207,10 +232,56 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
             "sector": sectors.get(sym, "Unknown"),
             "held": sym in tradeable,
             "in_top": int(r.rank) <= n_hold,
+            "rank_alt": alt_rank_of.get(sym),
+            "in_both": sym in in_both,
             "rsi": last.get("rsi14"), "sma50": last.get("sma50"),
             "sma200": last.get("sma200"), "atr": last.get("atr14"),
             "levels": _levels(last, cfg),
         })
+
+    # One consolidated table for the Momentum tab: every name in the top n on
+    # either lookback, with its rank AND score on both. Built from the
+    # rankings directly rather than `market`, because a name can be top-n on
+    # the comparison lookback without appearing in the primary ranking.
+    def _scores(rk: pd.DataFrame) -> tuple[dict, dict]:
+        if rk.empty:
+            return {}, {}
+        return (dict(zip(rk["symbol"], rk["rank"])),
+                dict(zip(rk["symbol"], rk["ram"])))
+
+    main_rank, main_score = _scores(ranked)
+    cmp_rank, cmp_score = _scores(alt)
+    vol_of = {**dict(zip(alt.get("symbol", []), alt.get("vol", []))),
+              **dict(zip(ranked.get("symbol", []), ranked.get("vol", [])))}
+    top = (list(ranked["symbol"].head(n_hold)) if not ranked.empty else []) + \
+        [x for x in (alt["symbol"].head(n_hold) if not alt.empty else [])
+         if x not in set(ranked["symbol"].head(n_hold))]
+    momentum_table = []
+    for sym in top:
+        f = frames.get(sym)
+        q = qual.get(sym)
+        r_main, r_cmp = main_rank.get(sym), cmp_rank.get(sym)
+        on_main = r_main is not None and r_main <= n_hold
+        on_cmp = r_cmp is not None and r_cmp <= n_hold
+        ret = (lambda mo: mom.trailing_return(f["close"], mo)) if f is not None \
+            else (lambda mo: None)
+        momentum_table.append({
+            "symbol": sym,
+            "status": "Both" if on_main and on_cmp else
+                      (f"{lbs[0]}M only" if on_main else f"{lbs[-1]}M only"),
+            "rank_main": r_main, "score_main": main_score.get(sym),
+            "rank_cmp": r_cmp, "score_cmp": cmp_score.get(sym),
+            "price": float(f["close"].iloc[-1]) if f is not None else None,
+            "ret_main": ret(lbs[0]), "ret_cmp": ret(lbs[-1]), "ret_1m": ret(1),
+            "vol": 100 * float(vol_of[sym]) if sym in vol_of else None,
+            "quality": q.score if q else None,
+            "sector": sectors.get(sym, "Unknown"),
+            "held": sym in holdings,
+        })
+    # Both first, then by main rank (names absent from it sort last).
+    momentum_table.sort(key=lambda r: (r["status"] != "Both",
+                                       r["rank_main"] or 10**6,
+                                       r["rank_cmp"] or 10**6))
 
     # Watched names carry their own price history, fetched by run_daily.py.
     watch_prices = {}
@@ -239,7 +310,8 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
                     freshness=freshness, cash=cash, watching=watching,
                     regime=regime, regime_detail=detail, split=split,
                     uncovered=uncovered, warnings=warnings,
-                    sector_exposure=sector_exposure)
+                    sector_exposure=sector_exposure, lookbacks=lbs,
+                    momentum_table=momentum_table)
 
 
 # ------------------------------------------------------------------ scripts

@@ -27,6 +27,23 @@ def main() -> None:
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)
     ap.add_argument("--shuffle", type=int, default=0)
+    ap.add_argument("--skip-months", type=int, default=None,
+                    help="override momentum_strategy.skip_months (0 = plain return)")
+    ap.add_argument("--lookback-months", type=int, default=None,
+                    help="override momentum_strategy.lookback_months")
+    ap.add_argument("--score", choices=["ram", "nse_blend"], default=None,
+                    help="ram = 12m momentum / vol (default); nse_blend = "
+                         "Nifty200 Momentum 30 style 6m+12m z-score blend")
+    ap.add_argument("--rebalance-days", type=int, default=None,
+                    help="override momentum_strategy.rebalance_days (126 = semi-annual)")
+    ap.add_argument("--selection", choices=["primary", "overlap"], default=None,
+                    help="overlap = hold only names top-band on BOTH the primary "
+                         "and compare_lookback_months rankings")
+    ap.add_argument("--compare-lookback-months", type=int, default=None,
+                    help="override momentum_strategy.compare_lookback_months")
+    ap.add_argument("--risk-off-scale", type=float, default=None,
+                    help="override momentum_strategy.risk_off_scale "
+                         "(1.0 = ignore the market regime)")
     ap.add_argument("--vol-target", action="store_true",
                     help="scale exposure to a target portfolio volatility")
     args = ap.parse_args()
@@ -36,6 +53,21 @@ def main() -> None:
     if args.vol_target:
         cfg = dict(cfg)
         cfg["momentum_strategy"] = {**cfg["momentum_strategy"], "vol_target": True}
+    for key in ("skip_months", "lookback_months", "score", "rebalance_days",
+                "selection", "compare_lookback_months", "risk_off_scale"):
+        if getattr(args, key) is not None:
+            cfg = dict(cfg)
+            cfg["momentum_strategy"] = {**cfg["momentum_strategy"],
+                                        key: getattr(args, key)}
+    ms = cfg["momentum_strategy"]
+    print(f"Momentum:    {ms['lookback_months']}-month lookback, "
+          f"skipping the latest {ms['skip_months']}, score {ms.get('score', 'ram')}, "
+          f"rebalance every {ms['rebalance_days']} sessions, "
+          f"risk-off scale {ms.get('risk_off_scale', 0.5)}")
+    if ms.get("selection") == "overlap":
+        print(f"Selection:   overlap -- top {ms.get('enter_rank', ms['n_hold'])} on "
+              f"BOTH {ms['lookback_months']}- and "
+              f"{ms.get('compare_lookback_months')}-month rankings")
     days = sorted(bc.have_days(con))
     if len(days) < 400:
         print(f"Only {len(days)} market days ingested. Run run_market_ingest.py first.")
@@ -75,6 +107,9 @@ def main() -> None:
         print("  is the part that is actually about ranking.")
 
     if res.holdings_log:
+        counts = [len(h) for _, h in res.holdings_log]
+        print(f"\n  names held per rebalance: avg {np.mean(counts):.1f}, "
+              f"min {min(counts)}, max {max(counts)}")
         print(f"\n  latest holdings ({res.holdings_log[-1][0]}):")
         print("   ", ", ".join(res.holdings_log[-1][1]))
 

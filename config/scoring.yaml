@@ -98,9 +98,16 @@ targets:
 momentum_strategy:                 # NOTE: distinct from the `momentum:`
                                    # scoring bucket above -- same word, very
                                    # different thing. Do not merge them.
-  lookback_months: 12
+  lookback_months: 9               # main ranking: 9-1 momentum. Beat 12 in
+                                   # 5 of 6 runs (docs/validation.md), but was
+                                   # picked on the same data -- expect some of
+                                   # the gain to shrink.
+  compare_lookback_months: 12      # also rank on 12-1 and show both side by
+                                   # side, with the names top-n on BOTH.
   skip_months: 1                   # exclude the latest month -- short-horizon
-                                   # returns reverse, so including it hurts
+                                   # returns reverse, so including it hurts.
+                                   # Tested 2026-10 (docs/validation.md): beat
+                                   # skip 0 in 5 of 6 runs. Hurts at 6 months.
   risk_adjusted: true              # divide momentum by realised volatility
   vol_window: 252
   require_above_200dma: true       # no falling knives in the top slice

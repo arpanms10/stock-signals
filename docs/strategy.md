@@ -24,14 +24,18 @@ PYTHONPATH=. .venv/bin/python run_momentum.py --universe nifty200 \
 
 v1 tried to time entries and exits and lost because it sat out 70% of the
 time. Momentum never asks "should I be in this stock?" -- it asks "which are
-strongest?" and holds the top slice, always, rotating monthly. 12-1 momentum
-(12 months excluding the most recent, because short-horizon returns reverse),
-divided by realised volatility, gated on being above the 200 DMA.
+strongest?" and holds the top slice, always, rotating monthly. 9-1 momentum
+(9 months excluding the most recent, because short-horizon returns reverse;
+12-1 is shown alongside for comparison),
+divided by realised volatility, gated on being above the 200 DMA. The skipped
+month and NSE's own Nifty200 Momentum 30 scoring were both tested against
+alternatives; see [validation](validation.md).
 
 *Superseded.* An early NIFTY 50 run showed 15.19% CAGR, but that universe was
 today's index members applied backwards -- survivorship bias worth roughly 14
-points. The survivorship-free figure is **14.5%**; see
-[validation](validation.md).
+points. The survivorship-free figure is **16.9%** on the 9-month ranking
+(11.9% to 17.3% depending on which days the rebalance falls; 11.8% on the
+previous 12-month ranking); see [validation](validation.md).
 
 ## Fundamentals: NSE primary, Yahoo for the gaps
 

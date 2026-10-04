@@ -12,8 +12,10 @@ Every item below is implemented and tested.
 
 ### DONE · Cross-sectional momentum ranking
 
-12-1 momentum (twelve months excluding the most recent, because short-horizon
+9-1 momentum (nine months excluding the most recent, because short-horizon
 returns reverse), divided by realised volatility, gated above the 200 DMA.
+12-1 is ranked alongside for comparison; it was the main ranking until
+2026-10-04.
 Monthly rotation with hysteresis so boundary names do not churn. Regime overlay
 scales the number of positions down rather than going to cash.
 
@@ -103,19 +105,28 @@ scheduling is the fix, but the advice needs to be executable first.
 
 | | 9-year CAGR |
 |---|---|
-| Momentum rotation | **14.5%** |
-| NIFTY 500 index | 11.3% |
-| Random-pick control | 1.8% |
+| Momentum rotation, 9-1 (current) | **16.9%** |
+| Momentum rotation, 12-1 (previous) | 11.8% |
+| NIFTY 500 index | 10.4% |
+| Random-pick control | 5.0% |
 | v1 signal rules (retired) | 1.3% |
 
-Momentum sits 8.4 standard deviations above a random control drawn from the
-same universe, so the ranking carries real information. But the edge is 3.2
-points with a **−44% maximum drawdown against the index's −38%**, and a Sharpe
-of 0.64.
+Momentum beat all 10 random controls drawn from the same universe, by 11.9
+points on average (3.3 standard deviations), so the ranking carries real
+information. It beats the index by 6.5 points, but with a **−43% maximum
+drawdown against the index's −37%**, and a Sharpe of 0.70. The rebalance dates
+alone move the CAGR between 11.9% and 17.3% (15.6% on average). The 9-month
+lookback was chosen over 12 months on this same data, so expect some of that
+edge to shrink.
 
-Removing survivorship bias cost 14 points of apparent return (28.7% → 14.5%)
-and dropped the random control from 17.7% to 1.8%. That collapse is the bias
+Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%)
+and dropped the random control from 17.2% to 5.0%. That collapse is the bias
 measured directly.
+
+*Corrected 2026-10-04:* the earlier 14.5% was run with ETFs leaking into the
+universe; see [validation](docs/validation.md). The earlier "8.4 standard
+deviations" did not reproduce even with the ETFs left in (2.6 with 10 seeds).
+The main ranking moved from 12 to 9 months the same day.
 
 **Honest split: roughly 70% of this framework's value is monitoring and
 discipline — red flags, stops, concentration, tax-aware selling. Perhaps 30% is
@@ -159,7 +170,9 @@ a table. Three months of that is worth more than ten years of backtest.
 
 ### 4. The drawdown, not the return, is the real problem
 
-−44% is worse than the index. A 3.2-point edge does not obviously compensate.
+−43% is worse than the index's −37%. A 6.5-point edge on one run (15.6% on
+average across start dates, against the index's 10.4%) helps, but the fall is
+still the part most people cannot sit through.
 
 **Fix:** volatility targeting — scale gross exposure to hit a target portfolio
 volatility. Best-evidenced improvement to momentum's Sharpe, and a structural

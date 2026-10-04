@@ -37,6 +37,20 @@ def momentum_score(close: pd.Series, lookback_months: int = 12,
     return 100 * (recent / past - 1)
 
 
+def trailing_return(close: pd.Series, months: int) -> float | None:
+    """Plain price return over the last `months`, ending today, in percent.
+
+    For display. It is the number you can check against your broker, unlike
+    the 12-1 figure the ranking uses, which deliberately ignores the latest
+    month.
+    """
+    n = months * TRADING_DAYS_MONTH
+    c = close.dropna()
+    if len(c) <= n or not c.iloc[-1 - n]:
+        return None
+    return float(100 * (c.iloc[-1] / c.iloc[-1 - n] - 1))
+
+
 def realised_volatility(close: pd.Series, n: int = 252) -> pd.Series:
     """Annualised standard deviation of daily returns."""
     return close.pct_change().rolling(n, min_periods=n // 2).std() * np.sqrt(252)
@@ -76,11 +90,20 @@ def build_panel(frames: dict[str, pd.DataFrame], cfg: dict) -> pd.DataFrame:
     return pd.concat(rows, ignore_index=True)
 
 
-def rank_on(panel: pd.DataFrame, on_date, cfg: dict) -> pd.DataFrame:
-    """Rank the universe as of one date. Returns best-first."""
+def rank_on(panel: pd.DataFrame, on_date, cfg: dict,
+            eligible: set[str] | None = None) -> pd.DataFrame:
+    """Rank the universe as of one date. Returns best-first.
+
+    `eligible` is the set of ISIN-confirmed equities (bhavcopy.
+    require_equity_symbols). Live callers pass it because their panels also
+    carry holdings, and a held ETF must never compete with stocks: its
+    near-zero volatility puts it at the top of a risk-adjusted ranking.
+    """
     m = cfg.get("momentum_strategy", {})
     col = "ram" if m.get("risk_adjusted", True) else "mom"
     snap = panel[panel["date"] == on_date].copy()
+    if eligible is not None:
+        snap = snap[snap["symbol"].isin(eligible)]
     snap = snap[snap[col].notna()]
     if snap.empty:
         return snap
@@ -145,6 +168,35 @@ def rebalance_dates(dates: list[dt.date], freq_days: int = 21) -> list[dt.date]:
             out.append(d)
             last = d
     return out
+
+
+def lookbacks(cfg: dict) -> list[int]:
+    """Primary lookback first, then the comparison one if configured."""
+    m = cfg.get("momentum_strategy", {})
+    out = [m.get("lookback_months", 12)]
+    alt = m.get("compare_lookback_months")
+    if alt and alt not in out:
+        out.append(alt)
+    return out
+
+
+def with_lookback(cfg: dict, months: int) -> dict:
+    return {**cfg, "momentum_strategy": {**cfg.get("momentum_strategy", {}),
+                                         "lookback_months": months}}
+
+
+def common_top(rankings: dict[int, pd.DataFrame], n: int) -> list[str]:
+    """Names in the top `n` of every ranking, best average rank first.
+
+    Agreement between two lookbacks is the cheap robustness check: a name that
+    is strong on both is less likely to be an artefact of one window.
+    """
+    tops = [dict(zip(r["symbol"].head(n), r["rank"].head(n)))
+            for r in rankings.values() if not r.empty]
+    if len(tops) < len(rankings) or not tops:
+        return []
+    both = set.intersection(*(set(t) for t in tops))
+    return sorted(both, key=lambda s: (sum(t[s] for t in tops), s))
 
 
 def target_holdings(ranked: pd.DataFrame, current: set[str], cfg: dict) -> list[str]:

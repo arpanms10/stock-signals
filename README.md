@@ -18,7 +18,7 @@ Decision support, not investment advice.
 ```bash
 uv venv && uv pip install -r requirements.txt
 
-cp config/holdings.example.csv config/holdings.csv    # a Kite export works as-is
+PYTHONPATH=. .venv/bin/python import_kite_holdings.py   # Kite .csv/.xlsx dropped in config/
 
 PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10   # ~70 min, once
 PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty200 --years 10
@@ -43,6 +43,7 @@ Optional — a report every Saturday, on this machine:
 | `run_pit_momentum.py` | Survivorship-free backtest |
 | `run_weekly.py` | Refresh everything, then report |
 | `install_schedule.py` | Install / check / remove the Saturday job |
+| `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
 | `set_buckets.py` | Pre-fill core / satellite / legacy |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
@@ -81,19 +82,29 @@ rank ignored; the safe default for anything bought before this existed).
 
 | | 9-year CAGR |
 |---|---|
-| Momentum rotation | **14.5%** |
-| NIFTY 500 index | 11.3% |
-| Random-pick control | 1.8% |
+| Momentum rotation, 9-1 (current) | **16.9%** |
+| Momentum rotation, 12-1 (previous) | 11.8% |
+| NIFTY 500 index | 10.4% |
+| Random-pick control | 5.0% |
 | v1 signal rules *(retired)* | 1.3% |
 
 After realistic Indian costs — STT, stamp duty, exchange fees, GST, slippage.
-Momentum sits 8.4 standard deviations above a random control drawn from the same
-universe, so the ranking carries real information. But the edge is 3.2 points
-with a **−44% drawdown against the index's −38%**, and a Sharpe of 0.64.
+Momentum beat all 10 random controls drawn from the same universe, by 11.9
+points on average (3.3 standard deviations), so the ranking carries real
+information. It beats the index by 6.5 points, but with a **−43% drawdown
+against the index's −37%**, and a Sharpe of 0.70. The rebalance dates alone
+move the CAGR between 11.9% and 17.3% (15.6% on average). The 9-month lookback
+was chosen over 12 months on this same data, so expect some of that edge to
+shrink.
 
-Removing survivorship bias cost 14 points of apparent return (28.7% → 14.5%) and
-dropped the random control from 17.7% to 1.8% — that collapse is the bias
+Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%) and
+dropped the random control from 17.2% to 5.0% — that collapse is the bias
 measured directly.
+
+*Corrected 2026-10-04:* the earlier 14.5% was run with ETFs leaking into the
+universe; see [validation](docs/validation.md). The earlier "8.4 standard
+deviations" did not reproduce even with the ETFs left in (2.6 with 10 seeds).
+The main ranking moved from 12 to 9 months the same day.
 
 **Honest split: roughly 70% of this framework's value is monitoring and
 discipline; perhaps 30% is momentum alpha.** Two ideas that sounded good and

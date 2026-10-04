@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+from pathlib import Path
 
 import pandas as pd
 
 import fundamentals as fu
 import portfolio as pf
 import watchlist as wl
+from data import bhavcopy as bc
 from data import quality, store
 from data.sources import universe as uni
 from scoring import pipeline, timing
@@ -72,6 +74,10 @@ def main() -> None:
     pool = (list(getattr(uni, args.universe)()["symbol"])
             if args.universe else wl.active_symbols())
     symbols = sorted(set(pool) | set(holdings))
+    # Holdings join the panel so they can be monitored, but only ISIN-confirmed
+    # equities may be ranked -- a held liquid ETF would otherwise rank first.
+    equities = bc.require_equity_symbols(
+        bc.connect(Path(__file__).parent / "data" / "market.db"))
 
     frames = build(con, cfg, symbols, holdings)
     bench = store.load_index(con, cfg["signals"]["regime_index"])
@@ -134,7 +140,8 @@ def main() -> None:
         print("  Not enough history to rank.")
     else:
         latest = max(panel["date"])
-        ranked = combined.combined_rank(panel, latest, cfg, qual)
+        ranked = combined.combined_rank(panel, latest, cfg, qual,
+                                         eligible=equities)
         if ranked.empty:
             print("  Nothing passes the filters today.")
         else:
@@ -142,18 +149,59 @@ def main() -> None:
             print(f"  Top {n} of {len(ranked)} eligible "
                   f"({len(panel[panel['date'] == latest])} in the pool), "
                   f"as of {latest}")
-            print(f"  {'#':>3} {'symbol':<12}{'12-1 mom%':>11}{'vol%':>8}"
+            print(f"  {'#':>3} {'symbol':<12}{'12M%':>8}{'1M%':>7}{'vol%':>7}"
                   f"{'score':>8}{'quality':>9}  held")
             for r in ranked.head(n).itertuples():
                 q = "" if pd.isna(r.quality) else f"{r.quality:.0f}"
-                print(f"  {r.rank:>3} {r.symbol:<12}{r.mom:>11.1f}"
-                      f"{100 * r.vol:>8.1f}{r.ram:>8.2f}{q:>9}"
+                f = frames.get(r.symbol)
+                r12 = mom.trailing_return(f["close"], 12) if f is not None else None
+                r1 = mom.trailing_return(f["close"], 1) if f is not None else None
+                print(f"  {r.rank:>3} {r.symbol:<12}"
+                      f"{'' if r12 is None else f'{r12:.1f}':>8}"
+                      f"{'' if r1 is None else f'{r1:.1f}':>7}"
+                      f"{100 * r.vol:>7.1f}{r.ram:>8.0f}{q:>9}"
                       f"  {'yes' if r.symbol in holdings else ''}")
+            print(f"\n  score = return from {cfg['momentum_strategy']['lookback_months']}"
+                  " months ago to 1 month ago, divided "
+                  "by volatility.\n  The latest month (1M%) is left out of it: "
+                  "short-term moves tend to reverse.")
             unknown = combined.unknown_quality_names(ranked.head(n))
             if unknown:
                 print(f"\n  No fundamentals on file for: {', '.join(unknown)}")
                 print("  These pass the quality gate only because nothing is")
                 print("  known about them. Fill config/fundamentals.csv.")
+
+    # ------------------------------------- 3b. agreement across lookbacks
+    lbs = mom.lookbacks(cfg)
+    if len(lbs) > 1 and not ranked.empty:
+        n = cfg["momentum_strategy"]["n_hold"]
+        rankings = {lbs[0]: ranked}
+        for lb in lbs[1:]:
+            c = mom.with_lookback(cfg, lb)
+            p = mom.build_panel(frames, c)
+            rankings[lb] = (combined.combined_rank(p, max(p["date"]), c, qual,
+                                                   eligible=equities)
+                            if not p.empty else pd.DataFrame())
+        both = mom.common_top(rankings, n)
+        label = " vs ".join(f"{lb}-MONTH" for lb in lbs)
+        print(section(f"3b. {label} -- top {n} on each, and the overlap"))
+        cols = [list(r["symbol"].head(n)) if not r.empty else []
+                for r in rankings.values()]
+        print("  " + "".join(f"{f'{lb}-1 momentum':<22}" for lb in lbs))
+        for i in range(n):
+            cells = []
+            for c in cols:
+                sym = c[i] if i < len(c) else ""
+                mark = "*" if sym in both else " "
+                cells.append(f"{i + 1:>3} {sym:<14}{mark}   " if sym else " " * 22)
+            print("  " + "".join(cells))
+        print(f"\n  * in the top {n} on every lookback: {len(both)} name(s)")
+        if both:
+            print("    " + ", ".join(
+                f"{s}{' (held)' if s in holdings else ''}" for s in both))
+        print("\n  Overlap names are strong on both windows, so less likely to "
+              "be an\n  artefact of one. The overlap alone has NOT been "
+              "backtested as a portfolio.")
 
     # ------------------------------------------------- 4. what to change
     if args.rebalance and not ranked.empty:
