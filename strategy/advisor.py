@@ -410,7 +410,8 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
                           sectors: dict[str, str] | None = None,
                           values: dict[str, float] | None = None,
                           book: float = 0.0,
-                          max_sector_pct: float | None = None) -> dict:
+                          max_sector_pct: float | None = None,
+                          min_trade_value: float = 0.0) -> dict:
     """Fund the adds from the sells, best first, and stop when money runs out.
 
     Without this the advisor emits every under-weight position as an ADD and
@@ -448,6 +449,23 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
         cap_value = book * max_sector_pct / 100
         room = {sec: cap_value - v for sec, v in held.items()}
 
+    def too_small(a: Advice, value: float) -> bool:
+        """An add the sector cap or the cash cut down to a token amount.
+
+        A 5-share JIOFIN add worth about 1,000 was the trigger: real
+        brokerage and attention for no change to the portfolio. The backtests
+        already skip trades below the same threshold, so the advice now
+        matches what was tested.
+        """
+        if not min_trade_value or value >= min_trade_value:
+            return False
+        a.action, a.qty = "WATCH", 0
+        a.reasons.append(f"only {value:,.0f} could be added -- below the "
+                         f"{min_trade_value:,.0f} minimum trade, so not worth "
+                         f"placing")
+        deferred.append(a)
+        return True
+
     remaining, funded, deferred = budget, [], []
     for a in sorted(adds, key=conviction):
         px = prices.get(a.symbol, 0.0)
@@ -465,6 +483,8 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
                 a.qty = int(left / px)
                 a.reasons.append(f"cut to fit the {max_sector_pct:.0f}% sector "
                                  f"cap: {left:,.0f} of room left after this plan")
+                if too_small(a, a.qty * px):
+                    continue
         cost = a.qty * px
         if cost <= remaining:
             remaining -= cost
@@ -476,6 +496,8 @@ def apply_cash_constraint(advices: list[Advice], prices: dict[str, float],
         # Part-fund rather than skip: half a position in the best business you
         # own beats a full position in the fourth best.
         affordable = int(remaining / px) if px else 0
+        if affordable >= 1 and too_small(a, affordable * px):
+            continue
         if affordable >= 1:
             a.qty = affordable
             a.reasons.append(f"part-funded: only {remaining:,.0f} of the "

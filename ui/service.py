@@ -305,7 +305,8 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     freshness = [{"label": c.label, "message": c.message} for c in checks]
     cash = adv.apply_cash_constraint(
         advices, prices, qual, 0.0, sectors=sectors, values=values, book=book,
-        max_sector_pct=cfg["risk"]["max_sector_pct"])
+        max_sector_pct=cfg["risk"]["max_sector_pct"],
+        min_trade_value=book * cfg["risk"].get("min_trade_pct", 0.0) / 100)
     # apply_cash_constraint can downgrade an ADD to WATCH, so rebuild the rows
     # it touched rather than reporting an action the plan cannot fund.
     by_symbol = {a.symbol: a for a in advices}

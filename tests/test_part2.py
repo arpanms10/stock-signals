@@ -522,3 +522,34 @@ def test_adds_do_not_refill_a_sector_past_its_cap():
     assert a["F1"].action == "ADD" and a["F1"].qty == 30   # cut to the room
     assert a["F2"].action == "WATCH"                       # no room left
     assert a["IT1"].action == "ADD" and a["IT1"].qty == 40 # other sectors fine
+
+
+def test_token_adds_become_watch_not_trades():
+    """The sector cap left room for 5 JIOFIN shares, about 1,000 -- a trade
+    that changes nothing. Below the minimum it is listed, not placed."""
+    prices = dict.fromkeys(["BIG", "F1", "IT1", "OTHER"], 100.0)
+    values = {"BIG": 25000.0, "F1": 1000.0, "IT1": 1000.0, "OTHER": 73000.0}
+    sectors = {"BIG": "Fin", "F1": "Fin", "IT1": "IT", "OTHER": "Misc"}
+    advices = [make_sell("BIG", 14, 1400.0),            # Fin 26% -> 24.6%
+               make_add("F1", 40), make_add("IT1", 40)]
+    quality = {"F1": q(95.0), "IT1": q(80.0)}
+    adv.apply_cash_constraint(advices, prices, quality, cash_available=10000.0,
+                              sectors=sectors, values=values, book=100000.0,
+                              max_sector_pct=25.0, min_trade_value=500.0)
+    a = {x.symbol: x for x in advices}
+    # 400 of sector room = 4 shares, under the 500 minimum.
+    assert a["F1"].action == "WATCH" and a["F1"].qty == 0
+    assert any("minimum trade" in r for r in a["F1"].reasons)
+    assert a["IT1"].action == "ADD" and a["IT1"].qty == 40
+
+
+def test_part_funded_add_below_minimum_is_not_placed():
+    prices = {"SELL": 100.0, "A": 100.0, "B": 100.0}
+    advices = [make_sell("SELL", 43, 4300.0),            # raises 4,300
+               make_add("A", 40), make_add("B", 40)]
+    adv.apply_cash_constraint(advices, prices, {"A": q(95.0), "B": q(80.0)},
+                              min_trade_value=500.0)
+    a = {x.symbol: x for x in advices}
+    assert a["A"].action == "ADD" and a["A"].qty == 40      # 4,000 funded
+    assert a["B"].action == "WATCH"                         # 300 left < 500
+    assert any("minimum trade" in r for r in a["B"].reasons)

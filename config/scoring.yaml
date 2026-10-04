@@ -63,6 +63,9 @@ risk:
   risk_per_trade_pct: 1.0          # max portfolio % lost if the stop hits
   max_position_pct: 5.0
   max_sector_pct: 25.0
+  min_trade_pct: 0.5               # an add smaller than this % of the book is
+                                   # not worth the brokerage and attention; the
+                                   # backtests skip trades below the same 0.5%
   max_positions: 10
   trail_lookback_days: 365         # fallback when a purchase date is unknown
 

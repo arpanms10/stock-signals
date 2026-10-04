@@ -169,7 +169,8 @@ def main() -> None:
 
     cash = adv.apply_cash_constraint(
         advices, prices, qual, args.cash, sectors=sectors, values=values,
-        book=book, max_sector_pct=cfg["risk"]["max_sector_pct"])
+        book=book, max_sector_pct=cfg["risk"]["max_sector_pct"],
+        min_trade_value=book * cfg["risk"].get("min_trade_pct", 0.0) / 100)
 
     summary = adv.summarise(advices)
     warnings = adv.sanity_warnings(advices, len(ranked), args.universe_size)
