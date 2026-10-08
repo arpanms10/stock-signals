@@ -33,6 +33,24 @@ Five NSE traps handled here, all of which fail silently rather than raising:
 
 Ingestion flags any unexplained move above 35% as a suspect bar.
 
+A sixth trap was in the ingestion itself, found 2026-10-08: **a failed
+download was recorded as a day with no data, and never retried.**
+`fetch_day()` turned any error (a dropped connection, throttling) into an
+empty day, and `ingest_range` marks every day it handles as done, so the
+next run skipped it. On top of that, the old-format archive is missing
+some early-2024 dates (2024-06-12 answers 404) that exist in the UDiFF
+format, which was only tried from July 2024. Together they left **249
+weekday trading days, about 9% since 2016, recorded as empty.**
+
+Fixed: `fetch_day` tries both formats. It returns an empty day only when
+neither has a file, and `None` when a request failed. A failed day is
+never recorded, and a missing one is recorded only once it is a week old,
+since a recent file may not be published yet. `repair_false_empty_days()`
+cleared the false markers, and a re-ingest refilled 227 of the 249 days.
+The other 22 exist in neither format, including 10 days in 2020–23 when
+the index traded: gaps in NSE's own archive. Backtest results computed
+before this fix ran on the holey history.
+
 A fifth trap was self-inflicted and worth recording: **OBV is a cumulative sum
 from an arbitrary origin**, so its percent change is not well defined -- near a
 zero crossing it explodes, and the value depends on how much history happened to

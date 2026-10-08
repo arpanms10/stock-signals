@@ -148,3 +148,83 @@ def test_universe_refuses_to_run_without_an_instrument_map(tmp_path):
     assert bc.equity_symbols(con) == set()
     with pytest.raises(bc.InstrumentMapMissing):
         bc.universe_on(con, dt.date(2020, 1, 25), top_n=2, min_days=5)
+
+
+# ---------------------------------------------------------- failed vs missing
+
+class _Resp:
+    def __init__(self, code):
+        self.status_code = code
+
+
+class _HTTP(Exception):
+    def __init__(self, code):
+        super().__init__(f"HTTP {code}")
+        self.response = _Resp(code)
+
+
+def _patch(monkeypatch, old, udiff):
+    import jugaad_data.nse as jn
+    monkeypatch.setattr(jn, "bhavcopy_raw", old)
+    monkeypatch.setattr(jn, "bhavcopy_udiff_raw", udiff)
+
+
+OLD_CSV = "SYMBOL,SERIES,CLOSE,TOTTRDQTY,TOTTRDVAL,ISIN\nAAA,EQ,10,100,1000,INE000A01010\n"
+UDIFF_CSV = "TckrSymb,SctySrs,ClsPric,TtlTradgVol,TtlTrfVal,ISIN\nAAA,EQ,10,100,1000,INE000A01010\n"
+
+
+def _raise(exc):
+    def f(d):
+        raise exc
+    return f
+
+
+def test_falls_back_to_the_other_format(monkeypatch):
+    import datetime as dt
+    from data import bhavcopy as bc
+    _patch(monkeypatch, _raise(_HTTP(404)), lambda d: UDIFF_CSV)
+    df = bc.fetch_day(dt.date(2024, 6, 12))          # old format missing, UDiFF present
+    assert list(df["symbol"]) == ["AAA"]
+
+
+def test_missing_in_both_is_empty_but_a_failure_is_none(monkeypatch):
+    import datetime as dt
+    import zipfile
+    from data import bhavcopy as bc
+    _patch(monkeypatch, _raise(_HTTP(404)), _raise(zipfile.BadZipFile()))
+    assert bc.fetch_day(dt.date(2023, 1, 2)).empty
+    _patch(monkeypatch, _raise(ConnectionError("reset")), _raise(_HTTP(404)))
+    assert bc.fetch_day(dt.date(2023, 1, 2)) is None
+
+
+def test_keep_day_rules():
+    import datetime as dt
+    import pandas as pd
+    from data import bhavcopy as bc
+    old = dt.date.today() - dt.timedelta(days=30)
+    new = dt.date.today() - dt.timedelta(days=1)
+    assert not bc.keep_day(old, None)                 # failed: retry
+    assert bc.keep_day(old, pd.DataFrame())           # long missing: record empty
+    assert not bc.keep_day(new, pd.DataFrame())       # recent: maybe not published
+    assert bc.keep_day(new, pd.DataFrame({"symbol": ["A"]}))
+
+
+def test_failed_day_is_not_marked_done(tmp_path, monkeypatch):
+    import datetime as dt
+    from data import bhavcopy as bc
+    con = bc.connect(tmp_path / "m.db")
+    monkeypatch.setattr(bc, "fetch_day", lambda d: None)
+    bc.ingest_range(con, dt.date(2023, 1, 2), dt.date(2023, 1, 3), pause=0, verbose=False)
+    assert bc.have_days(con) == set()                 # will be retried
+
+
+def test_repair_clears_only_non_holiday_weekdays(tmp_path):
+    import datetime as dt
+    from data import bhavcopy as bc
+    con = bc.connect(tmp_path / "m.db")
+    con.executemany("INSERT INTO market_days VALUES (?,?,?)",
+                    [("2023-01-02", 0, "x"), ("2023-01-26", 0, "x"),   # weekday / holiday
+                     ("2023-01-07", 0, "x"), ("2023-01-03", 100, "x")])  # Saturday / full
+    cleared = bc.repair_false_empty_days(con, {dt.date(2023, 1, 26)}, verbose=False)
+    assert cleared == ["2023-01-02"]
+    assert bc.have_days(con) == {"2023-01-26", "2023-01-07", "2023-01-03"}
