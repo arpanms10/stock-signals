@@ -60,3 +60,54 @@ class CostModel:
         total = self.buy_cost(price, qty) + self.sell_cost(price, qty)
         total += turnover * 2 * self.slippage_pct / 100
         return 100 * total / turnover
+
+
+@dataclass
+class OptionCostModel:
+    """Index/stock option charges, per Zerodha's F&O schedule (rates as of
+    2025-26 -- check zerodha.com/charges if they change).
+
+    Premium is what is traded, so most charges are a % of premium. Two that
+    are easy to miss: STT on the SELL side was raised to 0.1% of premium from
+    October 2024, and an in-the-money option held to expiry and exercised
+    pays STT of 0.125% of its intrinsic value -- on a cheap deep-ITM option
+    that can cost more than the premium-based charges combined.
+
+    Slippage: history only has closing prices, not quotes. A fill is assumed
+    `slippage_pct` of premium worse than the close on each side, never less
+    than one tick (0.05) -- liquid index options trade tighter, thin stock
+    options wider, so this is a middle assumption.
+    """
+    brokerage_per_order: float = 20.0
+    stt_sell_pct: float = 0.1          # of premium, sell side
+    stt_exercise_pct: float = 0.125    # of intrinsic, ITM option exercised at expiry
+    exchange_pct: float = 0.03503      # NSE, of premium
+    sebi_pct: float = 0.0001
+    stamp_buy_pct: float = 0.003
+    gst_pct: float = 18.0
+    slippage_pct: float = 1.0
+    tick: float = 0.05
+
+    def _fees(self, turnover: float) -> float:
+        exch = turnover * self.exchange_pct / 100
+        sebi = turnover * self.sebi_pct / 100
+        gst = (self.brokerage_per_order + exch + sebi) * self.gst_pct / 100
+        return self.brokerage_per_order + exch + sebi + gst
+
+    def buy_cost(self, premium: float, qty: float) -> float:
+        t = premium * qty
+        return self._fees(t) + t * self.stamp_buy_pct / 100
+
+    def sell_cost(self, premium: float, qty: float) -> float:
+        t = premium * qty
+        return self._fees(t) + t * self.stt_sell_pct / 100
+
+    def exercise_cost(self, intrinsic: float, qty: float) -> float:
+        """Held to expiry in the money: exercised automatically. No brokerage
+        on a cash-settled index exercise; STT on the intrinsic value."""
+        return max(intrinsic, 0.0) * qty * self.stt_exercise_pct / 100
+
+    def fill(self, premium: float, side: str) -> float:
+        """Buy a little above the close, sell a little below."""
+        s = max(premium * self.slippage_pct / 100, self.tick)
+        return premium + s if side == "buy" else max(premium - s, 0.0)

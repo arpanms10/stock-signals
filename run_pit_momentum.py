@@ -19,6 +19,37 @@ def show(title, m):
         print(f"  {k:>28}: {v}")
 
 
+def _report(res, args) -> None:
+    """A rotation strategy has no discrete trades to log: its record is the
+    equity curve and what it held at each rebalance."""
+    import pandas as pd
+    from backtest import report as rp
+    if res.equity is None or len(res.equity) < 2:
+        return
+    show("Equity curve", rp.equity_stats(res.equity))
+    months = rp.month_table(res.equity, "compound")
+    bench_m = rp.month_table(res.benchmark, "compound") if len(res.benchmark) else None
+    print("\n=== Monthly return, % ===")
+    print(months.fillna("").to_string())
+    if bench_m is not None and len(bench_m):
+        yr = pd.DataFrame({"strategy": months["Total"], "benchmark": bench_m["Total"]})
+        yr["difference"] = yr["strategy"] - yr["benchmark"]
+        print("\n=== By year, % (strategy vs benchmark) ===")
+        print(yr.round(2).to_string())
+    if args.export is not None:
+        holdings = pd.DataFrame([{"rebalance": d, "n": len(h), "holdings": ", ".join(h)}
+                                 for d, h in res.holdings_log])
+        path = rp.export(args.export or rp.default_path("momentum"), {
+            "Metrics": rp.stats_frame({**res.metrics, **rp.equity_stats(res.equity)}),
+            "Monthly return %": months,
+            "Benchmark monthly %": bench_m,
+            "Holdings log": holdings,
+            "Equity": pd.DataFrame({"strategy": res.equity, "benchmark": res.benchmark})
+            .rename_axis("date"),
+        })
+        print(f"\nExcel: {path}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--capital", type=float, default=1_000_000)
@@ -46,6 +77,8 @@ def main() -> None:
                          "(1.0 = ignore the market regime)")
     ap.add_argument("--vol-target", action="store_true",
                     help="scale exposure to a target portfolio volatility")
+    ap.add_argument("--export", nargs="?", const="", default=None, metavar="PATH",
+                    help="write the equity curve, monthly returns and holdings log to Excel")
     args = ap.parse_args()
 
     con = bc.connect(args.db)
@@ -86,6 +119,7 @@ def main() -> None:
     res = pit.run(con, cfg, start, end, bench, args.capital, CostModel(),
                   args.universe_size)
     show("Momentum, point-in-time universe (no survivorship bias)", res.metrics)
+    _report(res, args)
 
     if args.shuffle:
         print("\n=== Random-pick controls (same universe, dates and costs) ===")

@@ -16,6 +16,38 @@ def show(title: str, m: dict) -> None:
         print(f"  {k:>28}: {v}")
 
 
+def _report(res, args) -> None:
+    """Trade-level statistics and the year x month tables; Excel on --export."""
+    import pandas as pd
+    from backtest import report as rp
+    closed = [t for t in res.trades if t.exit_price is not None]
+    if not closed:
+        return
+    t = pd.DataFrame([{
+        "symbol": x.symbol, "entry_date": pd.Timestamp(x.entry_date),
+        "exit_date": pd.Timestamp(x.exit_date), "entry_price": x.entry_price,
+        "exit_price": x.exit_price, "qty": x.qty, "entry_rule": x.entry_rule,
+        "exit_rule": x.exit_rule, "partial": x.scale_out, "costs": round(x.costs, 2),
+        "pnl": round(x.pnl, 2), "return_pct": round(x.return_pct, 2)}
+        for x in closed]).sort_values("exit_date").reset_index(drop=True)
+    st = rp.trade_stats(t["pnl"])
+    show("Trades (rupees, after costs)", st)
+    show("Equity curve", rp.equity_stats(res.equity))
+    months = rp.month_table(res.equity, "compound")
+    print("\n=== Monthly return, % (equity curve) ===")
+    print(months.fillna("").to_string())
+    if args.export is not None:
+        path = rp.export(args.export or rp.default_path("trades"), {
+            "Metrics": rp.stats_frame({**res.metrics, **st, **rp.equity_stats(res.equity)}),
+            "Trades": t, "Monthly return %": months,
+            "P&L by month": rp.month_table(t.set_index("exit_date")["pnl"]),
+            "By symbol": rp.split_stats(t, "symbol"),
+            "By exit rule": rp.split_stats(t, "exit_rule"),
+            "Equity": res.equity.rename("equity").to_frame().rename_axis("date"),
+        }, trades=t)
+        print(f"\nExcel: {path} (trades also as CSV beside it)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--capital", type=float, default=1_000_000)
@@ -27,6 +59,11 @@ def main() -> None:
                     help="restrict to these symbols (few names = noisy result)")
     ap.add_argument("--per-symbol", action="store_true",
                     help="per-stock table vs buy-and-hold of that same stock")
+    ap.add_argument("--export", nargs="?", const="", default=None, metavar="PATH",
+                    help="write the trade log, metrics and year x month tables to Excel "
+                         "(default reports/backtests/trades_<time>.xlsx)")
+    ap.add_argument("--no-reconcile", action="store_true",
+                    help="skip checking sampled fills against the price data")
     args = ap.parse_args()
 
     con = store.connect()
@@ -51,8 +88,13 @@ def main() -> None:
             frames[s] = f.reset_index(drop=True)
     print(f"Backtesting {len(frames)} symbols")
 
-    res = bt.run(frames, bench, cfg, args.capital, CostModel())
+    costs = CostModel()
+    res = bt.run(frames, bench, cfg, args.capital, costs)
+    if not args.no_reconcile:
+        from backtest import reconcile as rc
+        print("\n" + rc.summary(rc.equity_trades(res.trades, frames, costs, k=8)))
     show("Strategy", res.metrics)
+    _report(res, args)
 
     n_trades = res.metrics.get("trades", 0)
     if n_trades < 30:
