@@ -76,6 +76,30 @@ showed the walls only made the range narrower, never more accurate, and that
 index thresholds labelled 71% of stocks "bearish". Both were changed.
 `run_fno_backtest.py` still reports the old range for comparison.
 
+## Forward log
+
+```bash
+PYTHONPATH=. .venv/bin/python record_fno.py               # score expired cycles, record this one
+PYTHONPATH=. .venv/bin/python record_fno.py --check-only  # score only
+```
+
+`history/fno_ranges.xlsx` gets one tab per monthly expiry. Each tab holds
+every underlying's range, the hit rate the backtest expects, the walls, PCR
+and max pain, all written down **before** the outcome is known. After expiry,
+the next run fills in the expiry close (from NSE's F&O bhavcopy) and whether
+each level held. The **Summary** tab compares actual hit rates with expected
+ones, per cycle and in total.
+
+The default basket is NIFTY, BANKNIFTY, FINNIFTY and MIDCPNIFTY plus every
+NIFTY 50 stock with F&O (about 54 underlyings, about a minute). Override it
+with `--symbols`. The first record of a cycle is kept, and `--force`
+replaces it. The Saturday job runs it, so a cycle is normally logged 15–20
+sessions before expiry.
+
+Judge it over several cycles. Stocks move together, so one large market move
+can push most of a cycle outside its range. The log started with the
+October 2026 expiry.
+
 ## Snapshots
 
 Every live run (CLI or dashboard) stores the chain in `data/signals.db`

@@ -48,6 +48,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 200
 | `record_momentum.py` | Save this month's momentum picks to `history/` |
 | `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
 | `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
+| `record_fno.py` | Monthly F&O forward log → `history/fno_ranges.xlsx`, scored at expiry |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).

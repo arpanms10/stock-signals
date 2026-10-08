@@ -128,6 +128,28 @@ points, on small "bullish" buckets. Over a period when most stocks fell,
 If price really gravitated to max pain, max pain would beat "price stays
 where it is" more than half the time. It beat it 36–43% of the time.
 
+### As price targets: reached no more often than any level
+
+Could an options level serve as a **target**, even if it isn't a barrier?
+Here, "reached" means any daily close at or beyond the level before expiry
+(intraday highs and lows aren't in the data). The null is how often price
+reached a level the same distance away.
+
+| | distance | reached | null | edge |
+|---|---|---|---|---|
+| stocks, call wall as upside target, 5 out | 4.2% | 22.6% | 22.6% | 0.0 |
+| stocks, call wall as upside target, 10 out | 4.5% | 32.4% | 32.5% | −0.1 |
+| stocks, put wall as downside target, 10 out | 3.6% | 39.3% | 39.6% | −0.3 |
+| stocks, max pain (above spot), 10 out | 2.0% | 52.3% | 52.7% | −0.4 |
+| indices, call wall, 10 out | 3.0% | 28.8% | 28.1% | +0.7 |
+| indices, put wall, 10 out | 2.0% | 37.0% | 34.3% | +2.7 |
+
+Every stock edge is within ±1.1 points at the 5- and 10-session offsets. One
+max-pain cell at 10 out is −3.1, which is worse, not better. The index edges
+fall inside their roughly ±4–8 point noise. A target taken from the option
+chain is a level at some distance from spot. How likely price is to reach it
+depends on that distance and on volatility, not on the OI sitting there.
+
 ## What this does and does not show
 
 - It covers **end-of-day** chains, and 20/10/5 sessions before **monthly**
