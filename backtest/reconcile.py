@@ -98,12 +98,13 @@ def options(trades: pd.DataFrame, k: int = 5, seed: int = 7, costs=None) -> pd.D
         prem = float(o["close"].iloc[0])
         intr = (max(spot_exp - t.strike, 0) if t.side == "CE" else max(t.strike - spot_exp, 0)) \
             if pd.notna(spot_exp) else np.nan
-        if t.action == "buy":
-            fill = costs.fill(prem, "buy")
-            pnl = (intr - fill) * t.lot - costs.buy_cost(fill, t.lot) - costs.exercise_cost(intr, t.lot)
+        from backtest.option_backtest import settle
+        fill = costs.fill(prem, t.action)
+        if pd.notna(intr):
+            per_unit, c, _ = settle(t.action, t.kind, fill, intr, t.lot, costs)
+            pnl = per_unit * t.lot - c
         else:
-            fill = costs.fill(prem, "sell")
-            pnl = (fill - intr) * t.lot - costs.sell_cost(fill, t.lot)
+            pnl = np.nan
         check(t, "P&L rebuilt from source", t.pnl, round(pnl, 2),
               ok=pd.notna(pnl) and abs(t.pnl - pnl) <= 0.05 * t.lot + 0.5)
     return pd.DataFrame(rows)
