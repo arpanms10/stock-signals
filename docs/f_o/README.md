@@ -157,7 +157,20 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --fno-intraday --remove  # rem
 Installs a second launchd agent that runs `snapshot_fno.py` every 30 minutes,
 09:30–15:30 on weekdays, for the forward-log basket. It skips exchange
 holidays and does nothing outside market hours, and it only runs while the
-Mac is awake. This builds the intraday history that today's change-in-OI PCR
+Mac is awake.
+
+The same install adds a second agent, `keep_awake_fno.py`, at 09:20 on
+weekdays. On an NSE trading day it runs macOS's own `caffeinate -i` until
+15:35, which stops the Mac sleeping when idle. That's a process holding a
+sleep assertion, not a change to system settings, and it ends with the
+process. It can't wake a Mac that's already asleep (launchd starts it when
+the Mac next wakes), and it can't keep a closed-lid laptop on battery awake.
+To have the Mac wake itself before the open, run this once yourself (it
+changes a system power setting and asks for your password):
+
+```bash
+sudo pmset repeat wakeorpoweron MTWRF 09:20:00
+``` This builds the intraday history that today's change-in-OI PCR
 needs before it can be tested. Until then it's labelled untested.
 
 To see how a day went, after the close:

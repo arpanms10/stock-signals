@@ -36,3 +36,16 @@ def test_day_report_tracks_first_to_last(tmp_path, monkeypatch):
     assert round(r["spot_chg_pct"], 2) == 1.0
     assert r["pcr_last"] > r["pcr_first"]
     assert len(timeline) == 2
+
+
+def test_keep_awake_until_close():
+    import keep_awake_fno as ka
+    assert ka.seconds_until_close(dt.datetime(2026, 10, 9, 9, 20)) == (6 * 60 + 15) * 60
+    assert ka.seconds_until_close(dt.datetime(2026, 10, 9, 16, 0)) == 0
+
+
+def test_awake_agent_runs_weekday_mornings():
+    import install_schedule as i
+    p = i.build_fno_awake()
+    assert p["StartCalendarInterval"] == [{"Weekday": d, "Hour": 9, "Minute": 20}
+                                         for d in range(1, 6)]
