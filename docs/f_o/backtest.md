@@ -108,6 +108,54 @@ validation:
 
 What these rules would have done after costs, not what to trade.
 
+## Stocks (monthly, entry 10 sessions out, Jan 2024 – Sep 2026)
+
+From `--compare --universe stocks`. That's about 6,500 trades per rule
+across ~200 stocks, and the automatic check passed for every rule. Use the
+**average per trade**: the totals add up one lot in every stock every month,
+which isn't a portfolio anyone holds.
+
+| rule | trades | win rate | profit factor | average per trade (₹/lot) |
+|---|---|---|---|---|
+| buy CE ATM | 6,612 | 32.1% | 0.88 | −1,283 |
+| buy PE ATM | 6,625 | 33.1% | 0.79 | −2,074 |
+| buy CE 1 straddle above | 6,450 | 15.7% | 0.73 | −1,435 |
+| buy PE 1 straddle below | 6,444 | 14.2% | 0.61 | −1,790 |
+| sell CE 1 straddle above | 6,450 | 84.2% | 1.29 | +1,149 |
+| sell PE 1 straddle below | 6,444 | 85.5% | 1.53 | +1,522 |
+| sell CE ATM | 6,612 | 67.3% | 1.08 | +760 |
+| sell PE ATM | 6,625 | 66.5% | 1.19 | +1,583 |
+
+The same pattern as indices, more strongly: buying lost after costs and
+selling made money, in every rule.
+
+| profit factor by year | 2024 | 2025 | 2026 |
+|---|---|---|---|
+| sell PE 1 straddle below | 1.46 | 1.79 | 1.38 |
+| buy PE 1 straddle below | 0.65 | 0.52 | 0.68 |
+| sell CE 1 straddle above | 1.29 | 1.11 | 1.62 |
+
+- **Consistent across all three years, but they're only three years.**
+  Stock history starts in 2024, so the sample has no stretch like 2022–23,
+  when the same put-selling rule lost heavily on indices.
+- **Losses arrive together.** About 200 short options expire on the same
+  day, so a broad fall hits them all at once. For selling the put one
+  straddle below, 27% of expiries lost on average across stocks; the worst
+  were Dec-2024 (−₹8,267 per stock-lot) and Oct-2024 (−₹8,084).
+- **The single-stock tail is severe.** The worst short put lost **₹2.18
+  lakh on one lot** (IEX), about 50× the median trade (+₹4,345). The worst
+  short call lost ₹1.69 lakh (INDIACEM). A bought option can't lose more
+  than its premium: the worst bought put lost ₹28,036.
+- **Margin.** Short stock options tie up a lot of margin per lot, so
+  return on capital is far below these per-lot figures.
+- **Skips:** 214 cycles had no traded ATM straddle to measure "one
+  straddle" from, 16 had a split or bonus inside, and up to 61 had no traded
+  strike near the target. All are counted in the output.
+
+Selling won small and often; a single stock's gap or a market-wide fall took
+back months of premium. What these rules would have done after costs, not
+what to trade.
+
 ## Also: trade logs for the equity backtests
 
 The same reporting now runs on the existing backtests:
