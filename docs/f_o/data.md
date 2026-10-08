@@ -55,12 +55,16 @@ source. NSE's daily F&O bhavcopy (UDiFF format) has every contract's
 end-of-day OI, change in OI, volume and close, plus the underlying's close and
 the lot size.
 
-To keep the history small, only two things are stored:
+To keep the history small, full chains are only stored on certain days:
 
-- `fo_spot`: every day, each underlying's close, near monthly expiry and lot.
-  This is where outcomes come from.
-- `fo_chain`: the near-monthly chain, kept only on days 20, 10 and 5 sessions
-  before expiry, within ±15% of spot.
+- `fo_spot`: every day, for every underlying: close, estimated high/low,
+  near monthly expiry, lot, straddle, straddle IV, skew-wing IVs and the next
+  monthly's IV. Outcomes, IV percentile and realised vol come from here.
+- `fo_chain`: the near-monthly chain on days 20, 10 and 5 sessions before
+  expiry, plus each weekly index expiry's chain 4, 2 and 1 sessions before
+  it, within ±15% of spot.
+- `fo_index_ohlc`: daily index high/low/close since 2019.
+- `fo_results`: announced results dates.
 
 ## History traps
 
@@ -87,9 +91,38 @@ To keep the history small, only two things are stored:
    the ATM strike didn't trade, there is no straddle, and the range falls
    back to the walls alone. The file also has no IV or bid/ask, so the
    historical straddle uses closes where the live one uses the bid/ask mid.
-6. **Sessions are counted as weekdays.** An exchange holiday can shift an
-   offset day by one, or skip it for that cycle. That's harmless for this
-   kind of validation, and it lets ingestion run in a single pass.
+6. **Sessions count exchange holidays** (see 7 below), so an offset day is
+   the same number of trading sessions before expiry in every cycle.
+
+## Added in the second round
+
+7. **Sessions count NSE's holidays now.** `/api/holiday-master?type=trading`
+   gives the F&O holidays per year, cached. Counting weekdays alone said
+   "13 sessions" to 27-Oct-2026, when Diwali (20-Oct) made it 12. The
+   historical ingest uses the same calendar, so offset days line up.
+8. **The bhavcopy has no IV, so IV is backed out of closing prices.** A
+   vectorised Black-Scholes bisection at the two skew wings, and the
+   straddle formula for ATM. To keep live and history comparable, the live
+   view computes the same straddle IV and skew from quotes, instead of
+   using NSE's IV column. Live NIFTY straddle IV (13.0%) sits close to NSE's
+   ATM IV (13.3%).
+9. **There is no underlying high/low in the F&O file.** For stocks it's
+   estimated as the near-month future's high/low minus that day's closing
+   basis. Basis changes little within a day, but this is an estimate. For
+   indices the real high/low comes from the index's own history
+   (niftyindices, via jugaad-data).
+10. **Results dates come from free text.** NSE's board-meeting endpoint
+    gives a purpose and a description. Most results meetings are filed as a
+    generic "Board Meeting Intimation" whose description mentions financial
+    results, so the match is on either field. It finds about 25,000 meetings
+    for 2024–26, peaking in the four results seasons. Only *announced*
+    meetings are known; a company that hasn't announced yet looks like it
+    has no results before expiry.
+11. **Pre-2024 history is indices only, with OI in shares.** The old format
+    has no underlying price or lot size. Spot and high/low come from the
+    index history, and every OI read is a ratio or argmax within one chain,
+    so shares versus contracts doesn't change the result. Absolute OI isn't
+    comparable across the 2024 boundary.
 
 ---
 
