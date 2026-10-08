@@ -176,3 +176,20 @@ trimming:
   tranches: 3                      # split a large trim rather than dumping it
   tranche_min_value: 15000         # below this, one tranche -- costs dominate
   prefer_strength: true            # trim into rallies, not into weakness
+
+# ---------------------------------------------------------------------------
+# F&O analysis (strategy/fno.py, run_fno.py). Option open interest says where
+# writers have put money, not where price will go -- these turn it into a
+# range and a bias, and docs/f_o/validation.md measures how often the range
+# actually held.
+# ---------------------------------------------------------------------------
+fno:
+  wall_window_pct: 10.0            # support/resistance searched within +/- this % of spot
+  wall_min_share_pct: 5.0          # a wall must hold >= this % of its side's OI in the window
+  # PCR (put OI / call OI), read the way Indian markets read it: puts are
+  # mostly written, so a high PCR means writers are defending the downside.
+  pcr_bearish_below: 0.7
+  pcr_bullish_above: 1.2
+  pcr_stretched_above: 1.6         # very high PCR is crowded -- contrarian caution
+  near_expiry_sessions: 2          # OI is distorted by rollover this close to expiry
+  stale_minutes: 30                # chain older than this during market hours is flagged

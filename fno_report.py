@@ -1,0 +1,250 @@
+"""F&O analysis for one or more underlyings: fetch, analyse, print, export.
+
+Shared by run_fno.py (terminal and Excel) and the dashboard's F&O tab, so all
+three show the same numbers.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import sqlite3
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+
+from data.sources import nse_derivatives as nsed
+from strategy import fno
+
+REPORTS = Path(__file__).parent / "reports" / "fno"
+
+
+@dataclass
+class Result:
+    view: fno.FnoView
+    chain: nsed.Chain
+
+
+def _cfg() -> dict:
+    from scoring.timing import load_config
+    return load_config()
+
+
+def load(symbol: str, expiry: dt.date | None = None, save: bool = True,
+         cfg: dict | None = None) -> Result:
+    """Live chain + futures from NSE, analysed. Saves a snapshot by default."""
+    cfg = cfg or _cfg()
+    chain = nsed.option_chain(symbol, expiry)
+    try:
+        fut = nsed.futures(chain.symbol)
+    except RuntimeError:
+        fut = None      # the chain is the point; futures are context
+    try:
+        lot = nsed.lot_size(chain.symbol, chain.expiry)
+    except RuntimeError:
+        lot = None
+    view = fno.analyse(chain.symbol, chain.strikes, chain.spot, chain.expiry,
+                       chain.timestamp, today=dt.date.today(), fut=fut,
+                       cfg=cfg, lot=lot, now=dt.datetime.now())
+    if save:
+        _save_snapshot(chain, fut)
+    return Result(view, chain)
+
+
+def _save_snapshot(chain: nsed.Chain, fut: pd.DataFrame | None) -> None:
+    # A failed save loses one point of history; it must not lose the analysis.
+    from data import store
+    try:
+        con = store.connect()
+        try:
+            store.save_option_snapshot(con, chain, fut)
+        finally:
+            con.close()
+    except sqlite3.Error as exc:
+        print(f"warning: snapshot not saved ({exc})", file=sys.stderr)
+
+
+def history(symbol: str, expiry: dt.date, since: dt.datetime | None = None,
+            cfg: dict | None = None) -> pd.DataFrame:
+    """PCR, walls and range at every stored snapshot of one expiry."""
+    from data import store
+    con = store.connect()
+    try:
+        snaps = store.load_option_snapshots(con, symbol, expiry, since)
+    finally:
+        con.close()
+    return fno.history(snaps, cfg or _cfg())
+
+
+# ------------------------------------------------------------------ text
+
+def _n(x, nd=0) -> str:
+    if x is None or pd.isna(x):
+        return "-"
+    return f"{x:,.{nd}f}"
+
+
+def _px(x) -> str:
+    if x is None or pd.isna(x):
+        return "-"
+    return f"{x:,.0f}" if abs(x) >= 1000 else f"{x:,.2f}"
+
+
+def _wall(w: fno.Wall | None) -> str:
+    if w is None:
+        return "-"
+    chg = w.chg_pct
+    return (f"{_px(w.strike)}  (OI {_n(w.oi)}"
+            + (f", {chg:+.1f}% today" if chg is not None else "") + ")")
+
+
+def text(v: fno.FnoView) -> str:
+    L = []
+    head = f"{v.symbol}  spot {_px(v.spot)}"
+    if v.futures:
+        head += f"  ·  fut {_px(v.futures.price)} ({v.futures.basis:+,.2f})"
+    head += (f"  ·  expiry {v.expiry:%d-%b-%Y} ({v.sessions} sessions)"
+             f"  ·  NSE {v.timestamp:%d-%b %H:%M}")
+    L.append(head)
+    L.append(f"PCR (OI) {_n(v.pcr['oi'], 2)} {v.pcr_bias}   "
+             f"PCR (ΔOI today) {_n(v.pcr['chg_oi'], 2)} {v.chg_pcr_bias}   "
+             f"→ bias: {v.bias}")
+    L.append(f"Strongest support     {_wall(v.support)}"
+             + (f"   next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else ""))
+    L.append(f"Strongest resistance  {_wall(v.resistance)}"
+             + (f"   next {_px(v.resistances[1].strike)}" if len(v.resistances) > 1 else ""))
+    L.append(f"Max pain {_px(v.max_pain)}   ATM {_px(v.atm)}   ATM IV {_n(v.atm_iv, 1)}%   "
+             f"Expected move ±{_px(v.straddle)} (straddle), ±{_px(v.iv_move)} (1σ IV)")
+    L.append(f"Expected range to expiry: {_px(v.range_low)} – {_px(v.range_high)}"
+             f"   (low: {v.low_from or '-'}, high: {v.high_from or '-'})")
+    if v.futures and v.futures.buildup:
+        L.append(f"Futures: price {v.futures.price_chg:+,.2f}, OI {v.futures.chg_oi:+,.0f}"
+                 f" → {v.futures.buildup}")
+    if v.lot:
+        L.append(f"Lot size {v.lot}; OI is in contracts.")
+    L.append("")
+    L += [f"  - {r}" for r in v.reasons]
+    if v.warnings:
+        L.append("")
+        L += [f"  ! {w}" for w in v.warnings]
+    return "\n".join(L)
+
+
+# ----------------------------------------------------------------- tables
+
+def summary_row(v: fno.FnoView) -> dict:
+    s, r = v.supports + [None] * 2, v.resistances + [None] * 2
+    row = {
+        "symbol": v.symbol, "nse_time": v.timestamp, "expiry": v.expiry,
+        "sessions_left": v.sessions, "spot": v.spot,
+        "futures": v.futures.price if v.futures else None,
+        "basis": v.futures.basis if v.futures else None,
+        "fut_buildup": v.futures.buildup if v.futures else None,
+        "pcr_oi": v.pcr["oi"], "pcr_chg_oi": v.pcr["chg_oi"], "bias": v.bias,
+        "support_1": s[0].strike if s[0] else None,
+        "support_2": s[1].strike if s[1] else None,
+        "resistance_1": r[0].strike if r[0] else None,
+        "resistance_2": r[1].strike if r[1] else None,
+        "max_pain": v.max_pain, "atm_iv_pct": v.atm_iv, "straddle": v.straddle,
+        "iv_move": v.iv_move, "range_low": v.range_low, "range_high": v.range_high,
+        "low_from": v.low_from, "high_from": v.high_from, "lot": v.lot,
+        "warnings": " | ".join(v.warnings),
+    }
+    return {k: round(x, 2) if isinstance(x, float) else x for k, x in row.items()}
+
+
+def chain_table(res: Result, window_pct: float | None = None) -> pd.DataFrame:
+    """The chain around spot, with each strike's role marked."""
+    v, df = res.view, res.chain.strikes.copy()
+    w = window_pct or fno.settings(_cfg())["wall_window_pct"]
+    df = df[(df["strike"] - v.spot).abs() <= v.spot * w / 100]
+    roles = {}
+    for i, x in enumerate(v.supports, 1):
+        roles.setdefault(x.strike, []).append(f"S{i}")
+    for i, x in enumerate(v.resistances, 1):
+        roles.setdefault(x.strike, []).append(f"R{i}")
+    roles.setdefault(v.atm, []).append("ATM")
+    if v.max_pain is not None:
+        roles.setdefault(v.max_pain, []).append("max pain")
+    df.insert(0, "role", df["strike"].map(lambda k: ", ".join(roles.get(k, []))))
+    return df.reset_index(drop=True)
+
+
+# ------------------------------------------------------------------ excel
+
+def write_excel(results: list[Result], path: Path | None = None) -> Path:
+    from openpyxl import Workbook
+    from openpyxl.chart import BarChart, Reference
+    from openpyxl.styles import Font, PatternFill
+
+    path = Path(path or REPORTS / f"fno_{dt.datetime.now():%Y%m%d_%H%M}.xlsx")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb = Workbook()
+    bold = Font(bold=True)
+    fills = {"S": PatternFill("solid", fgColor="D8F0DC"),
+             "R": PatternFill("solid", fgColor="F8DADA"),
+             "ATM": PatternFill("solid", fgColor="FFF2C4")}
+
+    def autosize(ws):
+        for col in ws.columns:
+            width = max(len(str(c.value)) if c.value is not None else 0 for c in col)
+            ws.column_dimensions[col[0].column_letter].width = min(max(width + 2, 8), 60)
+
+    ws = wb.active
+    ws.title = "Summary"
+    rows = [summary_row(r.view) for r in results]
+    cols = list(rows[0])
+    ws.append(cols)
+    for r in rows:
+        ws.append([r[c] for c in cols])
+    for c in ws[1]:
+        c.font = bold
+    ws.freeze_panes = "B2"
+    autosize(ws)
+    ws.cell(len(rows) + 3, 1, "Decision support, not investment advice. "
+            "OI is in contracts. Range = tighter of OI wall and spot ± ATM straddle, per side.")
+
+    for res in results:
+        v = res.view
+        ws = wb.create_sheet(v.symbol[:31])
+        ws.append([f"{v.symbol} -- expiry {v.expiry:%d-%b-%Y}, NSE {v.timestamp:%d-%b-%Y %H:%M}"])
+        ws["A1"].font = Font(bold=True, size=13)
+        for reason in v.reasons:
+            ws.append([reason])
+        for warning in v.warnings:
+            ws.append(["! " + warning])
+        ws.append([])
+        top = ws.max_row + 1
+        t = chain_table(res)
+        ws.append(list(t.columns))
+        for c in ws[top]:
+            c.font = bold
+        for rec in t.itertuples(index=False):
+            ws.append([None if (isinstance(x, float) and pd.isna(x)) else x for x in rec])
+            role = rec[0] or ""
+            fill = fills.get(role[:1]) or (fills["ATM"] if "ATM" in role else None)
+            if fill:
+                for c in ws[ws.max_row]:
+                    c.fill = fill
+        ws.freeze_panes = ws.cell(top + 1, 3)
+        autosize(ws)
+        ws.column_dimensions["A"].width = 12
+
+        # OI by strike: calls vs puts, the picture the walls come from.
+        strike_col = list(t.columns).index("strike") + 1
+        ce_col = list(t.columns).index("ce_oi") + 1
+        pe_col = list(t.columns).index("pe_oi") + 1
+        n = len(t)
+        chart = BarChart()
+        chart.title = f"{v.symbol} open interest by strike"
+        chart.y_axis.title = "contracts"
+        for col in (ce_col, pe_col):
+            chart.add_data(Reference(ws, min_col=col, min_row=top, max_row=top + n),
+                           titles_from_data=True)
+        chart.set_categories(Reference(ws, min_col=strike_col, min_row=top + 1,
+                                       max_row=top + n))
+        chart.width, chart.height = 26, 10
+        ws.add_chart(chart, ws.cell(2, len(t.columns) + 2).coordinate)
+
+    wb.save(path)
+    return path

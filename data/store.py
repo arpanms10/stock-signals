@@ -39,6 +39,28 @@ CREATE TABLE IF NOT EXISTS corporate_actions (
     subject TEXT,
     PRIMARY KEY (symbol, ex_date, subject)
 );
+-- F&O snapshots: one row per strike per NSE update (run_fno.py saves one per
+-- run). Keyed on NSE's own timestamp, so re-running between NSE updates
+-- replaces rather than duplicates. OI is in contracts.
+CREATE TABLE IF NOT EXISTS option_snapshots (
+    symbol TEXT NOT NULL,
+    expiry TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    spot REAL,
+    strike REAL NOT NULL,
+    ce_oi REAL, ce_chg_oi REAL, ce_vol REAL, ce_iv REAL, ce_ltp REAL,
+    ce_bid REAL, ce_ask REAL,
+    pe_oi REAL, pe_chg_oi REAL, pe_vol REAL, pe_iv REAL, pe_ltp REAL,
+    pe_bid REAL, pe_ask REAL,
+    PRIMARY KEY (symbol, expiry, ts, strike)
+);
+CREATE TABLE IF NOT EXISTS futures_snapshots (
+    symbol TEXT NOT NULL,
+    expiry TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    ltp REAL, prev_close REAL, oi REAL, chg_oi REAL, volume REAL, spot REAL,
+    PRIMARY KEY (symbol, expiry, ts)
+);
 CREATE TABLE IF NOT EXISTS fetch_log (
     scope TEXT NOT NULL,
     symbol TEXT NOT NULL,
@@ -162,3 +184,57 @@ def fetched_at(con, scope: str, symbol: str) -> dt.datetime | None:
                       (scope, symbol))
     row = cur.fetchone()
     return dt.datetime.fromisoformat(row[0]) if row and row[0] else None
+
+
+# ------------------------------------------------------------ F&O snapshots
+
+CHAIN_COLS = ["strike", "ce_oi", "ce_chg_oi", "ce_vol", "ce_iv", "ce_ltp",
+              "ce_bid", "ce_ask", "pe_oi", "pe_chg_oi", "pe_vol", "pe_iv",
+              "pe_ltp", "pe_bid", "pe_ask"]
+FUT_COLS = ["ltp", "prev_close", "oi", "chg_oi", "volume", "spot"]
+
+
+def save_option_snapshot(con, chain, fut: pd.DataFrame | None = None) -> int:
+    """Store one chain (a data.sources.nse_derivatives.Chain) and its futures."""
+    ts = chain.timestamp.isoformat(timespec="seconds")
+    key = (chain.symbol, chain.expiry.isoformat(), ts, chain.spot)
+    rows = [key + tuple(None if pd.isna(x) else float(x) for x in r)
+            for r in chain.strikes[CHAIN_COLS].itertuples(index=False, name=None)]
+    cols = ["symbol", "expiry", "ts", "spot"] + CHAIN_COLS
+    con.executemany(
+        f"INSERT OR REPLACE INTO option_snapshots ({','.join(cols)}) "
+        f"VALUES ({','.join('?' * len(cols))})", rows)
+    if fut is not None and len(fut):
+        frows = [(chain.symbol, r.expiry.isoformat(), ts)
+                 + tuple(None if pd.isna(getattr(r, c)) else float(getattr(r, c))
+                         for c in FUT_COLS)
+                 for r in fut.itertuples(index=False)]
+        fcols = ["symbol", "expiry", "ts"] + FUT_COLS
+        con.executemany(
+            f"INSERT OR REPLACE INTO futures_snapshots ({','.join(fcols)}) "
+            f"VALUES ({','.join('?' * len(fcols))})", frows)
+    con.commit()
+    return len(rows)
+
+
+def load_option_snapshots(con, symbol: str, expiry: dt.date,
+                          since: dt.datetime | None = None) -> pd.DataFrame:
+    """Every stored strike row for one underlying and expiry, oldest first."""
+    q = "SELECT * FROM option_snapshots WHERE symbol=? AND expiry=?"
+    params: list = [symbol.upper(), expiry.isoformat()]
+    if since is not None:
+        q += " AND ts >= ?"
+        params.append(since.isoformat(timespec="seconds"))
+    df = pd.read_sql_query(q + " ORDER BY ts, strike", con, params=params)
+    if not df.empty:
+        df["ts"] = pd.to_datetime(df["ts"])
+    return df
+
+
+def load_futures_snapshots(con, symbol: str, expiry: dt.date) -> pd.DataFrame:
+    df = pd.read_sql_query(
+        "SELECT * FROM futures_snapshots WHERE symbol=? AND expiry=? ORDER BY ts",
+        con, params=(symbol.upper(), expiry.isoformat()))
+    if not df.empty:
+        df["ts"] = pd.to_datetime(df["ts"])
+    return df
