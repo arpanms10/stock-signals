@@ -39,7 +39,9 @@ INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
 RECORD_COLS = ["recorded_on", "nse_time", "expiry", "sessions_left", "symbol",
                "kind", "spot", "straddle", "range_low", "range_high",
                "expected_hit_pct", "atm_iv_pct", "put_wall", "call_wall",
-               "pcr_oi", "pcr_positioning", "max_pain"]
+               "pcr_oi", "pcr_positioning", "max_pain", "iv_straddle_pct",
+               "iv_percentile", "iv_rv", "skew_pts", "term_pts",
+               "results_before_expiry"]
 OUTCOME_COLS = ["expiry_close", "ret_pct", "inside_range", "put_wall_held",
                 "call_wall_held", "max_pain_closer", "scored_on"]
 COLUMNS = RECORD_COLS + OUTCOME_COLS
@@ -68,6 +70,13 @@ def record_row(v, today: dt.date) -> dict:
         "call_wall": _num(v.resistance.strike) if v.resistance else None,
         "pcr_oi": _num(v.pcr["oi"]), "pcr_positioning": v.pcr_bias,
         "max_pain": _num(v.max_pain),
+        "iv_straddle_pct": _num(v.vol.iv, 1) if v.vol else None,
+        "iv_percentile": _num(v.vol.iv_pct, 0) if v.vol else None,
+        "iv_rv": _num(v.vol.iv_rv) if v.vol else None,
+        "skew_pts": _num(v.vol.skew, 1) if v.vol else None,
+        "term_pts": _num(v.vol.term, 1) if v.vol else None,
+        "results_before_expiry": (", ".join(f"{d:%d-%b}" for d in v.vol.results)
+                                  if v.vol and v.vol.results else None),
     }
 
 
