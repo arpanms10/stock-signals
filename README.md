@@ -49,6 +49,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 200
 | `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
 | `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
 | `record_fno.py` | Monthly F&O forward log → `history/fno_ranges.xlsx`, scored at expiry |
+| `run_option_backtest.py` | What a simple option rule would have done, after costs (`--compare`, `--excel`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -106,7 +107,7 @@ what you held is deliberately not in it.
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
-| [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md) |
+| [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
 | [**Code layout**](docs/layout.md) | Where things live |
 | [ROADMAP](ROADMAP.md) | What is built, and what is still wrong with it |
 

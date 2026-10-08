@@ -43,6 +43,9 @@ strategy/allocation.py     target weights, drift, concentration
 strategy/risk_monitor.py   stops and alerts on held positions
 backtest/pit_engine.py     point-in-time, survivorship-free
 backtest/engine.py         walk-forward trade simulation
+backtest/option_backtest.py   option rules on the F&O bhavcopy history
+backtest/report.py         trade stats, drawdown/streaks, year x month, Excel export
+backtest/reconcile.py      rebuild sampled trades from source before trusting metrics
 
 data/sources/nse_derivatives.py   live option chain, futures, expiries, lot sizes
 data/fo_bhavcopy.py        historical F&O chains -> data/fo_history.db

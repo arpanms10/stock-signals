@@ -112,6 +112,13 @@ result.
   expiry (IV usually drops after), options cheap for that stock (the one
   measured volatility effect), or very near expiry.
 
+## Backtesting a rule
+
+"Check an option" gives the odds for one contract. To see what a repeatable
+rule would have done (e.g. "buy the put one straddle below spot, 10 sessions
+before every monthly expiry"), after costs and with a checked trade log, see
+[option rule backtest](backtest.md).
+
 ## Volatility context
 
 ```
@@ -274,6 +281,7 @@ run_fno.py                        command line
 run_fno_backtest.py               the validation; writes the calibration files
 record_fno.py                     the monthly forward log
 snapshot_fno.py                   intraday snapshots (launchd)
+run_option_backtest.py            option rule backtest (docs/f_o/backtest.md)
 ui/fno_tab.py                     dashboard tab
 ```
 
