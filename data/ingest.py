@@ -109,12 +109,108 @@ def backfill_index(con, index: str = BENCHMARK, years: int = 10,
     return rows
 
 
-def backfill(con, symbols: list[str], years: int = 10, verbose: bool = True) -> None:
-    backfill_index(con, BENCHMARK, years, verbose=verbose)
-    for i, sym in enumerate(symbols, 1):
+DAILY_MAX_SESSIONS = 30     # beyond this gap, per-symbol history is the better tool
+DAILY_MAX_LAG = 5           # symbols further behind the pack than this go per symbol
+
+
+def _weekdays_after(last: dt.date, today: dt.date) -> list[dt.date]:
+    out, d = [], last + dt.timedelta(days=1)
+    while d <= today:
+        if d.weekday() < 5:
+            out.append(d)
+        d += dt.timedelta(days=1)
+    return out
+
+
+def refresh_from_daily_files(con, symbols: list[str], today: dt.date | None = None,
+                             verbose: bool = True) -> set[str]:
+    """Catch symbols up from NSE's full daily file: one download per missed
+    trading day for all of them, instead of one request per symbol, and one
+    corporate-actions request for the whole window.
+
+    Handles symbols that already have history ending within
+    DAILY_MAX_SESSIONS weekdays of today and DAILY_MAX_LAG of the pack
+    (the median last date); returns that set. The rest -- new symbols,
+    long gaps, the back-fill to 10 years -- are left to backfill_symbol().
+    A day that FAILED to download stops the run there (later days would
+    leave a hole behind them); a day with no file (holiday, or today before
+    NSE publishes) is skipped.
+    """
+    today = today or dt.date.today()
+    want = {s.upper() for s in symbols}
+    last = {s: dt.date.fromisoformat(d) for s, d in
+            con.execute("SELECT symbol, MAX(date) FROM prices GROUP BY symbol")
+            if s in want and d}
+    if not last:
+        return set()
+    # One suspended or delisted stock must not drag every download back to
+    # its last bar: only symbols near where most of them are use the files.
+    pack = sorted(last.values())[len(last) // 2]
+    window = {s: d for s, d in last.items()
+              if len(_weekdays_after(d, today)) <= DAILY_MAX_SESSIONS
+              and len(_weekdays_after(d, pack)) <= DAILY_MAX_LAG}
+    if not window:
+        return set()
+    frm = min(window.values())
+    days = _weekdays_after(frm, today)
+    if verbose:
+        print(f"Daily files: {len(window)} symbols, {len(days)} weekday(s) since {frm}",
+              flush=True)
+    saved, failed = 0, None
+    for day in days:
+        df = prices.daily_bars(day)
+        if df is None:
+            failed = day
+            print(f"  {day}: download failed -- stopping here; the next run resumes",
+                  flush=True)
+            break
+        if df.empty:
+            if verbose:
+                print(f"  {day}: no file (holiday, or not published yet)", flush=True)
+            continue
+        df = df[df["symbol"].isin(window.keys())]
+        df = df[df.apply(lambda r: r["date"] > window[r["symbol"]], axis=1)]
+        saved += store.save_prices(con, df)
         if verbose:
-            print(f"[{i}/{len(symbols)}]", end=" ", flush=True)
+            print(f"  {day}: {len(df)} symbols", flush=True)
+        time.sleep(PAUSE_SECONDS)
+    try:
+        actions, rights = ca.fetch_all(frm - dt.timedelta(days=7), today, set(window))
+        store.save_actions(con, actions)
+        if verbose:
+            for a in actions:
+                print(f"  corporate action: {a.symbol} {a.ex_date} {a.subject}", flush=True)
+            for r in rights:
+                print(f"  rights issue (not auto-adjusted): {r}", flush=True)
+    except Exception as exc:          # noqa: BLE001 -- prices are still worth keeping
+        print(f"  corporate actions unavailable: {exc}", flush=True)
+    for s in window:
+        store.mark_fetched(con, "stock", s, store.last_date(con, "stock", s))
+    if verbose:
+        print(f"Daily files: +{saved} rows" + (f", stopped at {failed}" if failed else ""),
+              flush=True)
+    return set(window) if failed is None else set()
+
+
+def backfill(con, symbols: list[str], years: int = 10, verbose: bool = True,
+             daily: bool = True) -> None:
+    """Index first, then stocks: recent gaps from the daily files (fast), and
+    anything they cannot cover one symbol at a time."""
+    from data.quality import suspect_bars
+    backfill_index(con, BENCHMARK, years, verbose=verbose)
+    done: set[str] = set()
+    if daily:
+        try:
+            done = refresh_from_daily_files(con, symbols, verbose=verbose)
+        except Exception as exc:      # noqa: BLE001 -- fall back, don't fail
+            print(f"Daily files unavailable ({exc}); fetching per symbol", flush=True)
+    rest = [s for s in symbols if s.upper() not in done]
+    if verbose and daily:
+        print(f"Per symbol: {len(rest)} symbol(s)", flush=True)
+    for i, sym in enumerate(rest, 1):
+        if verbose:
+            print(f"[{i}/{len(rest)}]", end=" ", flush=True)
         backfill_symbol(con, sym, years, verbose=verbose)
-        from data.quality import suspect_bars
+    for sym in symbols:
         for d, pct in suspect_bars(con, sym):
             print(f"  SUSPECT BAR: {sym} {d}: {pct:+.1f}%", flush=True)

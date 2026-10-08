@@ -83,8 +83,28 @@ Warnings appear at the top of the advisor and as a banner in the dashboard.
 PYTHONPATH=. .venv/bin/python run_backfill.py --years 10
 ```
 
-Incremental and safe to re-run — it fetches only the gaps, at both ends of what
-is already stored. Add `--symbols RELIANCE TCS` to limit it.
+Incremental and safe to re-run. With no arguments it refreshes your
+watchlist, your holdings and every symbol already in the price table. Add
+`--symbols RELIANCE TCS` to limit it.
+
+**How it fetches.** Recent gaps come from NSE's full daily market file
+(`sec_bhavdata_full`): one download per missed trading day covers every stock,
+with the same fields the per-symbol history returns (open, high, low, close,
+previous close, VWAP, volume, trades, delivery quantity and %). Corporate
+actions come in one request for the whole window. Catching up four days for
+~500 symbols takes about 20 seconds instead of 30–50 minutes.
+
+The per-symbol path is still used for what the daily files can't cover:
+new symbols, gaps longer than 30 sessions, the back-fill to `--years`, and
+any symbol more than 5 sessions behind the rest (usually a suspended
+stock). `--per-symbol` forces the old behaviour for everything. A day whose
+file fails to download stops the daily pass there, so no hole is left
+behind it; those symbols fall back to per-symbol fetching. A day with no
+file (a holiday, or today before NSE publishes in the evening) is skipped.
+
+The dashboard runs the same command from **Refresh prices** in the
+sidebar, or **Refresh now** on a stale-prices warning, and reloads the page
+when it finishes.
 
 ---
 

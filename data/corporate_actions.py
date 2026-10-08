@@ -90,6 +90,32 @@ def fetch(symbol: str, from_date: dt.date, to_date: dt.date) -> list[Action]:
     return sorted(actions, key=lambda a: a.ex_date)
 
 
+def fetch_all(from_date: dt.date, to_date: dt.date,
+              symbols: set[str] | None = None) -> tuple[list[Action], list[str]]:
+    """Every company's adjusting actions in a window, in ONE request (the
+    endpoint answers for all equities when no symbol is given), plus rights
+    issues to flag. `symbols` limits the result to those tracked."""
+    params = {"index": "equities",
+              "from_date": from_date.strftime("%d-%m-%Y"),
+              "to_date": to_date.strftime("%d-%m-%Y")}
+    rows = nse.get(CA_URL, params=params).json()
+    actions, rights = [], []
+    for r in rows:
+        sym = str(r.get("symbol", "")).strip().upper()
+        if symbols is not None and sym not in symbols:
+            continue
+        subject = (r.get("subject") or "").strip()
+        if _RIGHTS_RE.search(subject):
+            rights.append(f"{sym} {r.get('exDate')}: {subject}")
+        ex = _parse_ex_date(r.get("exDate", ""))
+        if ex is None:
+            continue
+        factor, kind = parse_factor(subject)
+        if factor != 1.0:
+            actions.append(Action(sym, ex, factor, kind, subject))
+    return sorted(actions, key=lambda a: (a.symbol, a.ex_date)), rights
+
+
 def find_rights(symbol: str, from_date: dt.date, to_date: dt.date) -> list[str]:
     """Rights issues also move price but need the subscription price to adjust
     properly. We surface them for your judgement rather than guess."""

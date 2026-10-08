@@ -94,3 +94,52 @@ def index_history(index: str, from_date: dt.date, to_date: dt.date) -> pd.DataFr
     df = df.drop_duplicates(subset="date").sort_values("date")
     df["symbol"] = index
     return df.reset_index(drop=True)
+
+
+DAILY_COLUMNS = {
+    "SYMBOL": "symbol", "OPEN_PRICE": "open", "HIGH_PRICE": "high",
+    "LOW_PRICE": "low", "CLOSE_PRICE": "close", "PREV_CLOSE": "prev_close",
+    "AVG_PRICE": "vwap", "TTL_TRD_QNTY": "volume", "NO_OF_TRADES": "trades",
+    "DELIV_QTY": "delivery_qty", "DELIV_PER": "delivery_pct",
+}
+
+
+def parse_daily(text: str) -> pd.DataFrame:
+    """NSE's full daily bhavcopy (sec_bhavdata_full) -> price-table rows.
+
+    One file per trading day holds every listed stock with the same fields
+    the per-symbol history returns -- open/high/low/close, previous close,
+    VWAP, volume, trades, delivery quantity and % -- so a day missed across
+    500 symbols is one download, not 500. EQ series only (the NTPC trap)."""
+    import io
+    df = pd.read_csv(io.StringIO(text))
+    df.columns = [c.strip() for c in df.columns]
+    df = df[df["SERIES"].astype(str).str.strip().str.upper() == "EQ"].copy()
+    out = df.rename(columns=DAILY_COLUMNS)
+    out["symbol"] = out["symbol"].astype(str).str.strip().str.upper()
+    out["date"] = pd.to_datetime(df["DATE1"].astype(str).str.strip(), format="%d-%b-%Y").dt.date
+    for c in [v for v in DAILY_COLUMNS.values() if v != "symbol"]:
+        # Delivery is "-" for some instruments; that is missing, not zero.
+        out[c] = pd.to_numeric(out[c].astype(str).str.strip(), errors="coerce")
+    keep = ["symbol", "date"] + [v for v in DAILY_COLUMNS.values() if v != "symbol"]
+    return out[keep].dropna(subset=["close"]).drop_duplicates("symbol").reset_index(drop=True)
+
+
+def daily_bars(day: dt.date) -> pd.DataFrame | None:
+    """Every stock's bar for one day. Empty: no file (holiday, or not
+    published yet -- NSE puts it up in the evening). None: the request
+    failed and should be retried; never confused with "no data"."""
+    from jugaad_data.nse import full_bhavcopy_raw
+    try:
+        text = full_bhavcopy_raw(day)
+    except Exception as exc:        # noqa: BLE001 -- jugaad raises many kinds
+        resp = getattr(exc, "response", None)
+        if resp is not None and getattr(resp, "status_code", None) == 404:
+            return EMPTY_STOCK.copy()
+        return None
+    if not text or "SYMBOL" not in text[:200]:
+        return None
+    try:
+        return parse_daily(text)
+    except Exception:               # noqa: BLE001 -- an unreadable file is a failure
+        return None

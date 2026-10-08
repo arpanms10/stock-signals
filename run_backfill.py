@@ -42,6 +42,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--years", type=int, default=10)
     ap.add_argument("--symbols", nargs="*", default=None)
+    ap.add_argument("--per-symbol", action="store_true",
+                    help="fetch each symbol's history separately (slow); default catches "
+                         "recent gaps up from NSE's daily market file")
     ap.add_argument("--universe", default=None,
                     help="nifty50 | nifty200 | nifty500 -- backfill an index instead")
     args = ap.parse_args()
@@ -66,7 +69,7 @@ def main() -> None:
                   file=sys.stderr)
             sys.exit(1)
     print(f"Backfilling {len(symbols)} symbols, {args.years}y")
-    ingest.backfill(con, symbols, years=args.years)
+    ingest.backfill(con, symbols, years=args.years, daily=not args.per_symbol)
     print("done")
 
 
