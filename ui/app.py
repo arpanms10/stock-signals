@@ -4,6 +4,8 @@ Sections:
   1. MY HOLDINGS -- what you own and what to do about it
   2. MARKET      -- the ranked universe and where entries would trigger
   3. MOMENTUM    -- top picks on both momentum lookbacks, ranked and scored
+  4. WATCHING    -- flagged names under observation
+  5. F&O         -- PCR, OI support/resistance, expected range (ui/fno_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -93,8 +95,8 @@ for f in snap.freshness:
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market, tab_mom, tab_watch = st.tabs(
-    ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  "])
+tab_hold, tab_market, tab_mom, tab_watch, tab_fno = st.tabs(
+    ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -599,3 +601,8 @@ with tab_watch:
                 import watching as wg
                 st.info(wg.remove(drop)[1])
                 load.clear()
+
+# ========================================================================= F&O
+with tab_fno:
+    from ui import fno_tab
+    fno_tab.render()
