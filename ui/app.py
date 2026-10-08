@@ -63,18 +63,39 @@ if st.sidebar.button("Recompute", width='stretch'):
     load.clear()
     st.rerun()
 
+def run_and_reload(label: str, args: list[str], where) -> None:
+    """Run a refresh script with live output, then reload everything.
+
+    Recompute is folded in: a successful refresh clears the cache and reruns
+    the page, so what you see afterwards is the refreshed data. A failure
+    stays on screen with its output instead of a misleading "Done".
+    Keep this tab open while it runs -- a long refresh is cut short if the
+    page reruns underneath it.
+    """
+    where.write(f"Running `{' '.join(args)}`... keep this tab open.")
+    box = where.empty()
+    lines: list[str] = []
+    for line in service.run_script(args):
+        lines.append(line)
+        box.code("\n".join(lines[-14:]), language=None)
+    code = service.exit_code(lines)
+    if code == 0:
+        load.clear()
+        st.session_state["refreshed"] = label
+        st.rerun()
+    else:
+        where.error(f"{label} failed (exit code {code}). The output above says why; "
+                    "nothing was reloaded.")
+
+
 st.sidebar.divider()
-st.sidebar.caption("**Refresh data**  \nThese fetch from NSE and take minutes.")
+st.sidebar.caption("**Refresh data**  \nThese fetch from NSE and take minutes. "
+                   "The page reloads itself when one finishes.")
 for label, args in service.SCRIPTS.items():
     if st.sidebar.button(label, width='stretch', key=f"s_{label}"):
-        st.sidebar.write(f"Running `{' '.join(args)}`...")
-        box = st.sidebar.empty()
-        lines: list[str] = []
-        for line in service.run_script(args):
-            lines.append(line)
-            box.code("\n".join(lines[-14:]), language=None)
-        load.clear()
-        st.sidebar.success("Done -- press Recompute to reload.")
+        run_and_reload(label, args, st.sidebar)
+if done := st.session_state.pop("refreshed", None):
+    st.sidebar.success(f"{done}: done, and the page has reloaded with the new data.")
 
 snap = load(size)
 
@@ -88,10 +109,15 @@ st.sidebar.caption(
 st.title("📈 Stock Signals")
 st.caption(snap.regime_detail)
 for f in snap.freshness:
-    if f["label"] == "stale":
-        st.error(f"⚠️ {f['message']}")
-    elif f["label"] == "ageing":
-        st.info(f["message"])
+    if f["label"] not in ("stale", "ageing"):
+        continue
+    msg, fix = st.columns([4, 1], vertical_alignment="center")
+    (msg.error if f["label"] == "stale" else msg.info)(
+        (f"⚠️ {f['message']}" if f["label"] == "stale" else f["message"]))
+    button, script = service.FIXES.get(f.get("kind"), (None, None))
+    if button and fix.button(button, key=f"fix_{f.get('kind')}", width="stretch",
+                             type="primary", help=f"Runs '{script}', then reloads the page."):
+        run_and_reload(script, service.SCRIPTS[script], st)
 for w in snap.warnings:
     st.warning(w)
 

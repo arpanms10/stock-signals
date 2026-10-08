@@ -304,8 +304,9 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     wg.fill_missing_baselines(watch_prices)
     watching = wg.report(watch_prices)
 
-    checks = [fr.assess(mkt), fr.assess_prices(con, []), fr.assess_fundamentals()]
-    freshness = [{"label": c.label, "message": c.message} for c in checks]
+    checks = [("market", fr.assess(mkt)), ("prices", fr.assess_prices(con, [])),
+              ("fundamentals", fr.assess_fundamentals())]
+    freshness = [{"kind": k, "label": c.label, "message": c.message} for k, c in checks]
     cash = adv.apply_cash_constraint(
         advices, prices, qual, 0.0, sectors=sectors, values=values, book=book,
         max_sector_pct=cfg["risk"]["max_sector_pct"],
@@ -355,3 +356,19 @@ def run_script(args: list[str]):
         yield line.rstrip()
     proc.wait()
     yield f"\n[exit code {proc.returncode}]"
+
+
+# Which script fixes which stale source -- for the button on the warning.
+FIXES = {"prices": ("Refresh now", "Refresh prices (watchlist + holdings)"),
+         "market": ("Update now", "Update full-market data"),
+         "fundamentals": ("Refresh now", "Refresh fundamentals (NSE + Yahoo)")}
+
+
+def exit_code(lines: list[str]) -> int | None:
+    """The code run_script reports as its last line."""
+    import re
+    for line in reversed(lines):
+        m = re.search(r"\[exit code (-?\d+)\]", line)
+        if m:
+            return int(m.group(1))
+    return None

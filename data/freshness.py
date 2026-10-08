@@ -18,6 +18,25 @@ WARN_DAYS = 3
 STALE_DAYS = 6
 
 
+def sessions_since(latest: dt.date, today: dt.date) -> int:
+    """Trading sessions after `latest` up to today: weekdays minus NSE's
+    holidays. Without the holidays, a market holiday (Gandhi Jayanti, Diwali)
+    counted as a missed session and pushed the dashboard into "stale" early.
+    If the holiday calendar can't be fetched, weekdays alone."""
+    hol: set[dt.date] = set()
+    try:
+        from data.sources import nse_derivatives as nsed
+        hol = set(nsed.holidays_between(latest, today))
+    except Exception:          # noqa: BLE001 -- staleness must still be reported
+        pass
+    behind, d = 0, latest + dt.timedelta(days=1)
+    while d <= today:
+        if d.weekday() < 5 and d not in hol:
+            behind += 1
+        d += dt.timedelta(days=1)
+    return behind
+
+
 @dataclass
 class Freshness:
     label: str              # fresh | ageing | stale
@@ -48,14 +67,9 @@ def assess(con, today: dt.date | None = None,
                          f"No {source} at all. Run run_market_ingest.py.")
     latest = dt.date.fromisoformat(row[0])
 
-    # Count weekdays since the last recorded session as a proxy for sessions
-    # missed -- the table cannot tell us about days it never fetched.
-    behind = 0
-    d = latest + dt.timedelta(days=1)
-    while d <= today:
-        if d.weekday() < 5:
-            behind += 1
-        d += dt.timedelta(days=1)
+    # Trading sessions since the last recorded one -- the table cannot tell
+    # us about days it never fetched.
+    behind = sessions_since(latest, today)
 
     if behind <= FRESH_DAYS:
         return Freshness("fresh", latest, behind,
@@ -72,25 +86,27 @@ def assess(con, today: dt.date | None = None,
 
 
 def assess_prices(con, symbols: list[str], today: dt.date | None = None) -> Freshness:
-    """Freshness of the per-symbol price table the scoring actually reads."""
+    """Freshness of the per-symbol price table the scoring actually reads.
+
+    Measured at the date MOST symbols have reached (the median of each
+    symbol's last date), not the newest date anywhere: a refresh that updated
+    one symbol out of 500 used to read as "current". Symbols whose prices
+    stop well before that (suspended, delisted) don't hold it back either.
+    """
     today = today or dt.date.today()
-    row = con.execute("SELECT MAX(date) FROM prices").fetchone()
-    if not row or not row[0]:
+    rows = con.execute("SELECT symbol, MAX(date) FROM prices GROUP BY symbol").fetchall()
+    if not rows:
         return Freshness("stale", None, 999,
                          "No price history. Run run_backfill.py.")
-    latest = dt.date.fromisoformat(row[0])
-    behind = 0
-    d = latest + dt.timedelta(days=1)
-    while d <= today:
-        if d.weekday() < 5:
-            behind += 1
-        d += dt.timedelta(days=1)
+    lasts = sorted(dt.date.fromisoformat(r[1]) for r in rows)
+    latest = lasts[len(lasts) // 2]
+    behind = sessions_since(latest, today)
     label = ("fresh" if behind <= FRESH_DAYS else
              "ageing" if behind <= WARN_DAYS else "stale")
     msg = {"fresh": f"Prices current to {latest}.",
            "ageing": f"Prices are {behind} sessions behind ({latest}).",
            "stale": f"Prices are {behind} sessions behind ({latest}). "
-                    f"Run run_backfill.py before acting on anything here."}[label]
+                    f"Refresh prices before acting on anything here."}[label]
     return Freshness(label, latest, behind, msg)
 
 
