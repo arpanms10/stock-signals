@@ -127,8 +127,9 @@ To keep the history small, full chains are only stored on certain days:
 12. **A failed download is not "no data".** The F&O ingest had the same
     flaw as the equity one (see [data](../data.md)). A failed request now
     comes back as `None` and is retried on the next run. A 404 is recorded
-    as an empty day only once it is a week old. The F&O history had one
-    such hole: 2021-03-30.
+    as an empty day only once it is a week old. The one empty trading day in
+    the F&O history, 2021-03-30, was re-checked: NSE's archive has no file
+    for it, so it's a real gap, not a failed download.
 
 ---
 
