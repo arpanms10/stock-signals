@@ -62,3 +62,22 @@ def test_new_cycle_goes_after_existing_ones(tmp_path):
     nov = [dict(row("A"), expiry=dt.date(2026, 11, 23))]
     rf.record(nov, dt.date(2026, 11, 23), p)
     assert load_workbook(p).sheetnames == ["Summary", "Oct 2026 expiry", "Nov 2026 expiry"]
+
+
+def test_hint_gaps_scored_within_cycle(tmp_path):
+    p = tmp_path / "f.xlsx"
+    # 10 stocks: the two highest-PCR rose, the two lowest fell -> +100 points
+    rows = [dict(row(f"S{i}"), pcr_oi=i / 10) for i in range(10)]
+    rows += [dict(row("NIFTY", kind="index"), skew_pts=s) for s in (1.0,)]
+    rf.record(rows, EXP, p)
+    closes = {f"S{i}": (110.0 if i >= 8 else 90.0 if i <= 1 else 100.5) for i in range(10)}
+    closes["NIFTY"] = 120.0
+    rf.score(EXP, closes, p, EXP)
+    ws = load_workbook(p)["Summary"]
+    head = [c.value for c in ws[1]]
+    summ = [dict(zip(head, [c.value for c in r])) for r in ws.iter_rows(min_row=2) if r[1].value]
+    eq = [s for s in summ if s["kind"] == "equity"]
+    assert all(s["hint_gap_pts"] == 100.0 for s in eq)          # cycle and ALL CYCLES
+    assert "PCR" in eq[0]["tentative_hint"]
+    ix = next(s for s in summ if s["kind"] == "index")
+    assert ix["hint_gap_pts"] is None                            # one index: too few

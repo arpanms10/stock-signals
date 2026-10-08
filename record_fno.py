@@ -197,13 +197,41 @@ def _rate(rows: list[dict], col: str):
     return _num(100 * sum(bool(v) for v in vals) / len(vals), 1) if vals else None
 
 
+def _up_gap(rows: list[dict], col: str, top_share: float) -> float | None:
+    """Points: % that rose among the top `top_share` of rows by `col`, minus %
+    among the bottom `top_share` (fifths) or among the remainder (shares
+    above a fifth, used for the four indices)."""
+    rs = [r for r in rows if r.get(col) is not None and r.get("ret_pct") is not None]
+    if len(rs) < 4:
+        return None
+    rs.sort(key=lambda r: r[col])
+    n = len(rs)
+    k = max(1, round(n * top_share))
+    top = rs[-k:]
+    bottom = rs[:k] if top_share <= 0.2 else rs[:n - k]
+    up = lambda xs: 100 * sum(r["ret_pct"] > 0 for r in xs) / len(xs)
+    return _num(up(top) - up(bottom), 1)
+
+
+# The two directional hints the backtest found but did not confirm
+# (docs/f_o/validation.md). Kept out of the live view; scored here, on
+# records written before the outcome, so the forward record decides.
+HINTS = {"equity": ("PCR: top fifth minus bottom fifth, % up (backtest: +5 to +6)",
+                    "pcr_oi", 0.2),
+         "index": ("skew: top 40% minus rest, % up (backtest: about +17)",
+                   "skew_pts", 0.4)}
+
+
 def summary_rows(cycles: dict[str, list[dict]]) -> list[dict]:
     """Per expiry and kind, plus an all-cycles total: actual vs expected."""
     out = []
 
-    def line(label, kind, rows):
+    def line(label, kind, rows, gap=None):
         scored = [r for r in rows if r.get("expiry_close") is not None]
         exp = [r["expected_hit_pct"] for r in rows if r.get("expected_hit_pct") is not None]
+        hint, col, share = HINTS[kind]
+        if gap is None and scored:
+            gap = _up_gap(scored, col, share)
         out.append({
             "cycle": label, "kind": kind, "recorded": len(rows), "scored": len(scored),
             "inside_range_pct": _rate(scored, "inside_range"),
@@ -211,6 +239,7 @@ def summary_rows(cycles: dict[str, list[dict]]) -> list[dict]:
             "put_wall_held_pct": _rate(scored, "put_wall_held"),
             "call_wall_held_pct": _rate(scored, "call_wall_held"),
             "max_pain_closer_pct": _rate(scored, "max_pain_closer"),
+            "tentative_hint": hint, "hint_gap_pts": gap,
         })
 
     every: list[dict] = []
@@ -222,14 +251,25 @@ def summary_rows(cycles: dict[str, list[dict]]) -> list[dict]:
                 line(name, kind, sub)
     for kind in ("index", "equity"):
         sub = [r for r in every if r.get("kind") == kind]
-        if sub:
+        if not sub:
+            continue
+        if kind == "equity":
+            # Within-cycle gaps averaged: a cycle is one recording date, so
+            # this is the backtest's within-date comparison. Pooling across
+            # cycles would let one cycle's market move decide it.
+            gaps = [g for g in (_up_gap([r for r in rows if r.get("kind") == kind
+                                         and r.get("expiry_close") is not None],
+                                        "pcr_oi", 0.2) for rows in cycles.values())
+                    if g is not None]
+            line("ALL CYCLES", kind, sub, _num(sum(gaps) / len(gaps), 1) if gaps else None)
+        else:
             line("ALL CYCLES", kind, sub)
     return out
 
 
 SUMMARY_COLS = ["cycle", "kind", "recorded", "scored", "inside_range_pct",
                 "expected_hit_pct", "put_wall_held_pct", "call_wall_held_pct",
-                "max_pain_closer_pct"]
+                "max_pain_closer_pct", "tentative_hint", "hint_gap_pts"]
 
 
 def _write_summary(wb) -> None:
@@ -239,7 +279,9 @@ def _write_summary(wb) -> None:
             "One expiry is noise: stocks move together, so one large market move "
             "can push most of a cycle outside its range. Judge inside_range_pct "
             "against expected_hit_pct over several cycles. Walls held/max pain "
-            "closer are positioning checks -- the backtest found no edge in them.")
+            "closer are positioning checks -- the backtest found no edge in them. "
+            "hint_gap_pts scores the two unconfirmed directional hints; they stay "
+            "out of the live view until many cycles here agree with the backtest.")
 
 
 # ------------------------------------------------------------------- live
