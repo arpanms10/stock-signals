@@ -49,3 +49,24 @@ def test_awake_agent_runs_weekday_mornings():
     p = i.build_fno_awake()
     assert p["StartCalendarInterval"] == [{"Weekday": d, "Hour": 9, "Minute": 20}
                                          for d in range(1, 6)]
+
+
+def test_missing_walls_are_not_moved(tmp_path, monkeypatch):
+    import numpy as np
+    import pandas as pd
+    from strategy import fno
+    con = store.connect(tmp_path / "s.db")
+    monkeypatch.setattr(store, "connect", lambda *a, **k: con)
+    p = json.loads((FIX / "reliance_chain.json").read_text())
+    for minutes in (0, 30):
+        c = d.parse_chain(p, "RELIANCE")
+        c.timestamp = c.timestamp + dt.timedelta(minutes=minutes)
+        store.save_option_snapshot(con, c)
+    hist = pd.DataFrame({"ts": pd.to_datetime(["2026-10-08 10:00", "2026-10-08 10:30"]),
+                         "spot": [1.0, 1.0], "pcr_oi": [1.0, 1.0], "pcr_chg_oi": [None, None],
+                         "support": [np.nan, np.nan], "resistance": [5.0, 5.0],
+                         "max_pain": [1.0, 1.0], "straddle": [1.0, 1.0],
+                         "range_low": [0.0, 0.0], "range_high": [2.0, 2.0]})
+    monkeypatch.setattr(fno, "history", lambda g, cfg=None: hist)
+    summ, _ = sf.day_frames(dt.date(2026, 10, 8))
+    assert not summ.iloc[0]["walls_moved"]

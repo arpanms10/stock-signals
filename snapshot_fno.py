@@ -76,7 +76,10 @@ def day_frames(day: dt.date):
             if pd.notna(a["support"]) and pd.notna(b["support"]) else None,
             "call_wall": f"{a['resistance']:g} -> {b['resistance']:g}"
             if pd.notna(a["resistance"]) and pd.notna(b["resistance"]) else None,
-            "walls_moved": bool(a["support"] != b["support"] or a["resistance"] != b["resistance"]),
+            # NaN != NaN, so compare "both missing" as unchanged.
+            "walls_moved": any(not (x == y or (pd.isna(x) and pd.isna(y)))
+                               for x, y in ((a["support"], b["support"]),
+                                            (a["resistance"], b["resistance"]))),
             "straddle_chg_pct": (100 * (b["straddle"] / a["straddle"] - 1)
                                  if a["straddle"] and b["straddle"] else None),
         })
