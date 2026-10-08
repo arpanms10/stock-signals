@@ -160,6 +160,20 @@ holidays and does nothing outside market hours, and it only runs while the
 Mac is awake. This builds the intraday history that today's change-in-OI PCR
 needs before it can be tested. Until then it's labelled untested.
 
+To see how a day went, after the close:
+
+```bash
+PYTHONPATH=. .venv/bin/python snapshot_fno.py --report                      # today
+PYTHONPATH=. .venv/bin/python snapshot_fno.py --report --date 2026-10-08 --excel
+```
+
+It prints one row per underlying: snapshots taken, first and last time,
+spot change, PCR first → last, the latest change-in-OI PCR, the put and call
+walls first → last, and the straddle's change. `--excel` writes
+`reports/fno/intraday_<date>.xlsx` with that summary plus the full
+half-hour timeline. For one underlying, the dashboard's F&O tab draws the
+same PCR line ("PCR through the day").
+
 ## Keeping it current
 
 The Saturday job (`run_weekly.py`) now also:
