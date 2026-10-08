@@ -68,6 +68,55 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
+## Momentum, re-run on the repaired market history (2026-10-08)
+
+Everything below this section was run on a market history that, it turned
+out, had **249 trading days (about 9% since 2016) recorded as empty**: failed
+downloads saved as "no data" and never retried ([data](data.md)). 227 of
+them were refilled, and the current setup was re-run on the repaired
+history: top 200 by liquidity, monthly, 15 stocks, `risk_off_scale: 1.0`,
+data to 2026-10-08.
+
+| | CAGR range, 4 start dates | average | worst fall | vs random picks (10 seeds) |
+|---|---|---|---|---|
+| **9-month (main)** | **11.1 - 12.1** | **11.7** | -39 to -46% | beats 10/10, +7.6 pts, **3.2 sd** |
+| 12-month | 9.2 - 11.3 | 10.4 | -42 to -50% | beats 10/10, +7.2 pts, 2.8 sd |
+| overlap of both | 5.8 - 11.6 | 8.4 | -41 to -51% | |
+| NIFTY 500 | 9.9 - 10.3 | | -38% | |
+| random picks (9-month universe) | -0.1 - 8.0 | 3.8 | -48 to -55% | |
+
+**Split in halves** (default start): 9-month 11.3% to 2022-04 (index 11.7%)
+and 11.6% from 2022-05 (index 9.0%); 12-month 13.1% and 12.0%.
+
+What changed, and what still holds:
+
+- **The headline is lower and much less sensitive to dates.** 9-month
+  averages 11.7%, not 12.5%, and the spread across start dates shrank from
+  5 points to 1. Against the index's ~10.1% over the same starts, the edge
+  is **about 1.5 points a year**, with deeper falls (-39% to -46% against
+  -38%). The ranking still clearly carries information: it beats every
+  random pick from the same universe, by about 3 standard deviations.
+- **9 months now leads 12 months** on all four start dates (11.7% vs
+  10.4% on average). Split into halves, 12 months does a little better in
+  both, so the lead depends on the path. 9 stays the main ranking with 12
+  alongside, as before.
+- **Skipping the latest month still helps** (9-month): 11.4 / 12.1 / 12.1 /
+  11.1% with the skip, against 10.4 / 13.3 / 8.3 / 7.6% without. That's 3
+  of 4, averaging 11.7% vs 9.9%.
+- **The overlap is worse than either list**, more clearly than before.
+- **NSE-blend scoring, semi-annual: still not adopted.** It returned 10.8 /
+  10.8 / 14.7% on three starts, against 11.4 / 12.1 / 12.1% for the current
+  ranking, with falls of -48% to -53%.
+- **Reopened: the market-regime rule.** Holding half the stocks when the
+  index is below its 200-day average (`risk_off_scale: 0.5`) now returns
+  15.7 / 10.9 / 12.3 / 14.5% against 11.4 / 12.1 / 12.1 / 11.1% without it.
+  That's 3 of 4 starts, averaging 13.4% vs 11.7%, with similar worst falls
+  (-42% to -43% vs -39% to -46%). On the old history the rule lost with 12
+  months and won only with 9. The reasons it was dropped haven't changed:
+  the live advisor doesn't do it, it concentrates rather than de-risks, and
+  it was tuned on this same data. **The config is unchanged.** If it's
+  revisited, it needs a period it wasn't chosen on.
+
 ## Momentum: does skipping the latest month earn its place? (2026-10-04)
 
 The ranking scores 12-1 momentum: the return from 12 months ago to 1 month
@@ -203,7 +252,8 @@ together by chance.
 the dashboard, as information. Backtest and live advice now behave the same
 in a falling market.
 
-With the rule off, across the four start dates:
+With the rule off, across the four start dates (**superseded**: on the
+repaired history these are 11.7%, 10.4% and 8.4%; see the section at the top):
 
 | | CAGR range | average | worst fall | vs random picks |
 |---|---|---|---|---|
@@ -216,9 +266,10 @@ The two lookbacks tie: 9 months has the shallower falls, 12 months the
 steadier returns across start dates. Neither is proven better, so both stay,
 9 as the main ranking and 12 alongside. The overlap is worse than either.
 
-**The honest headline:** the ranking clearly carries information (it beats
-random picks from the same universe by about 3 standard deviations), but the
-edge over simply holding the index is about 2 points a year, with deeper falls.
+**The honest headline** (updated 2026-10-08): the ranking clearly carries
+information (it beats random picks from the same universe by about 3
+standard deviations), but the edge over simply holding the index is about
+1.5 points a year, with deeper falls.
 The earlier 16.9% depended on the regime rule paired with the 9-month
 lookback, and did not survive removing the rule.
 
