@@ -98,3 +98,12 @@ def test_old_format_indices_only_with_spot_from_index():
     assert (n["spot"] == 13634.6).all() and n["lot"].isna().all()
     ft = fb.features(n, dt.date(2021, 1, 29)).set_index("symbol")
     assert ft.loc["NIFTY", "straddle"] == 600
+
+
+def test_failed_fo_download_is_retried(tmp_path, monkeypatch):
+    con = fb.connect(tmp_path / "h.db")
+    monkeypatch.setattr(fb, "fetch_day", lambda d: None)
+    import data.sources.nse_derivatives as nd
+    monkeypatch.setattr(nd, "holidays_between", lambda a, b: [])
+    fb.ingest_range(con, dt.date(2025, 1, 2), dt.date(2025, 1, 3), pause=0, verbose=False)
+    assert con.execute("SELECT COUNT(*) FROM fo_days").fetchone()[0] == 0

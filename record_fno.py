@@ -300,7 +300,7 @@ def expiry_closes(expiry: dt.date) -> dict[str, float]:
     """Each underlying's close on expiry day, from that day's F&O bhavcopy."""
     from data import fo_bhavcopy as fb
     norm = fb.fetch_day(expiry)
-    if norm.empty:
+    if norm is None or norm.empty:      # failed, or not published yet: retry later
         return {}
     sp = fb.spots(norm, expiry)
     return dict(zip(sp["symbol"], sp["spot"].astype(float)))

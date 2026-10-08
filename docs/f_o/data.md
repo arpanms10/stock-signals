@@ -124,6 +124,12 @@ To keep the history small, full chains are only stored on certain days:
     so shares versus contracts doesn't change the result. Absolute OI isn't
     comparable across the 2024 boundary.
 
+12. **A failed download is not "no data".** The F&O ingest had the same
+    flaw as the equity one (see [data](../data.md)). A failed request now
+    comes back as `None` and is retried on the next run. A 404 is recorded
+    as an empty day only once it is a week old. The F&O history had one
+    such hole: 2021-03-30.
+
 ---
 
 See also: [validation](validation.md) · the equity-side traps in

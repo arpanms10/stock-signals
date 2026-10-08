@@ -45,8 +45,12 @@ def _sample(trades: pd.DataFrame, k: int, seed: int) -> pd.DataFrame:
     return trades.sample(k, random_state=seed)
 
 
+EMPTY = pd.DataFrame(columns=["symbol", "instr", "expiry", "strike", "opt", "close", "vol", "spot"])
+
+
 def _day_files(day: dt.date, src: str, symbol: str):
-    """(option rows normalised, underlying close) for one day, from source."""
+    """(option rows normalised, underlying close) for one day, from source.
+    A failed download comes back empty, so its checks fail -- loudly."""
     from data import fo_bhavcopy as fb
     if src == "old":
         from jugaad_data.nse import index_df
@@ -59,10 +63,11 @@ def _day_files(day: dt.date, src: str, symbol: str):
                     spot = float(df["CLOSE"].iloc[0])
             except Exception:
                 pass
-        return fb.fetch_day_old(day, {symbol: spot}), spot
+        norm = fb.fetch_day_old(day, {symbol: spot})
+        return (EMPTY if norm is None else norm), spot
     norm = fb.fetch_day(day)
-    if norm.empty:
-        return norm, np.nan
+    if norm is None or norm.empty:
+        return EMPTY, np.nan
     s = norm.loc[norm["symbol"] == symbol, "spot"]
     return norm, float(s.median()) if len(s) else np.nan
 
