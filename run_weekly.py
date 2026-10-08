@@ -97,6 +97,21 @@ def main() -> int:
         if not step("Record momentum picks", ["record_momentum.py"], log,
                     timeout=1800):
             failures.append("momentum record")
+        # F&O: check NSE's endpoints still answer properly, then extend the
+        # bhavcopy history and re-run the validation -- which rewrites the
+        # hit rates and reach curves the live view quotes, so they never go
+        # stale (config/fno_calibration.json, config/fno_reach.json).
+        if not step("F&O self-test", ["run_fno.py", "--selftest"], log, timeout=600):
+            failures.append("F&O self-test")
+        if not args.skip_refresh:
+            if not step("Refresh F&O history and validation",
+                        ["run_fno_backtest.py", "--ingest"], log, timeout=5400):
+                failures.append("F&O validation")
+        # F&O forward log: scores any expired cycle, then records the current
+        # one if not yet recorded (record_fno.py). Saturday reads Friday's
+        # closing chain, so a cycle is logged ~15-20 sessions before expiry.
+        if not step("Record F&O ranges", ["record_fno.py"], log, timeout=1800):
+            failures.append("F&O record")
 
     STATE.write_text(f"{dt.datetime.now().isoformat(timespec='seconds')}\n"
                      f"{'FAILED: ' + ', '.join(failures) if failures else 'ok'}\n")

@@ -1,0 +1,40 @@
+{
+ "built": "2026-10-08",
+ "source": "run_fno_backtest.py: share of expiry closes inside spot +/- ATM straddle, by group and sessions before expiry",
+ "range_hit_pct": {
+  "equity": {
+   "5": 59.5,
+   "10": 62.5,
+   "20": 53.6
+  },
+  "index": {
+   "5": 49.5,
+   "10": 57.4,
+   "20": 66.7
+  },
+  "index weekly": {
+   "1": 63.9,
+   "2": 64.6,
+   "4": 62.4
+  }
+ },
+ "equity_conditional": {
+  "overall": 60.9,
+  "n": 12964,
+  "low_iv_pct": {
+   "below": 20,
+   "n": 2995,
+   "pct": 56.0
+  },
+  "results_in_cycle": {
+   "false": {
+    "n": 11367,
+    "pct": 61.4
+   },
+   "true": {
+    "n": 1597,
+    "pct": 57.4
+   }
+  }
+ }
+}
