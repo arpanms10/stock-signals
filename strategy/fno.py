@@ -801,3 +801,140 @@ def conditional_note(v: "FnoView", cond: dict | None) -> str | None:
     if not notes:
         return None
     return (f"Since 2024, stocks' range held {base:.0f}% overall; " + "; ".join(notes) + ".")
+
+
+# ------------------------------------------------------------ option check
+
+@dataclass
+class OptionCheck:
+    """The facts about one contract a buyer would weigh. Not a recommendation:
+    the validation found nothing here that predicts direction."""
+    symbol: str
+    strike: float
+    side: str                     # "CE" | "PE"
+    lots: int
+    lot: int | None
+    bid: float | None
+    ask: float | None
+    mid: float | None
+    ltp: float | None
+    spread_pct: float | None      # (ask - bid) / mid
+    oi: float
+    volume: float
+    iv: float | None              # NSE's IV for this strike, %
+    breakeven: float | None
+    breakeven_pct: float | None
+    breakeven_moves: float | None
+    p_profit_hist: float | None   # beyond breakeven at expiry, historical
+    p_profit_model: float | None
+    p_itm_hist: float | None      # beyond the strike at expiry
+    p_itm_model: float | None
+    p_touch_be_intraday: float | None   # traded through breakeven before expiry
+    delta: float | None
+    theta_day: float | None       # premium per unit, per day
+    vega: float | None            # premium per unit, per vol point
+    payoff: list = field(default_factory=list)   # (label, level, P&L per lot)
+    notes: list = field(default_factory=list)
+
+    @property
+    def units(self) -> int:
+        return (self.lot or 1) * self.lots
+
+    @property
+    def cost(self) -> float | None:
+        return self.mid * self.units if self.mid is not None else None
+
+
+def _beyond(spot, straddle, level, side, kind, curve):
+    """P(expiry close on the profitable side of `level`) for a call (above)
+    or put (below), from the reach curves -- historical and model."""
+    want_up = side == "CE"
+    if level == spot:
+        return 0.5, 0.5, None
+    x = reach(spot, straddle, level, kind, curve)
+    if x is None:
+        return None, None, None
+    same = (x.side == "up") == want_up
+    if same:
+        return x.hist_expiry, x.model_expiry, x.hist_touch_intraday
+    # The level is on the other side of spot: profitable unless price moves
+    # past it the wrong way.
+    flip = lambda p: None if p is None else 1 - p
+    return flip(x.hist_expiry), flip(x.model_expiry), None
+
+
+def option_check(v: FnoView, strikes: pd.DataFrame, strike: float, side: str,
+                 lots: int = 1, curve: dict | None = None,
+                 r_pct: float = 6.5) -> OptionCheck | None:
+    side = side.upper()
+    s = side.lower()
+    rows = strikes[strikes["strike"] == strike]
+    if rows.empty:
+        return None
+    row = rows.iloc[0]
+    bid, ask, ltp = (row.get(f"{s}_bid"), row.get(f"{s}_ask"), row.get(f"{s}_ltp"))
+    bid = None if pd.isna(bid) else float(bid)
+    ask = None if pd.isna(ask) else float(ask)
+    ltp = None if pd.isna(ltp) else float(ltp)
+    mid = _mid(row, s)
+    mid = None if math.isnan(mid) else mid
+    spread = (100 * (ask - bid) / mid) if bid and ask and mid else None
+
+    g = add_greeks(rows, v.spot, v.days, r_pct).iloc[0]
+    be = None
+    if mid is not None:
+        be = strike + mid if side == "CE" else strike - mid
+    ph = pm = ih = im = tb = None
+    if be is not None and v.straddle:
+        ph, pm, tb = _beyond(v.spot, v.straddle, be, side, v.kind, curve)
+        ih, im, _ = _beyond(v.spot, v.straddle, strike, side, v.kind, curve)
+
+    oc = OptionCheck(
+        symbol=v.symbol, strike=float(strike), side=side, lots=lots, lot=v.lot,
+        bid=bid, ask=ask, mid=mid, ltp=ltp, spread_pct=spread,
+        oi=float(row.get(f"{s}_oi", 0) or 0), volume=float(row.get(f"{s}_vol", 0) or 0),
+        iv=None if pd.isna(row.get(f"{s}_iv")) else float(row[f"{s}_iv"]),
+        breakeven=be, breakeven_pct=None if be is None else 100 * (be / v.spot - 1),
+        breakeven_moves=None if be is None or not v.straddle else abs(be - v.spot) / v.straddle,
+        p_profit_hist=ph, p_profit_model=pm, p_itm_hist=ih, p_itm_model=im,
+        p_touch_be_intraday=tb,
+        delta=None if pd.isna(g[f"{s}_delta"]) else float(g[f"{s}_delta"]),
+        theta_day=None if pd.isna(g[f"{s}_theta"]) else float(g[f"{s}_theta"]),
+        vega=None if pd.isna(g[f"{s}_vega"]) else float(g[f"{s}_vega"]),
+    )
+
+    # Payoff at expiry, per lot, at the levels the view already shows.
+    if mid is not None:
+        levels = [("range low", v.range_low), ("put wall", v.support.strike if v.support else None),
+                  ("spot", v.spot), ("call wall", v.resistance.strike if v.resistance else None),
+                  ("range high", v.range_high), ("breakeven", be)]
+        unit = v.lot or 1
+        for label, lvl in levels:
+            if lvl is None:
+                continue
+            intrinsic = max(lvl - strike, 0) if side == "CE" else max(strike - lvl, 0)
+            oc.payoff.append((label, float(lvl), (intrinsic - mid) * unit))
+        oc.payoff.sort(key=lambda t: t[1])
+
+    n = oc.notes
+    n.append("Direction: nothing in this data predicted whether the price rose or fell "
+             "by expiry (docs/f_o/validation.md). The odds below are for a move of the "
+             "needed size, up or down alike.")
+    if mid is None:
+        n.append("No live quote or trade for this strike -- no price to check.")
+    if spread is not None and spread > 5:
+        n.append(f"Wide spread: {spread:.0f}% of the premium. Buying at the ask and "
+                 "selling at the bid gives that up straight away.")
+    if oc.oi < 100 or oc.volume < 50:
+        n.append("Thin: little open interest or volume at this strike today.")
+    if v.vol and v.vol.results:
+        n.append("Results before expiry: IV is usually bid up into results and falls "
+                 "after, which lowers premiums even if the price doesn't move.")
+    if v.vol and v.vol.iv_pct is not None and v.vol.iv_pct < 20 and v.kind == "equity":
+        n.append("Options are cheap for this stock against its own past year (IV "
+                 "percentile below 20). For stocks like that, moves exceeded the priced "
+                 "move more often than usual (range held 56% vs 61%).")
+    if v.sessions <= 2:
+        n.append("Near expiry: time decay is fastest now, and the premium is mostly "
+                 "a bet on the next few sessions.")
+    return oc

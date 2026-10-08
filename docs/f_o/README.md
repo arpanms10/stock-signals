@@ -84,6 +84,34 @@ showed the walls only made the range narrower, never more accurate, and that
 index thresholds labelled 71% of stocks "bearish". Both were changed.
 `run_fno_backtest.py` still reports the old range for comparison.
 
+## Check an option
+
+```bash
+PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --option 22000PE --lots 2
+```
+
+The dashboard has the same panel below "Reach a level": pick put or call, a
+strike and lots. It shows the facts a buyer would weigh, and deliberately
+**no buy or sell suggestion**: the validation found nothing in this data
+that predicts direction, so a suggestion would be a guess presented as a
+result.
+
+- **Premium:** bid, ask, mid, last, spread, OI and volume (is it liquid?),
+  and the cost for the lots, which is also a buyer's maximum loss.
+- **Breakeven at expiry,** in % and in moves (straddles).
+- **Odds:** how often a move that size finished beyond the breakeven and
+  beyond the strike, historical and model, each labelled with which has
+  been better calibrated for the kind. It also shows how often price
+  traded through the breakeven before expiry. These are for a move of that
+  size either way; there's no direction in them.
+- **Greeks for the position in ₹:** delta (and its equivalent in units of
+  the underlying), time decay per day, and value per vol point.
+- **P&L at expiry** at the range edges, the walls, spot and the breakeven,
+  plus a payoff chart.
+- **Notes when they apply:** a wide spread, a thin strike, results before
+  expiry (IV usually drops after), options cheap for that stock (the one
+  measured volatility effect), or very near expiry.
+
 ## Volatility context
 
 ```

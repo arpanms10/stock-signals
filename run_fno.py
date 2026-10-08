@@ -5,6 +5,7 @@
     PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --expiry 2026-11-23
     PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --excel reports/nifty.xlsx
     PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --level 1250 1150
+    PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --option 22000PE --lots 2
     PYTHONPATH=. .venv/bin/python run_fno.py --selftest     # are NSE's endpoints still working?
 
 Defaults to the nearest MONTHLY expiry -- NIFTY's weeklies are skipped unless
@@ -95,11 +96,21 @@ def main(argv=None) -> int:
     ap.add_argument("--level", type=float, nargs="+", default=(), metavar="PRICE",
                     help="how often a move to each price was reached before expiry "
                          "(one symbol only)")
+    ap.add_argument("--option", default=None, metavar="STRIKE{CE|PE}",
+                    help="check one contract, e.g. 22000PE (one symbol only)")
+    ap.add_argument("--lots", type=int, default=1, help="with --option")
     ap.add_argument("--no-save", action="store_true",
                     help="do not store a snapshot of the chain")
     a = ap.parse_args(argv)
-    if a.level and len(a.symbols) > 1:
-        ap.error("--level needs a single symbol: a price only means something for one")
+    if (a.level or a.option) and len(a.symbols) > 1:
+        ap.error("--level/--option need a single symbol: a price only means something for one")
+    opt = None
+    if a.option:
+        import re
+        m = re.fullmatch(r"([\d.]+)\s*(CE|PE)", a.option.strip().upper())
+        if not m:
+            ap.error("--option looks like 22000PE or 1250CE")
+        opt = (float(m.group(1)), m.group(2))
 
     results, failed = [], 0
     for sym in a.symbols:
@@ -112,6 +123,16 @@ def main(argv=None) -> int:
         results.append(res)
         print(fno_report.text(res.view, res.reaches))
         print()
+        if opt:
+            from strategy import fno as _fno
+            oc = _fno.option_check(res.view, res.chain.strikes, opt[0], opt[1], a.lots,
+                                   fno_report.reach_curve(),
+                                   _fno.settings(fno_report._cfg())["risk_free_pct"])
+            if oc is None:
+                print(f"No {opt[0]:g} strike in this chain.")
+            else:
+                print(fno_report.option_text(oc, res.view.kind))
+            print()
 
     if a.excel is not None and results:
         path = fno_report.write_excel(results, Path(a.excel) if a.excel else None)

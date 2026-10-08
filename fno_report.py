@@ -220,6 +220,38 @@ def vol_line(c: fno.VolContext) -> str:
     return "Volatility: " + "   ".join(parts)
 
 
+def option_text(oc: fno.OptionCheck, kind: str) -> str:
+    """One contract, as a buyer would check it. Not a recommendation."""
+    side = "put" if oc.side == "PE" else "call"
+    L = [f"Option check: {oc.symbol} {_px(oc.strike)} {oc.side} ({side}), {oc.lots} lot(s) "
+         f"of {oc.lot or '?'}"]
+    if oc.mid is None:
+        L.append("  No live quote or trade for this strike.")
+    else:
+        L.append(f"  Premium {_px(oc.mid)} mid (bid {_px(oc.bid)} / ask {_px(oc.ask)}, "
+                 f"spread {_n(oc.spread_pct, 1)}%), last {_px(oc.ltp)}   IV {_n(oc.iv, 1)}%   "
+                 f"OI {_n(oc.oi)}  volume {_n(oc.volume)}")
+        L.append(f"  Cost {_n(oc.cost)} -- also the most a buyer can lose")
+        L.append(f"  Breakeven at expiry {_px(oc.breakeven)} ({oc.breakeven_pct:+.1f}%, "
+                 f"{_n(oc.breakeven_moves, 1)} moves)")
+        best = "model" if kind == "index" else "historical"
+        L.append(f"  Finished beyond breakeven: {_pct(oc.p_profit_hist)} historical, "
+                 f"{_pct(oc.p_profit_model)} model   (in the money: "
+                 f"{_pct(oc.p_itm_hist)} / {_pct(oc.p_itm_model)})   -- {best} is the "
+                 f"better-calibrated column for {'indices' if kind == 'index' else 'stocks'}")
+        if oc.p_touch_be_intraday is not None:
+            L.append(f"  Traded through breakeven at some point before expiry: "
+                     f"{_pct(oc.p_touch_be_intraday)}")
+        u = oc.units
+        L.append(f"  Per position: delta {_n(oc.delta, 2)} ({_n(oc.delta * u if oc.delta else None)} "
+                 f"units of the underlying), time decay {_n(oc.theta_day * u if oc.theta_day else None)}"
+                 f"/day, {_n(oc.vega * u if oc.vega else None)} per vol point")
+        pay = "   ".join(f"{lbl} {_px(lvl)}: {pl * oc.lots:+,.0f}" for lbl, lvl, pl in oc.payoff)
+        L.append(f"  P&L at expiry if it closes at -- {pay}")
+    L += [f"  * {n}" for n in oc.notes]
+    return "\n".join(L)
+
+
 def text(v: fno.FnoView, levels: list | None = None) -> str:
     L = []
     head = f"{v.symbol}  spot {_px(v.spot)}"

@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -126,6 +127,108 @@ def _vol_row(vc) -> None:
                 help="Next monthly's straddle IV minus this one. Negative "
                      "(inverted) usually means an event -- often results -- "
                      "before this expiry.")
+
+
+def _payoff_chart(oc, v) -> alt.Chart:
+    """P&L at expiry for the position, spot +/- two straddles."""
+    span = 2 * (v.straddle or v.spot * 0.05)
+    lo, hi = v.spot - span, v.spot + span
+    xs = np.linspace(lo, hi, 121)
+    unit = oc.units
+    if oc.side == "CE":
+        pl = (np.maximum(xs - oc.strike, 0) - oc.mid) * unit
+    else:
+        pl = (np.maximum(oc.strike - xs, 0) - oc.mid) * unit
+    df = pd.DataFrame({"x": xs, "pl": pl})
+    pad = 0.08 * (pl.max() - pl.min() or 1)
+    xsc = alt.Scale(domain=[float(lo), float(hi)], nice=False)
+    ysc = alt.Scale(domain=[float(pl.min() - pad), float(pl.max() + pad)], nice=False)
+    color = CALL if oc.side == "CE" else PUT
+    line = alt.Chart(df).mark_line(strokeWidth=2, color=color, clip=True).encode(
+        x=alt.X("x:Q", scale=xsc, title="price at expiry", axis=alt.Axis(format=",.0f")),
+        y=alt.Y("pl:Q", scale=ysc, title="P&L at expiry (₹)", axis=alt.Axis(format=",.0f")),
+        tooltip=[alt.Tooltip("x:Q", title="price at expiry", format=",.0f"),
+                 alt.Tooltip("pl:Q", title="P&L (₹)", format=",.0f")])
+    zero = alt.Chart(pd.DataFrame({"y": [0.0]})).mark_rule(color=MUTED, strokeWidth=1).encode(
+        y=alt.Y("y:Q", scale=ysc, title="P&L at expiry (₹)"))
+    marks = pd.DataFrame({"x": [v.spot, oc.breakeven], "label": ["spot", "breakeven"]})
+    rules = alt.Chart(marks).mark_rule(color=MUTED, strokeDash=[4, 3]).encode(
+        x=alt.X("x:Q", scale=xsc, title="price at expiry"),
+        tooltip=["label:N", alt.Tooltip("x:Q", title="level", format=",.2f")])
+    return _style((line + zero + rules).properties(height=220))
+
+
+def _option_panel(v, res) -> None:
+    """Facts about one contract. Deliberately no buy/sell suggestion: the
+    validation found nothing in this data that predicts direction."""
+    from strategy import fno
+    st.markdown("**Check an option** &nbsp; " + c.pill("facts, not a recommendation", "neutral"),
+                unsafe_allow_html=True)
+    t = res.chain.strikes
+    near = t[(t["strike"] - v.spot).abs() <= v.spot * 0.08]["strike"].tolist()
+    if not near:
+        return
+    a, b, d = st.columns([1, 1.4, 1])
+    side = a.radio("Type", ["Put (PE)", "Call (CE)"], horizontal=True, key=f"oc_side_{v.symbol}")
+    side = "PE" if side.startswith("Put") else "CE"
+    default = min(near, key=lambda k: abs(k - v.spot))
+    strike = b.selectbox("Strike", near, index=near.index(default),
+                         format_func=lambda k: f"{k:,.0f}" if k >= 100 else f"{k:,.2f}",
+                         key=f"oc_strike_{v.symbol}")
+    lots = d.number_input("Lots", min_value=1, value=1, step=1, key=f"oc_lots_{v.symbol}")
+    oc = fno.option_check(v, t, strike, side, int(lots), fno_report.reach_curve(),
+                          fno.settings(fno_report._cfg())["risk_free_pct"])
+    if oc is None or oc.mid is None:
+        st.info("No live quote or trade for this strike.")
+        return
+    u = oc.units
+    m = st.columns(5)
+    m[0].metric("Premium (mid)", _px(oc.mid), f"bid {_px(oc.bid)} / ask {_px(oc.ask)}",
+                delta_color="off", delta_arrow="off")
+    m[1].metric("Cost", f"₹{oc.cost:,.0f}", f"{oc.lots} × {oc.lot or '?'}",
+                delta_color="off", delta_arrow="off",
+                help="Premium × lot size × lots. For a buyer, also the maximum loss.")
+    m[2].metric("Breakeven at expiry", _px(oc.breakeven),
+                f"{oc.breakeven_pct:+.1f}% · {oc.breakeven_moves:.1f} moves",
+                delta_color="off", delta_arrow="off")
+    best = "model" if v.kind == "index" else "historical"
+    m[3].metric("Beyond breakeven at expiry",
+                _pct(oc.p_profit_model if best == "model" else oc.p_profit_hist),
+                f"{'historical' if best == 'model' else 'model'} "
+                f"{_pct(oc.p_profit_hist if best == 'model' else oc.p_profit_model)}",
+                delta_color="off", delta_arrow="off",
+                help=f"How often a move this size finished beyond the breakeven. The "
+                     f"{best} estimate is shown first: it has been the better-calibrated "
+                     f"one for {'indices' if v.kind == 'index' else 'stocks'}. A move of "
+                     "the same size the other way gets the same number -- there is no "
+                     "direction in it.")
+    m[4].metric("In the money at expiry",
+                _pct(oc.p_itm_model if best == "model" else oc.p_itm_hist),
+                f"traded through BE: {_pct(oc.p_touch_be_intraday)}",
+                delta_color="off", delta_arrow="off",
+                help="Finished beyond the strike (some value left), and how often price "
+                     "traded through the breakeven at some point before expiry.")
+    m = st.columns(5)
+    m[0].metric("Delta", f"{oc.delta:+.2f}" if oc.delta is not None else "--",
+                f"{oc.delta * u:+,.0f} units" if oc.delta is not None else None,
+                delta_color="off", delta_arrow="off",
+                help="Premium change per 1-point move in the underlying.")
+    m[1].metric("Time decay / day",
+                f"₹{oc.theta_day * u:,.0f}" if oc.theta_day is not None else "--",
+                help="What the position loses per day from time alone, all else equal.")
+    m[2].metric("Per vol point", f"₹{oc.vega * u:,.0f}" if oc.vega is not None else "--",
+                help="Change in value if implied volatility moves 1 point.")
+    m[3].metric("IV (this strike)", f"{oc.iv:.1f}%" if oc.iv else "--")
+    m[4].metric("Spread", f"{oc.spread_pct:.1f}%" if oc.spread_pct is not None else "--",
+                f"OI {oc.oi:,.0f} · vol {oc.volume:,.0f}", delta_color="off", delta_arrow="off")
+    st.altair_chart(_payoff_chart(oc, v), width="stretch")
+    st.dataframe(pd.DataFrame([{"if expiry close is": lbl, "level": round(lvl, 2),
+                                "P&L (₹)": round(pl * oc.lots)} for lbl, lvl, pl in oc.payoff]),
+                 hide_index=True, width="content")
+    for n in oc.notes:
+        st.caption("• " + n)
+    st.caption("Decision support, not investment advice. Whether to trade, and which "
+               "way, is yours to decide.")
 
 
 def _px(x) -> str:
@@ -283,6 +386,8 @@ def render() -> None:
                        + (" For indices the model column has been better calibrated: "
                           "the historical ones ran 4-8 points high out of sample."
                           if v.kind == "index" else ""))
+
+    _option_panel(v, res)
 
     with st.expander("Why these numbers", expanded=False):
         for r in v.reasons:

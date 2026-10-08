@@ -334,3 +334,31 @@ def test_conditional_note_only_for_measured_conditions():
     assert fno.conditional_note(v, cond) is None
     v.kind = "index"
     assert fno.conditional_note(v, cond) is None
+
+
+def test_option_check_put_facts():
+    c = d.parse_chain(json.loads((FIX / "nifty_chain.json").read_text()), "NIFTY")
+    curve = {"index": {"n": 10, "z": [0, 1, 2, 4], "touch": [1, .5, .2, 0],
+                       "expiry": [.5, .25, .08, 0], "touch_intraday": [1, .6, .3, 0]}}
+    v = fno.analyse("NIFTY", c.strikes, c.spot, c.expiry, c.timestamp, lot=65,
+                    curve=curve, today=dt.date(2026, 10, 8))
+    oc = fno.option_check(v, c.strikes, 22000, "PE", lots=2, curve=curve)
+    assert oc.breakeven == pytest.approx(22000 - oc.mid)
+    assert oc.cost == pytest.approx(oc.mid * 130)
+    assert oc.delta < 0 and oc.theta_day < 0 and oc.vega > 0
+    assert 0 < oc.p_profit_model < oc.p_itm_model < 0.5     # OTM put, BE further out
+    assert oc.p_profit_hist < oc.p_itm_hist
+    pl = dict((lbl, p) for lbl, _, p in oc.payoff)
+    assert pl["breakeven"] == pytest.approx(0, abs=1e-6)
+    assert pl["spot"] == pytest.approx(-oc.mid * 65)          # expires worthless
+    assert any("Direction" in n for n in oc.notes)
+
+
+def test_option_check_itm_call_is_mostly_profitable_side():
+    c = d.parse_chain(json.loads((FIX / "nifty_chain.json").read_text()), "NIFTY")
+    v = fno.analyse("NIFTY", c.strikes, c.spot, c.expiry, c.timestamp, lot=65,
+                    today=dt.date(2026, 10, 8))
+    k = float(c.strikes.strike[c.strikes.strike < c.spot - 400].max())   # deep ITM call
+    oc = fno.option_check(v, c.strikes, k, "CE")
+    assert oc.p_itm_model > 0.5
+    assert fno.option_check(v, c.strikes, 1.0, "CE") is None
