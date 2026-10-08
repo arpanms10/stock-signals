@@ -76,6 +76,42 @@ showed the walls only made the range narrower, never more accurate, and that
 index thresholds labelled 71% of stocks "bearish". Both were changed.
 `run_fno_backtest.py` still reports the old range for comparison.
 
+## Reach: is a target or stop realistic?
+
+```bash
+PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --level 1250 1150
+```
+
+For any price, plus both walls automatically:
+
+```
+  call wall  1,250 (+5.2%, 1.3 moves): reached on a close before expiry 18%, beyond it at expiry 14% (model 16%)
+  level      1,150 (-3.2%, 0.8 moves): reached on a close before expiry 35%, beyond it at expiry 24% (model 26%)
+```
+
+The distance is measured in **moves**, meaning ATM straddles, so a 5% move in
+a volatile stock and a 5% move in NIFTY aren't treated alike. "Reached" is
+the share of past observations where a move that size closed at or beyond
+the level on some day before expiry. "Beyond at expiry" is the share that
+finished there. "Model" answers the same question from the
+straddle-implied normal distribution.
+
+The dashboard shows the same numbers under each wall and in a **Reach a
+level** box.
+
+What it isn't: **a forecast of direction.** Up and down moves are pooled, so
++5% and −5% get the same number. The sample's own direction was a falling
+market, and baking that in would bias every estimate. It also counts daily
+closes only, so an intraday touch is more likely than it says. Use it to
+judge whether a target is realistic for this expiry, or how often a stop at
+that distance would have been hit, not whether price is headed there.
+
+The curves live in `config/fno_reach.json`, rebuilt by every
+`run_fno_backtest.py` run from the observations 5 and 10 sessions out. Out
+of sample (built on Jan 2024 – Jun 2025, tested on Jul 2025 onward), the
+historical numbers were within about 1–4 points of what happened, and the
+model ran 2–4 points high for stocks. See [validation](validation.md).
+
 ## Forward log
 
 ```bash

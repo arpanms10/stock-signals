@@ -150,6 +150,33 @@ fall inside their roughly ±4–8 point noise. A target taken from the option
 chain is a level at some distance from spot. How likely price is to reach it
 depends on that distance and on volatility, not on the OI sitting there.
 
+### Reach probabilities: calibrated
+
+Walls carry no information as targets, but the **distance** to a target
+does. The reach feature (see the [overview](README.md)) estimates how
+often a move of a given size, measured in ATM straddles, reached a level
+before expiry. To check it out of sample, the curve was built on
+observations before July 2025 and scored on everything after. The levels
+scored were the walls and spot ± straddle, i.e. the targets and stops
+someone would actually look up.
+
+| stocks, predicted | reached on a close: predicted → actual | beyond at expiry (historical) | beyond at expiry (model) |
+|---|---|---|---|
+| 0–10% | 4.8 → 3.6 | 4.9 → 3.2 | 4.8 → 2.5 |
+| 10–20% | 15.0 → 12.5 | 18.4 → 17.6 | 14.9 → 11.0 |
+| 20–30% | 26.8 → 26.1 | 24.7 → 25.2 | 21.8 → 19.3 |
+| 30–40% | 34.7 → 33.3 | 35.0 → 38.2 | 34.9 → 36.9 |
+| 40–50% | 44.8 → 45.8 | 44.9 → 50.0 | 44.7 → 49.7 |
+| 50–70% | 59.4 → 62.6 | | |
+
+Each bin holds between about 500 and 14,800 levels. The historical estimate
+is within about 1–4 points in every bin. It
+slightly overstates the long shots and understates the likely moves. The
+model overstates low-probability levels for stocks by 2–4 points. Indices
+(about 400 levels) match similarly, with wider noise: the model fits within
+about 1 point from 10% up, and the historical estimate runs up to 6 points
+high in the 20–40% bins. Full table in the validation report.
+
 ## What this does and does not show
 
 - It covers **end-of-day** chains, and 20/10/5 sessions before **monthly**

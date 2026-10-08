@@ -31,6 +31,8 @@ from scoring.timing import load_config
 from strategy import fno
 
 REPORTS = Path(__file__).parent / "reports" / "fno"
+REACH_PATH = Path(__file__).parent / "config" / "fno_reach.json"
+SPLIT = "2025-07-01"       # reach calibration: curve built before, tested after
 MAX_CYCLE_RATIO = 2.0      # spot moved >2x or <0.5x inside a cycle: a split/bonus
 
 
@@ -187,6 +189,58 @@ def score(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return out
 
 
+def reach_calibration(obs: pd.DataFrame, split: str = SPLIT) -> pd.DataFrame:
+    """Out of sample: build the reach curve on obs before `split`, then
+    check its probabilities -- and the model's -- on obs after it.
+
+    Levels tested per observation: both walls and spot +/- straddle, i.e.
+    the targets and stops someone would actually look up. Binned by the
+    predicted probability; a calibrated estimate has actual ~= predicted
+    in every bin.
+    """
+    o = obs[~obs["adjusted"]].dropna(subset=["straddle"])
+    curve = fno.reach_curve(o[o["date"] < split])
+    test = o[(o["date"] >= split) & o["sessions"].isin([5, 10])]
+    rows = []
+    for r in test.itertuples():
+        for lvl in (r.support, r.resistance, r.spot + r.straddle, r.spot - r.straddle):
+            if pd.isna(lvl):
+                continue
+            x = fno.reach(r.spot, r.straddle, float(lvl), r.kind, curve)
+            if x is None or x.hist_touch is None:
+                continue
+            touched = (r.path_max >= lvl) if x.side == "up" else (r.path_min <= lvl)
+            beyond = (r.close >= lvl) if x.side == "up" else (r.close <= lvl)
+            rows.append({"kind": r.kind, "hist_touch": x.hist_touch,
+                         "hist_expiry": x.hist_expiry, "model_expiry": x.model_expiry,
+                         "touched": bool(touched), "beyond": bool(beyond)})
+    t = pd.DataFrame(rows)
+    out = []
+    bins = [0, .1, .2, .3, .4, .5, .7, 1.0001]
+    for kind, g in t.groupby("kind"):
+        for pred, actual in (("hist_touch", "touched"), ("hist_expiry", "beyond"),
+                             ("model_expiry", "beyond")):
+            b = pd.cut(g[pred], bins, right=False)
+            for interval, h in g.groupby(b, observed=True):
+                out.append({"kind": kind, "estimate": pred, "bin": str(interval),
+                            "n": len(h), "predicted_pct": 100 * h[pred].mean(),
+                            "actual_pct": 100 * h[actual].mean()})
+    return pd.DataFrame(out)
+
+
+def write_reach_curve(obs: pd.DataFrame, path: Path = REACH_PATH) -> dict:
+    import json
+    curves = fno.reach_curve(obs)
+    path.write_text(json.dumps({
+        "built": dt.date.today().isoformat(),
+        "source": "run_fno_backtest.py: F&O bhavcopy, 5 and 10 sessions before "
+                  "monthly expiries, up and down pooled, daily closes",
+        "first": str(obs["date"].min()), "last": str(obs["date"].max()),
+        "curves": curves,
+    }, indent=1))
+    return curves
+
+
 def md_table(t: pd.DataFrame) -> str:
     if t.empty:
         return "_none_"
@@ -224,6 +278,8 @@ def main(argv=None) -> int:
         print("No observations with a completed expiry. Run with --ingest first.")
         return 1
     tables = score(obs)
+    tables["Reach calibration (out of sample)"] = reach_calibration(obs)
+    curves = write_reach_curve(obs)
     REPORTS.mkdir(parents=True, exist_ok=True)
     md = to_markdown(tables)
     path = REPORTS / f"validation_{dt.date.today():%Y%m%d}.md"
@@ -231,6 +287,8 @@ def main(argv=None) -> int:
     obs.to_csv(REPORTS / "validation_obs.csv", index=False)
     print(md)
     print(f"\nWritten: {path}")
+    sizes = ", ".join(f"{k} n={v['n']}" for k, v in curves.items())
+    print(f"Reach curves ({sizes}) -> {REACH_PATH}")
     return 0
 
 

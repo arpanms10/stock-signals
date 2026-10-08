@@ -90,6 +90,16 @@ def _pcr_line(h: pd.DataFrame) -> alt.Chart:
     return _style((line + pts).properties(height=220))
 
 
+def _pct(p) -> str:
+    return "--" if p is None else f"{100 * p:.0f}%"
+
+
+def _reach_caption(x) -> str | None:
+    if x is None or x.hist_touch is None:
+        return None
+    return f"reached {_pct(x.hist_touch)}"
+
+
 def _px(x) -> str:
     if x is None or pd.isna(x):
         return "--"
@@ -178,14 +188,17 @@ def render() -> None:
                 unsafe_allow_html=True)
     m = st.columns(6)
     m[0].metric("Put wall", _px(v.support.strike) if v.support else "--",
-                f"next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else None,
+                _reach_caption(v.support_reach),
                 delta_color="off", delta_arrow="off",
                 help="Largest put OI below spot, read as support. Held no more often "
-                     "than any level the same distance away.")
+                     "than any level the same distance away. 'reached' = how often a "
+                     "move this size closed at or below it before expiry.")
     m[1].metric("Call wall", _px(v.resistance.strike) if v.resistance else "--",
-                f"next {_px(v.resistances[1].strike)}" if len(v.resistances) > 1 else None,
+                _reach_caption(v.resistance_reach),
                 delta_color="off", delta_arrow="off",
-                help="Largest call OI above spot, read as resistance. Same caveat.")
+                help="Largest call OI above spot, read as resistance. Same caveat. "
+                     "'reached' = how often a move this size closed at or above it "
+                     "before expiry.")
     m[2].metric("PCR (OI)", f"{v.pcr['oi']:.2f}" if v.pcr["oi"] else "--",
                 f"{v.pcr_bias} ({norms})", delta_color="off", delta_arrow="off",
                 help="Stocks run far lower PCR than indices, so each is read against "
@@ -201,6 +214,35 @@ def render() -> None:
     m[5].metric("Futures", _px(v.futures.price) if v.futures else "--",
                 (v.futures.buildup or f"{v.futures.basis:+,.2f} basis") if v.futures else None,
                 delta_color="off", delta_arrow="off")
+
+    st.markdown("**Reach a level** &nbsp; " + c.pill("not a forecast of direction", "neutral"),
+                unsafe_allow_html=True)
+    lc, r1, r2, r3 = st.columns([1.2, 1, 1, 1])
+    default = v.resistance.strike if v.resistance else round(v.spot * 1.05, 2)
+    level = lc.number_input("Price (target or stop)", min_value=0.0, value=float(default),
+                            step=float(max(round(v.spot * 0.005, 0), 0.5)),
+                            key=f"fno_level_{v.symbol}")
+    x = fno_report.reaches(v, [level])
+    x = x[0] if x else None
+    if x is None:
+        lc.caption("Needs an ATM straddle and a price away from spot.")
+    else:
+        r1.metric("Reached before expiry", _pct(x.hist_touch),
+                  f"{x.distance_pct:+.1f}% · {x.moves:.1f} moves", delta_color="off",
+                  delta_arrow="off",
+                  help="Share of past cases where a move this size (in ATM straddles) "
+                       "closed at or beyond the level on some day before expiry. Daily "
+                       "closes only -- an intraday touch is more likely than this. Up "
+                       "and down pooled.")
+        r2.metric("Beyond it at expiry", _pct(x.hist_expiry),
+                  help="Share of past cases where the expiry close was at or beyond it.")
+        r3.metric("Model (IV)", _pct(x.model_expiry), "beyond at expiry",
+                  delta_color="off", delta_arrow="off",
+                  help="Same question from the straddle-implied normal distribution. "
+                       "Out of sample it ran 2-4 points high for stocks.")
+        if x.n:
+            lc.caption(f"From {x.n:,} past {'stock' if v.kind == 'equity' else 'index'} "
+                       "observations, 5-10 sessions before expiry, Jan 2024 onward.")
 
     with st.expander("Why these numbers", expanded=False):
         for r in v.reasons:

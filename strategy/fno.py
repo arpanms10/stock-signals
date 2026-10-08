@@ -284,6 +284,8 @@ class FnoView:
     futures: FuturesView | None
     lot: int | None = None
     kind: str = "index"
+    support_reach: "Reach | None" = None
+    resistance_reach: "Reach | None" = None
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -333,7 +335,7 @@ def analyse(symbol: str, strikes: pd.DataFrame, spot: float, expiry: dt.date,
             timestamp: dt.datetime, today: dt.date | None = None,
             fut: pd.DataFrame | None = None, cfg: dict | None = None,
             lot: int | None = None, now: dt.datetime | None = None,
-            kind: str | None = None) -> FnoView:
+            kind: str | None = None, curve: dict | None = None) -> FnoView:
     s = settings(cfg)
     kind = kind or strikes.attrs.get("kind") or "index"
     today = today or timestamp.date()
@@ -363,6 +365,10 @@ def analyse(symbol: str, strikes: pd.DataFrame, spot: float, expiry: dt.date,
         range_hit_pct=range_hit_pct(kind, sess, s) if move_from == "straddle" else None,
         futures=fv, lot=lot, kind=kind,
     )
+    if sup:
+        v.support_reach = reach(spot, strad, sup[0].strike, kind, curve)
+    if res:
+        v.resistance_reach = reach(spot, strad, res[0].strike, kind, curve)
     v.reasons = _reasons(v)
     v.warnings = _warnings(v, s, now)
     return v
@@ -462,3 +468,90 @@ def history(snaps: pd.DataFrame, cfg: dict | None = None) -> pd.DataFrame:
                     "max_pain": max_pain(g), "straddle": strad,
                     "range_low": lo, "range_high": hi})
     return pd.DataFrame(out, columns=cols)
+
+
+# ------------------------------------------------------------------ reach
+
+# Expected |move| of a normal variable is sigma * sqrt(2/pi), and an ATM
+# straddle prices roughly that, so sigma*sqrt(t) ~= straddle / (0.798 * spot).
+STRADDLE_TO_SIGMA = math.sqrt(2 / math.pi)
+REACH_GRID = [round(0.05 * i, 2) for i in range(81)]          # 0 .. 4 moves
+
+
+def _ncdf(x: float) -> float:
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+
+
+def reach_curve(obs: pd.DataFrame, offsets=(5, 10)) -> dict:
+    """Historical reach probabilities by distance in straddle units, per kind.
+
+    `obs` is run_fno_backtest.observe(): spot, close, path_min/max (daily
+    closes) and the straddle at observation. Up and down moves are pooled:
+    the sample's direction was the period's drift (mostly falling stocks),
+    which the validation found nothing to predict, so baking it in would
+    only bias every estimate. 20 sessions out is left out -- 11 expiries, all
+    skewed by that same drift.
+    """
+    o = obs[(~obs["adjusted"]) & obs["sessions"].isin(offsets)].dropna(subset=["straddle"])
+    o = o[o["straddle"] > 0]
+    out = {}
+    for kind, g in o.groupby("kind"):
+        s = g["straddle"].to_numpy()
+        up = (g["path_max"].to_numpy() - g["spot"].to_numpy()) / s
+        dn = (g["spot"].to_numpy() - g["path_min"].to_numpy()) / s
+        ret = (g["close"].to_numpy() - g["spot"].to_numpy()) / s
+        touch = np.concatenate([up, dn])
+        beyond = np.concatenate([ret, -ret])
+        out[kind] = {
+            "n": int(len(g)),
+            "z": REACH_GRID,
+            "touch": [round(float((touch >= z).mean()), 4) for z in REACH_GRID],
+            "expiry": [round(float((beyond >= z).mean()), 4) for z in REACH_GRID],
+        }
+    return out
+
+
+@dataclass
+class Reach:
+    level: float
+    side: str                     # "up" | "down"
+    distance_pct: float
+    moves: float                  # distance in ATM straddles
+    hist_touch: float | None      # closed at/beyond it on some day before expiry
+    hist_expiry: float | None     # beyond it at expiry
+    model_expiry: float | None    # same, from the straddle-implied normal
+    n: int | None                 # observations behind the historical numbers
+
+
+def reach(spot: float, straddle: float | None, level: float, kind: str,
+          curve: dict | None) -> Reach | None:
+    """How often price got to `level` before expiry, for moves this size.
+
+    Not a forecast of direction: the same distance up or down gets the same
+    historical number. It answers "is this target (or stop) realistic for
+    this expiry?", not "will it get there?".
+    """
+    if not straddle or straddle <= 0 or level <= 0 or level == spot:
+        return None
+    side = "up" if level > spot else "down"
+    z = abs(level - spot) / straddle
+    sig = straddle / (STRADDLE_TO_SIGMA * spot)
+    model = 1 - _ncdf(abs(math.log(level / spot)) / sig)
+    c = (curve or {}).get(kind)
+    ht = he = None
+    if c:
+        ht = float(np.interp(z, c["z"], c["touch"]))
+        he = float(np.interp(z, c["z"], c["expiry"]))
+    return Reach(level=level, side=side, distance_pct=100 * (level / spot - 1),
+                 moves=z, hist_touch=ht, hist_expiry=he, model_expiry=model,
+                 n=c["n"] if c else None)
+
+
+def load_reach_curve(path) -> dict | None:
+    import json
+    from pathlib import Path
+    p = Path(path)
+    if not p.exists():
+        return None
+    data = json.loads(p.read_text())
+    return data.get("curves")

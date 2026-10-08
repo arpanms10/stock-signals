@@ -4,6 +4,7 @@
     PYTHONPATH=. .venv/bin/python run_fno.py NIFTY BANKNIFTY RELIANCE --excel
     PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --expiry 2026-11-23
     PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --excel reports/nifty.xlsx
+    PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --level 1250 1150
 
 Defaults to the nearest MONTHLY expiry -- NIFTY's weeklies are skipped unless
 named with --expiry. Each run saves a snapshot of the chain to the local
@@ -30,20 +31,25 @@ def main(argv=None) -> int:
                     help="YYYY-MM-DD; default: nearest monthly expiry")
     ap.add_argument("--excel", nargs="?", const="", default=None, metavar="PATH",
                     help="also write an Excel report (default reports/fno/fno_<time>.xlsx)")
+    ap.add_argument("--level", type=float, nargs="+", default=(), metavar="PRICE",
+                    help="how often a move to each price was reached before expiry "
+                         "(one symbol only)")
     ap.add_argument("--no-save", action="store_true",
                     help="do not store a snapshot of the chain")
     a = ap.parse_args(argv)
+    if a.level and len(a.symbols) > 1:
+        ap.error("--level needs a single symbol: a price only means something for one")
 
     results, failed = [], 0
     for sym in a.symbols:
         try:
-            res = fno_report.load(sym, a.expiry, save=not a.no_save)
+            res = fno_report.load(sym, a.expiry, save=not a.no_save, levels=a.level)
         except (NotFnO, ValueError, RuntimeError) as exc:
             print(f"{sym.upper()}: {exc}\n", file=sys.stderr)
             failed += 1
             continue
         results.append(res)
-        print(fno_report.text(res.view))
+        print(fno_report.text(res.view, res.reaches))
         print()
 
     if a.excel is not None and results:

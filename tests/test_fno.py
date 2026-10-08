@@ -196,3 +196,52 @@ def test_iv_fallback_range_has_no_hit_rate():
                     dt.datetime(2026, 1, 1, 15, 30), kind="equity")
     assert v.range_from == "IV" and v.range_hit_pct is None
     assert v.range_low < 100 < v.range_high
+
+
+def _obs(rows):
+    """rows: (kind, sessions, spot, straddle, path_min, path_max, close)."""
+    return pd.DataFrame([dict(kind=k, sessions=s, spot=sp, straddle=st, path_min=lo,
+                              path_max=hi, close=c, adjusted=False)
+                         for k, s, sp, st, lo, hi, c in rows])
+
+
+def test_reach_curve_pools_up_and_down_in_straddle_units():
+    obs = _obs([("equity", 5, 100, 10, 95, 120, 110),    # up 2 moves, down 0.5
+                ("equity", 10, 100, 10, 80, 101, 85),    # up 0.1, down 2 moves
+                ("equity", 20, 100, 10, 50, 150, 50)])   # 20 out: excluded
+    c = fno.reach_curve(obs)["equity"]
+    assert c["n"] == 2
+    z = c["z"].index(1.0)
+    assert c["touch"][z] == 0.5           # 2 of the 4 pooled moves went >= 1
+    assert c["expiry"][z] == 0.5          # +1.0 and +1.5 (as -ret) of 4 -> 2/4
+    assert c["touch"][0] == 1.0
+
+
+def test_reach_interpolates_and_is_symmetric():
+    curve = {"equity": {"n": 10, "z": [0, 1, 2], "touch": [1, .4, .1],
+                        "expiry": [.5, .2, .05]}}
+    up = fno.reach(100, 10, 115, "equity", curve)
+    dn = fno.reach(100, 10, 85, "equity", curve)
+    assert up.side == "up" and dn.side == "down"
+    assert up.hist_touch == pytest.approx(0.25) == dn.hist_touch
+    assert up.moves == pytest.approx(1.5)
+
+
+def test_reach_model_at_one_straddle():
+    # one straddle ~ 0.8 sigma: P(beyond) ~ 1 - N(0.8) ~ 21%
+    x = fno.reach(1000, 10, 1010, "index", None)
+    assert x.model_expiry == pytest.approx(0.212, abs=0.01)
+    assert x.hist_touch is None
+
+
+def test_reach_none_without_straddle_or_at_spot():
+    assert fno.reach(100, None, 110, "equity", None) is None
+    assert fno.reach(100, 10, 100, "equity", None) is None
+
+
+def test_walls_get_reach_when_curve_given():
+    curve = {"index": {"n": 1, "z": [0, 4], "touch": [1, 0], "expiry": [.5, 0]}}
+    c = d.parse_chain(json.loads((FIX / "nifty_chain.json").read_text()), "NIFTY")
+    v = fno.analyse("NIFTY", c.strikes, c.spot, c.expiry, c.timestamp, curve=curve)
+    assert v.resistance_reach.side == "up" and v.support_reach.side == "down"
+    assert 0 < v.resistance_reach.hist_touch < 1

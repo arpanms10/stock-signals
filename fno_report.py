@@ -8,7 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import sqlite3
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -17,12 +17,14 @@ from data.sources import nse_derivatives as nsed
 from strategy import fno
 
 REPORTS = Path(__file__).parent / "reports" / "fno"
+REACH_PATH = Path(__file__).parent / "config" / "fno_reach.json"
 
 
 @dataclass
 class Result:
     view: fno.FnoView
     chain: nsed.Chain
+    reaches: list = field(default_factory=list)     # fno.Reach for asked-for levels
 
 
 def _cfg() -> dict:
@@ -30,8 +32,18 @@ def _cfg() -> dict:
     return load_config()
 
 
+def reach_curve() -> dict | None:
+    return fno.load_reach_curve(REACH_PATH)
+
+
+def reaches(v: fno.FnoView, levels, curve: dict | None = None) -> list:
+    curve = curve if curve is not None else reach_curve()
+    out = [fno.reach(v.spot, v.straddle, float(x), v.kind, curve) for x in levels]
+    return [x for x in out if x is not None]
+
+
 def load(symbol: str, expiry: dt.date | None = None, save: bool = True,
-         cfg: dict | None = None) -> Result:
+         cfg: dict | None = None, levels=()) -> Result:
     """Live chain + futures from NSE, analysed. Saves a snapshot by default."""
     cfg = cfg or _cfg()
     chain = nsed.option_chain(symbol, expiry)
@@ -45,10 +57,11 @@ def load(symbol: str, expiry: dt.date | None = None, save: bool = True,
         lot = None
     view = fno.analyse(chain.symbol, chain.strikes, chain.spot, chain.expiry,
                        chain.timestamp, today=dt.date.today(), fut=fut,
-                       cfg=cfg, lot=lot, now=dt.datetime.now())
+                       cfg=cfg, lot=lot, now=dt.datetime.now(),
+                       curve=(curve := reach_curve()))
     if save:
         _save_snapshot(chain, fut)
-    return Result(view, chain)
+    return Result(view, chain, reaches(view, levels, curve))
 
 
 def _save_snapshot(chain: nsed.Chain, fut: pd.DataFrame | None) -> None:
@@ -98,7 +111,19 @@ def _wall(w: fno.Wall | None) -> str:
             + (f", {chg:+.1f}% today" if chg is not None else "") + ")")
 
 
-def text(v: fno.FnoView) -> str:
+def _pct(p) -> str:
+    return "-" if p is None else f"{100 * p:.0f}%"
+
+
+def reach_line(x: fno.Reach) -> str:
+    """One level's reach, in words."""
+    s = (f"{_px(x.level)} ({x.distance_pct:+.1f}%, {x.moves:.1f} moves): "
+         f"reached on a close before expiry {_pct(x.hist_touch)}, "
+         f"beyond it at expiry {_pct(x.hist_expiry)}")
+    return s + f" (model {_pct(x.model_expiry)})"
+
+
+def text(v: fno.FnoView, levels: list | None = None) -> str:
     L = []
     head = f"{v.symbol}  spot {_px(v.spot)}"
     if v.futures:
@@ -125,6 +150,12 @@ def text(v: fno.FnoView) -> str:
     if v.futures and v.futures.buildup:
         L.append(f"  Futures: price {v.futures.price_chg:+,.2f}, OI {v.futures.chg_oi:+,.0f}"
                  f" → {v.futures.buildup}")
+    walls = [x for x in (v.resistance_reach, v.support_reach) if x is not None]
+    if walls or levels:
+        L.append("Reach (how often a move this size got there; not a forecast of direction):")
+        L += [f"  {'call wall' if x.side == 'up' else 'put wall ':<9}  {reach_line(x)}"
+              for x in walls]
+        L += [f"  {'level':<9}  {reach_line(x)}" for x in (levels or [])]
     if v.lot:
         L.append(f"Lot size {v.lot}; OI is in contracts.")
     L.append("")
@@ -152,6 +183,12 @@ def summary_row(v: fno.FnoView) -> dict:
         "resistance_1": r[0].strike if r[0] else None,
         "resistance_2": r[1].strike if r[1] else None,
         "max_pain": v.max_pain, "atm_iv_pct": v.atm_iv, "straddle": v.straddle,
+        "call_wall_reach_pct": (100 * v.resistance_reach.hist_touch
+                                if v.resistance_reach and v.resistance_reach.hist_touch
+                                is not None else None),
+        "put_wall_reach_pct": (100 * v.support_reach.hist_touch
+                               if v.support_reach and v.support_reach.hist_touch
+                               is not None else None),
         "iv_move": v.iv_move, "range_low": v.range_low, "range_high": v.range_high,
         "range_from": v.range_from, "range_hit_pct": v.range_hit_pct, "lot": v.lot,
         "warnings": " | ".join(v.warnings),
@@ -210,7 +247,9 @@ def write_excel(results: list[Result], path: Path | None = None) -> Path:
     ws.cell(len(rows) + 3, 1, "Decision support, not investment advice. "
             "OI is in contracts. Range = spot ± ATM straddle; range_hit_pct is how often the "
             "expiry close landed inside it since Jan 2024. Walls, PCR and max pain are "
-            "positioning: validation found no edge (docs/f_o/validation.md).")
+            "positioning: validation found no edge (docs/f_o/validation.md). *_reach_pct: how "
+            "often a move this size reached the wall on a daily close before expiry -- "
+            "not a forecast of direction.")
 
     for res in results:
         v = res.view
@@ -221,6 +260,9 @@ def write_excel(results: list[Result], path: Path | None = None) -> Path:
             ws.append([reason])
         for warning in v.warnings:
             ws.append(["! " + warning])
+        for x in [v.resistance_reach, v.support_reach] + list(res.reaches):
+            if x is not None:
+                ws.append(["Reach " + reach_line(x)])
         ws.append([])
         top = ws.max_row + 1
         t = chain_table(res)
