@@ -43,9 +43,17 @@ strategy/risk_monitor.py   stops and alerts on held positions
 backtest/pit_engine.py     point-in-time, survivorship-free
 backtest/engine.py         walk-forward trade simulation
 
+data/sources/nse_derivatives.py   live option chain, futures, expiries, lot sizes
+data/fo_bhavcopy.py        historical F&O chains -> data/fo_history.db
+strategy/fno.py            PCR, OI walls, max pain, straddle, range (pure)
+fno_report.py              F&O load/text/Excel, shared by CLI and dashboard
+run_fno.py                 F&O analysis; run_fno_backtest.py validates it
+docs/f_o/                  F&O docs: overview, data traps, validation
+
 ui/app.py                  dashboard: holdings and market sections
 ui/service.py              cached pipeline feeding the UI
 ui/components.py           badges and formatting
+ui/fno_tab.py              the F&O tab
 run_ui.py                  launch the dashboard
 ```
 

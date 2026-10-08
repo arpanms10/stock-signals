@@ -46,6 +46,8 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 200
 | `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
 | `set_buckets.py` | Pre-fill core / satellite / legacy |
 | `record_momentum.py` | Save this month's momentum picks to `history/` |
+| `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
+| `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -103,6 +105,7 @@ what you held is deliberately not in it.
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
+| [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md) |
 | [**Code layout**](docs/layout.md) | Where things live |
 | [ROADMAP](ROADMAP.md) | What is built, and what is still wrong with it |
 
