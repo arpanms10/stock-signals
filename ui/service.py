@@ -334,6 +334,9 @@ SCRIPTS = {
     "Refresh fundamentals (NSE + Yahoo)": ["fetch_fundamentals.py"],
     "Update full-market data": ["run_market_ingest.py", "--years", "10"],
     "Suggest buckets": ["set_buckets.py"],
+    # F&O: the bhavcopy history behind IV percentile, realised vol and the
+    # validation's hit rates and reach curves (rewritten on every run).
+    "Refresh F&O history + validation": ["run_fno_backtest.py", "--ingest"],
 }
 
 
