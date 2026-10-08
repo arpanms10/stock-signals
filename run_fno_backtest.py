@@ -32,19 +32,44 @@ from strategy import fno
 
 REPORTS = Path(__file__).parent / "reports" / "fno"
 REACH_PATH = Path(__file__).parent / "config" / "fno_reach.json"
+CALIBRATION_PATH = Path(__file__).parent / "config" / "fno_calibration.json"
 SPLIT = "2025-07-01"       # reach calibration: curve built before, tested after
 MAX_CYCLE_RATIO = 2.0      # spot moved >2x or <0.5x inside a cycle: a split/bonus
 
 
 # --------------------------------------------------------------- measuring
 
+def _regime(start: str) -> pd.Series:
+    """date -> 'rising' / 'falling': NIFTY 500 above or below its 200-day
+    average (the dashboard's own regime definition), from signals.db."""
+    from data import store
+    try:
+        con = store.connect()
+        idx = store.load_index(con, "NIFTY 500")
+        con.close()
+    except Exception:
+        return pd.Series(dtype=object)
+    if idx.empty:
+        return pd.Series(dtype=object)
+    c = idx.set_index(idx["date"].astype(str))["close"]
+    ma = c.rolling(200).mean()
+    return pd.Series(np.where(c > ma, "rising", "falling"), index=c.index)[ma.notna()]
+
+
 def observe(con, cfg: dict) -> pd.DataFrame:
-    """One row per (date, symbol): what OI said, and what happened."""
+    """One row per (date, symbol, expiry): what the chain said, its volatility
+    context, and what happened by expiry."""
     chains = pd.read_sql_query("SELECT * FROM fo_chain", con)
     spot = fb.spot_history(con)
-    lots = pd.read_sql_query("SELECT date, symbol, lot FROM fo_spot", con)
-    spot = spot.merge(lots, on=["date", "symbol"])
+    # Indices: the index's real daily high/low beats one estimated from the future.
+    ohlc = pd.read_sql_query("SELECT date, symbol, high AS ih, low AS il FROM fo_index_ohlc", con)
+    spot = spot.merge(ohlc, on=["date", "symbol"], how="left")
+    spot["spot_high"] = spot["ih"].fillna(spot["spot_high"])
+    spot["spot_low"] = spot["il"].fillna(spot["spot_low"])
     by_sym = {s: g.sort_values("date").set_index("date") for s, g in spot.groupby("symbol")}
+    res = pd.read_sql_query("SELECT symbol, date FROM fo_results", con)
+    results = {s: sorted(g["date"]) for s, g in res.groupby("symbol")}
+    regime = _regime("2019-01-01")
     for side in ("ce", "pe"):
         for f in ("iv", "bid", "ask"):
             chains[f"{side}_{f}"] = np.nan
@@ -52,28 +77,38 @@ def observe(con, cfg: dict) -> pd.DataFrame:
     rows = []
     for (date, sym, expiry), g in chains.groupby(["date", "symbol", "expiry"], sort=False):
         hist = by_sym.get(sym)
-        if hist is None or expiry not in hist.index:
+        if hist is None or expiry not in hist.index or date not in hist.index:
             continue                          # expiry not reached yet
         s0 = float(g["spot"].iloc[0])
         path = hist.loc[(hist.index > date) & (hist.index <= expiry)]
         close = float(hist.loc[expiry, "spot"])
-        lot0 = hist.loc[date, "lot"] if date in hist.index else None
+        lot0 = hist.loc[date, "lot"]
         adjusted = (path["lot"].nunique(dropna=True) > 1
-                    or (lot0 is not None and pd.notna(lot0)
-                        and (path["lot"].dropna() != lot0).any())
+                    or (pd.notna(lot0) and (path["lot"].dropna() != lot0).any())
                     or not (1 / MAX_CYCLE_RATIO < close / s0 < MAX_CYCLE_RATIO))
         kind = hist["kind"].iloc[0]
+        cycle = g["cycle"].iloc[0] or "monthly"
         v = fno.analyse(sym, g.sort_values("strike").reset_index(drop=True), s0,
                         dt.date.fromisoformat(expiry),
                         dt.datetime.fromisoformat(date + "T15:30:00"), cfg=cfg,
                         kind=kind)
         old_lo, old_hi, _, _ = fno.expected_range(s0, v.straddle, v.support, v.resistance)
+        before = hist.loc[hist.index < date]
+        today = hist.loc[date]
+        iv = today["iv_straddle"]
+        pct, _ = fno.iv_percentile(iv if pd.notna(iv) else None, before["iv_straddle"])
+        rv = fno.realized_vol(pd.concat([before["spot"], pd.Series([s0])]))
+        r_dates = [d for d in results.get(sym, []) if date < d <= expiry]
         rows.append({
             "date": date, "symbol": sym, "expiry": expiry,
-            "kind": kind, "sessions": int(g["sessions"].iloc[0]),
+            "kind": kind, "cycle": cycle,
+            "group": f"{kind} weekly" if cycle == "weekly" else kind,
+            "src": today.get("src"), "sessions": int(g["sessions"].iloc[0]),
             "spot": s0, "close": close,
             "path_min": float(path["spot"].min()) if len(path) else close,
             "path_max": float(path["spot"].max()) if len(path) else close,
+            "path_low": float(path["spot_low"].min()) if path["spot_low"].notna().any() else np.nan,
+            "path_high": float(path["spot_high"].max()) if path["spot_high"].notna().any() else np.nan,
             "adjusted": bool(adjusted),
             "pcr_oi": v.pcr["oi"], "pcr_bias": v.pcr_bias, "bias": v.bias,
             "support": v.support.strike if v.support else np.nan,
@@ -84,11 +119,20 @@ def observe(con, cfg: dict) -> pd.DataFrame:
             "max_pain": v.max_pain if v.max_pain is not None else np.nan,
             "old_low": old_lo if old_lo is not None else np.nan,
             "old_high": old_hi if old_hi is not None else np.nan,
+            "iv": iv, "iv_pct": pct, "rv20": rv,
+            "iv_rv": iv / rv if pd.notna(iv) and rv else np.nan,
+            "skew": today["iv_put_wing"] - today["iv_call_wing"]
+            if pd.notna(today["iv_put_wing"]) and pd.notna(today["iv_call_wing"]) else np.nan,
+            "term": today["iv_next"] - iv if pd.notna(today["iv_next"]) and pd.notna(iv) else np.nan,
+            "results_in_cycle": bool(r_dates) if kind == "equity" else None,
+            "regime": regime.get(date),
         })
     obs = pd.DataFrame(rows)
     if obs.empty:
         return obs
     obs["ret_pct"] = 100 * (obs["close"] / obs["spot"] - 1)
+    # The realised move in units of the priced move: 1.0 = exactly the straddle.
+    obs["moves"] = (obs["close"] - obs["spot"]).abs() / obs["straddle"]
     return obs
 
 
@@ -111,7 +155,7 @@ def score(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     out = {}
     rng_rows, wall_rows, pcr_rows, mp_rows = [], [], [], []
-    for (kind, k), g in o.groupby(["kind", "sessions"]):
+    for (kind, k), g in o.groupby(["group", "sessions"]):
         pool = g["ret_pct"].to_numpy()
         idx = g.index
 
@@ -179,13 +223,120 @@ def score(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
     out["Walls"] = pd.DataFrame(wall_rows)
     out["PCR"] = pd.DataFrame(pcr_rows)
     out["Max pain"] = pd.DataFrame(mp_rows)
-    out["Sample"] = (obs.groupby(["kind", "sessions"])
+    out["Sample"] = (obs.groupby(["group", "src", "sessions"])
                      .agg(observations=("symbol", "size"),
                           underlyings=("symbol", "nunique"),
                           expiries=("expiry", "nunique"),
                           dropped_adjusted=("adjusted", "sum"),
                           first=("date", "min"), last=("date", "max"))
                      .reset_index())
+    return out
+
+
+FACTORS = {"iv_pct": "IV percentile", "iv_rv": "IV / realised vol",
+           "skew": "skew (put - call IV, pts)", "term": "next month - this month IV, pts"}
+
+
+def _quintiles(g: pd.DataFrame, col: str) -> pd.Series:
+    x = g[col]
+    return pd.qcut(x.rank(method="first"), 5, labels=[1, 2, 3, 4, 5])
+
+
+def context_tables(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Does the volatility context predict the SIZE of the move (in priced
+    units, `moves`), and does skew predict its direction?
+
+    A factor matters if the share of expiries inside the straddle, and the
+    average move in straddles, shift steadily across its quintiles. Spearman
+    rho between factor and realised move summarises it; with n in the
+    thousands, |rho| below ~0.03 is noise.
+    """
+    o = obs[(~obs["adjusted"]) & (obs["cycle"] == "monthly")
+            & obs["sessions"].isin([5, 10])].dropna(subset=["straddle"]).copy()
+    o["inside"] = o["moves"] <= 1
+    o["signed"] = (o["close"] - o["spot"]) / o["straddle"]
+    size_rows, dir_rows, summ = [], [], []
+    for kind, g in o.groupby("kind"):
+        for col, label in FACTORS.items():
+            h = g.dropna(subset=[col])
+            if len(h) < 100:
+                continue
+            q = _quintiles(h, col)
+            rho = h[col].rank().corr(h["moves"].rank())     # Spearman, without scipy
+            summ.append({"kind": kind, "factor": label, "n": len(h),
+                         "rho_vs_move_size": rho,
+                         "inside_q1_pct": 100 * h.loc[q == 1, "inside"].mean(),
+                         "inside_q5_pct": 100 * h.loc[q == 5, "inside"].mean(),
+                         "moves_q1": h.loc[q == 1, "moves"].mean(),
+                         "moves_q5": h.loc[q == 5, "moves"].mean()})
+            for b, hb in h.groupby(q, observed=True):
+                size_rows.append({"kind": kind, "factor": label, "quintile": int(b),
+                                  "n": len(hb), "factor_median": hb[col].median(),
+                                  "inside_straddle_pct": 100 * hb["inside"].mean(),
+                                  "mean_moves": hb["moves"].mean()})
+            if col == "skew":
+                for b, hb in h.groupby(q, observed=True):
+                    dir_rows.append({"kind": kind, "skew_quintile": int(b), "n": len(hb),
+                                     "skew_median": hb["skew"].median(),
+                                     "up_pct": 100 * (hb["signed"] > 0).mean(),
+                                     "mean_signed_moves": hb["signed"].mean()})
+    out = {"Move size vs volatility context (summary)": pd.DataFrame(summ),
+           "Move size by quintile": pd.DataFrame(size_rows),
+           "Direction vs skew": pd.DataFrame(dir_rows)}
+
+    eq = o[o["kind"] == "equity"].dropna(subset=["results_in_cycle"])
+    if len(eq):
+        out["Results inside the cycle (stocks)"] = (
+            eq.groupby("results_in_cycle")
+            .agg(n=("moves", "size"), inside_straddle_pct=("inside", "mean"),
+                 mean_moves=("moves", "mean"), median_iv=("iv", "median"))
+            .assign(inside_straddle_pct=lambda t: 100 * t["inside_straddle_pct"])
+            .reset_index())
+    rg = o.dropna(subset=["regime"])
+    if len(rg):
+        out["Market regime (NIFTY 500 vs its 200-day average)"] = (
+            rg.groupby(["kind", "regime"])
+            .agg(n=("moves", "size"), inside_straddle_pct=("inside", "mean"),
+                 mean_moves=("moves", "mean"), up_pct=("signed", lambda x: (x > 0).mean()))
+            .assign(inside_straddle_pct=lambda t: 100 * t["inside_straddle_pct"],
+                    up_pct=lambda t: 100 * t["up_pct"])
+            .reset_index())
+    return out
+
+
+LOW_IV_PCT = 20
+
+
+def conditional_rates(obs: pd.DataFrame) -> dict:
+    """Stocks only (the index sample is too small to split): the +/- straddle
+    hit rate by IV-percentile band and by results-inside-the-cycle, pooled
+    over 5 and 10 sessions out. Only these two passed the within-date check
+    (docs/f_o/validation.md); the rest are not used."""
+    o = obs[(~obs["adjusted"]) & (obs["cycle"] == "monthly") & (obs["kind"] == "equity")
+            & obs["sessions"].isin([5, 10])].dropna(subset=["straddle"])
+    inside = o["moves"] <= 1
+    out = {"overall": round(100 * inside.mean(), 1), "n": int(len(o))}
+    # Only the bottom band: it was the weakest in 2024 and in 2025-26 alike,
+    # and held up within dates. The middle bands' higher rates appeared in
+    # one period only, so they are reported, not quoted.
+    p = o.dropna(subset=["iv_pct"])
+    low = p[p["iv_pct"] < LOW_IV_PCT]
+    out["low_iv_pct"] = {"below": LOW_IV_PCT, "n": int(len(low)),
+                         "pct": round(100 * (low["moves"] <= 1).mean(), 1)}
+    r = o.dropna(subset=["results_in_cycle"])
+    out["results_in_cycle"] = {
+        str(bool(k)).lower(): {"n": int(len(g)), "pct": round(100 * (g["moves"] <= 1).mean(), 1)}
+        for k, g in r.groupby("results_in_cycle")}
+    return out
+
+
+def calibration(tables: dict) -> dict:
+    """Measured +/- straddle hit rates by group and sessions, for the live view."""
+    r = tables["Ranges"]
+    r = r[r["range"] == "±straddle (live)"]
+    out: dict = {}
+    for row in r.itertuples():
+        out.setdefault(row.kind, {})[int(row.sessions)] = round(float(row.expiry_inside_pct), 1)
     return out
 
 
@@ -198,7 +349,7 @@ def reach_calibration(obs: pd.DataFrame, split: str = SPLIT) -> pd.DataFrame:
     predicted probability; a calibrated estimate has actual ~= predicted
     in every bin.
     """
-    o = obs[~obs["adjusted"]].dropna(subset=["straddle"])
+    o = obs[(~obs["adjusted"]) & (obs["cycle"] == "monthly")].dropna(subset=["straddle"])
     curve = fno.reach_curve(o[o["date"] < split])
     test = o[(o["date"] >= split) & o["sessions"].isin([5, 10])]
     rows = []
@@ -211,17 +362,29 @@ def reach_calibration(obs: pd.DataFrame, split: str = SPLIT) -> pd.DataFrame:
                 continue
             touched = (r.path_max >= lvl) if x.side == "up" else (r.path_min <= lvl)
             beyond = (r.close >= lvl) if x.side == "up" else (r.close <= lvl)
+            ext = r.path_high if x.side == "up" else r.path_low
+            hit_i = (np.nan if pd.isna(ext) else
+                     bool(ext >= lvl) if x.side == "up" else bool(ext <= lvl))
             rows.append({"kind": r.kind, "hist_touch": x.hist_touch,
                          "hist_expiry": x.hist_expiry, "model_expiry": x.model_expiry,
-                         "touched": bool(touched), "beyond": bool(beyond)})
+                         "hist_touch_intraday": x.hist_touch_intraday,
+                         "touched": bool(touched), "beyond": bool(beyond),
+                         "touched_intraday": hit_i})
     t = pd.DataFrame(rows)
     out = []
+    if t.empty:
+        return pd.DataFrame(out)
     bins = [0, .1, .2, .3, .4, .5, .7, 1.0001]
     for kind, g in t.groupby("kind"):
         for pred, actual in (("hist_touch", "touched"), ("hist_expiry", "beyond"),
-                             ("model_expiry", "beyond")):
-            b = pd.cut(g[pred], bins, right=False)
-            for interval, h in g.groupby(b, observed=True):
+                             ("model_expiry", "beyond"),
+                             ("hist_touch_intraday", "touched_intraday")):
+            g2 = g.dropna(subset=[pred, actual])
+            if g2.empty:
+                continue
+            g2 = g2.assign(**{actual: g2[actual].astype(float)})
+            b = pd.cut(g2[pred], bins, right=False)
+            for interval, h in g2.groupby(b, observed=True):
                 out.append({"kind": kind, "estimate": pred, "bin": str(interval),
                             "n": len(h), "predicted_pct": 100 * h[pred].mean(),
                             "actual_pct": 100 * h[actual].mean()})
@@ -230,7 +393,7 @@ def reach_calibration(obs: pd.DataFrame, split: str = SPLIT) -> pd.DataFrame:
 
 def write_reach_curve(obs: pd.DataFrame, path: Path = REACH_PATH) -> dict:
     import json
-    curves = fno.reach_curve(obs)
+    curves = fno.reach_curve(obs[obs["cycle"] == "monthly"])
     path.write_text(json.dumps({
         "built": dt.date.today().isoformat(),
         "source": "run_fno_backtest.py: F&O bhavcopy, 5 and 10 sessions before "
@@ -263,6 +426,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--ingest", action="store_true",
                     help="download/refresh the F&O bhavcopy history first")
+    ap.add_argument("--ingest-old", action="store_true",
+                    help="also download the pre-2024 index history (once; ~1 hour)")
     ap.add_argument("--start", type=dt.date.fromisoformat, default=fb.FIRST_DAY)
     ap.add_argument("--end", type=dt.date.fromisoformat,
                     default=dt.date.today() - dt.timedelta(days=1))
@@ -272,14 +437,30 @@ def main(argv=None) -> int:
     if a.ingest:
         print(f"Ingesting F&O bhavcopy {a.start} .. {a.end} (skips days held)")
         fb.ingest_range(con, a.start, a.end)
+        print("Index OHLC and results dates")
+        last = con.execute("SELECT MAX(date) FROM fo_index_ohlc").fetchone()[0]
+        fb.ingest_index_ohlc(con, dt.date.fromisoformat(last) if last else fb.OLD_FIRST_DAY,
+                             a.end)
+        fb.ingest_results(con, a.start, a.end + dt.timedelta(days=60))
+    if a.ingest_old:
+        print("Old-format index history, 2019-2023 (skips days held)")
+        fb.ingest_old_range(con, fb.OLD_FIRST_DAY, fb.FIRST_DAY - dt.timedelta(days=1))
 
     obs = observe(con, load_config())
     if obs.empty:
         print("No observations with a completed expiry. Run with --ingest first.")
         return 1
     tables = score(obs)
+    tables.update(context_tables(obs))
     tables["Reach calibration (out of sample)"] = reach_calibration(obs)
     curves = write_reach_curve(obs)
+    import json
+    CALIBRATION_PATH.write_text(json.dumps({
+        "built": dt.date.today().isoformat(),
+        "source": "run_fno_backtest.py: share of expiry closes inside spot +/- ATM "
+                  "straddle, by group and sessions before expiry",
+        "range_hit_pct": calibration(tables),
+        "equity_conditional": conditional_rates(obs)}, indent=1))
     REPORTS.mkdir(parents=True, exist_ok=True)
     md = to_markdown(tables)
     path = REPORTS / f"validation_{dt.date.today():%Y%m%d}.md"
