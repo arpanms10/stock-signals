@@ -245,3 +245,92 @@ def test_walls_get_reach_when_curve_given():
     v = fno.analyse("NIFTY", c.strikes, c.spot, c.expiry, c.timestamp, curve=curve)
     assert v.resistance_reach.side == "up" and v.support_reach.side == "down"
     assert 0 < v.resistance_reach.hist_touch < 1
+
+
+# ---------------------------------------------------------- pricing, vol
+
+def test_implied_vol_inverts_price_and_rejects_impossible():
+    p = fno.bs_price(100, 110, 0.1, 0.065, 0.3, True)
+    assert float(fno.implied_vol(p, 100, 110, 0.1, 0.065, True)) == pytest.approx(0.3, abs=1e-6)
+    # below intrinsic: no volatility produces it
+    assert np.isnan(float(fno.implied_vol(1.0, 100, 90, 0.1, 0.065, True)))
+
+
+def test_greeks_signs_and_atm_delta():
+    c = chain([(95, 1, 1, {"ce_iv": 20.0, "pe_iv": 20.0}),
+               (100, 1, 1, {"ce_iv": 20.0, "pe_iv": 20.0}),
+               (105, 1, 1, {"ce_iv": 20.0, "pe_iv": 20.0})])
+    g = fno.add_greeks(c, 100.0, 30, 6.5).set_index("strike")
+    assert 0.5 < g.loc[100, "ce_delta"] < 0.6          # ATM call, small carry
+    assert g.loc[100, "ce_delta"] - g.loc[100, "pe_delta"] == pytest.approx(1, abs=0.002)
+    assert (g["ce_theta"] < 0).all() and (g["ce_gamma"] > 0).all()
+    assert g.loc[95, "ce_prob_itm"] > g.loc[105, "ce_prob_itm"]
+
+
+def test_greeks_blank_without_iv():
+    g = fno.add_greeks(chain([(100, 1, 1)]), 100.0, 30, 6.5)
+    assert np.isnan(g["ce_delta"].iloc[0])
+
+
+def test_straddle_iv_round_trip():
+    # a straddle priced off sigma=20% for 73 days returns ~20%
+    T = 73 / 365
+    strad = fno.STRADDLE_TO_SIGMA * 100 * 0.20 * np.sqrt(T)
+    assert fno.straddle_iv(100, strad, 73) == pytest.approx(20.0, rel=1e-6)
+    assert fno.straddle_iv(100, None, 73) is None
+
+
+def test_iv_percentile_needs_history_and_counts_below():
+    hist = pd.Series(range(1, 201))          # 1..200
+    pct, n = fno.iv_percentile(150.5, hist)
+    assert n == 200 and pct == pytest.approx(75.0)
+    assert fno.iv_percentile(10, pd.Series(range(50)))[0] is None
+
+
+def test_realized_vol():
+    rng = np.random.default_rng(0)
+    closes = pd.Series(100 * np.exp(np.cumsum(rng.normal(0, 0.01, 400))))
+    rv = fno.realized_vol(closes, n=399)
+    assert rv == pytest.approx(100 * 0.01 * np.sqrt(252), rel=0.1)
+    assert fno.realized_vol(closes.head(5)) is None
+
+
+def test_wing_skew_positive_when_puts_richer():
+    T, r = fno.year_frac(30), 0.065
+    rows = []
+    for k in (90, 95, 100, 105, 110):
+        iv = 0.25 if k < 100 else 0.20
+        rows.append((k, 1, 1, {"ce_ltp": float(fno.bs_price(100, k, T, r, iv, True)),
+                               "pe_ltp": float(fno.bs_price(100, k, T, r, iv, False))}))
+    sk = fno.wing_skew(chain(rows), 100.0, 5.0, 30, 6.5)
+    assert sk == pytest.approx(5.0, abs=0.05)
+
+
+def test_sessions_to_skips_holidays():
+    assert fno.sessions_to(dt.date(2026, 10, 8), dt.date(2026, 10, 27)) == 13
+    assert fno.sessions_to(dt.date(2026, 10, 8), dt.date(2026, 10, 27),
+                           [dt.date(2026, 10, 20)]) == 12
+
+
+def test_results_warning():
+    c = d.parse_chain(json.loads((FIX / "reliance_chain.json").read_text()), "RELIANCE")
+    v = fno.analyse("RELIANCE", c.strikes, c.spot, c.expiry, c.timestamp,
+                    results=[dt.date(2026, 10, 17)])
+    assert any("Results due 17-Oct" in w for w in v.warnings)
+
+
+def test_conditional_note_only_for_measured_conditions():
+    cond = {"overall": 61.0, "low_iv_pct": {"below": 20, "n": 3000, "pct": 56.0},
+            "results_in_cycle": {"true": {"n": 1600, "pct": 57.4}}}
+    c = d.parse_chain(json.loads((FIX / "reliance_chain.json").read_text()), "RELIANCE")
+    hist = pd.Series(np.linspace(10, 60, 200))            # today's IV is low vs this
+    v = fno.analyse("RELIANCE", c.strikes, c.spot, c.expiry, c.timestamp,
+                    kind="equity", iv_history=hist, results=[dt.date(2026, 10, 17)])
+    note = fno.conditional_note(v, cond)
+    assert "results inside the cycle it held 57%" in note
+    v.vol.iv_pct = 50.0                                     # middle band: not quoted
+    assert "IV percentile" not in fno.conditional_note(v, cond)
+    v.vol.results = []
+    assert fno.conditional_note(v, cond) is None
+    v.kind = "index"
+    assert fno.conditional_note(v, cond) is None

@@ -203,4 +203,5 @@ fno:
     index:  {5: 49, 10: 56, 20: 58}
     equity: {5: 61, 10: 63, 20: 54}
   near_expiry_sessions: 2          # OI is distorted by rollover this close to expiry
+  risk_free_pct: 6.5               # Greeks and IV from prices; small effect at <3 months
   stale_minutes: 30                # chain older than this during market hours is flagged

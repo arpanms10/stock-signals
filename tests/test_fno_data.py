@@ -86,3 +86,20 @@ def test_lot_sizes_skip_section_headers_and_blank_months():
     assert get("NIFTY", dt.date(2026, 10, 1)) == [65]
     assert get("RELIANCE", dt.date(2026, 11, 1)) == [500]
     assert get("FINNIFTY", dt.date(2027, 3, 1)) == []   # blank: no contract
+
+
+def test_holidays_and_results_parsing():
+    from data.sources import nse_events as ev
+    h = d.parse_holidays({"FO": [{"tradingDate": "20-Oct-2026"}, {"tradingDate": "02-Oct-2026"}],
+                          "CM": [{"tradingDate": "01-Jan-2026"}]})
+    assert h == [dt.date(2026, 10, 2), dt.date(2026, 10, 20)]
+    rows = [
+        {"bm_symbol": "INFY", "bm_date": "23-Oct-2026", "bm_purpose": "Board Meeting Intimation",
+         "bm_desc": "to consider and approve the Unaudited Financial results for the quarter"},
+        {"bm_symbol": "BAJFINANCE", "bm_date": "01-Oct-2026", "bm_purpose": "Fund Raising",
+         "bm_desc": "To consider Fund Raising"},
+        {"bm_symbol": "TCS", "bm_date": "08-Oct-2026", "bm_purpose": "Financial Results/Dividend",
+         "bm_desc": ""},
+    ]
+    df = ev.parse(rows)
+    assert list(df["symbol"]) == ["INFY", "TCS"]

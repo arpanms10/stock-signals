@@ -97,7 +97,35 @@ def _pct(p) -> str:
 def _reach_caption(x) -> str | None:
     if x is None or x.hist_touch is None:
         return None
-    return f"reached {_pct(x.hist_touch)}"
+    p = x.hist_touch_intraday if x.hist_touch_intraday is not None else x.hist_touch
+    return f"reached {_pct(p)}"
+
+
+def _vol_row(vc) -> None:
+    st.markdown("**Volatility**")
+    m = st.columns(5)
+    m[0].metric("Straddle IV", f"{vc.iv:.1f}%" if vc.iv else "--",
+                help="Annualised volatility implied by the ATM straddle -- the "
+                     "same measure the history uses, so the percentile compares "
+                     "like with like.")
+    m[1].metric("IV percentile", f"{vc.iv_pct:.0f}" if vc.iv_pct is not None else "--",
+                None if vc.iv_pct is not None else
+                ("history not current" if vc.iv_hist_n == 0 else f"{vc.iv_hist_n} days of history"),
+                delta_color="off", delta_arrow="off",
+                help="Share of the past year's daily straddle IVs below today's. "
+                     "Needs 120 days of F&O history (run_fno_backtest.py --ingest).")
+    m[2].metric("Realised (20d)", f"{vc.rv20:.1f}%" if vc.rv20 else "--",
+                f"IV/RV {vc.iv_rv:.2f}" if vc.iv_rv else None,
+                delta_color="off", delta_arrow="off",
+                help="How much it has actually moved, annualised, over the last 20 "
+                     "sessions. Needs a history refreshed within the last week.")
+    m[3].metric("Skew", f"{vc.skew:+.1f} pts" if vc.skew is not None else "--",
+                help="IV of the put one straddle below spot minus the call one "
+                     "straddle above. Positive: downside protection costs more.")
+    m[4].metric("Next month", f"{vc.term:+.1f} pts" if vc.term is not None else "--",
+                help="Next monthly's straddle IV minus this one. Negative "
+                     "(inverted) usually means an event -- often results -- "
+                     "before this expiry.")
 
 
 def _px(x) -> str:
@@ -110,7 +138,8 @@ def render() -> None:
     st.subheader("F&O: where option writers have put their money")
     st.caption(
         "The range is spot ± the ATM straddle -- the move the market is pricing -- "
-        "with how often the expiry close actually landed inside it since 2024. "
+        "with how often the expiry close actually landed inside it (stocks since "
+        "2024, indices since 2019). "
         "Walls, PCR and max pain show where writers are positioned; tested on "
         "~14,000 expiries, none of them predicted where price ended up "
         "(`docs/f_o/validation.md`).")
@@ -172,7 +201,7 @@ def render() -> None:
     m[2].metric("Range high", _px(v.range_high),
                 f"spot + {v.range_from}" if v.range_from else None,
                 delta_color="off", delta_arrow="off")
-    m[3].metric("Held since 2024",
+    m[3].metric("Held since " + ("2024" if v.kind == "equity" else "2019"),
                 f"~{v.range_hit_pct:.0f}%" if v.range_hit_pct is not None else "--",
                 f"{'stocks' if v.kind == 'equity' else 'indices'}, this far out",
                 delta_color="off", delta_arrow="off",
@@ -183,6 +212,11 @@ def render() -> None:
                 delta_color="off", delta_arrow="off",
                 help="ATM call + put premium (bid/ask mid): what the market charges "
                      "for a move either way.")
+
+    if v.conditional:
+        st.caption(v.conditional)
+    if v.vol:
+        _vol_row(v.vol)
 
     st.markdown("**Positioning** &nbsp; " + c.pill("no measured edge", "neutral"),
                 unsafe_allow_html=True)
@@ -217,7 +251,7 @@ def render() -> None:
 
     st.markdown("**Reach a level** &nbsp; " + c.pill("not a forecast of direction", "neutral"),
                 unsafe_allow_html=True)
-    lc, r1, r2, r3 = st.columns([1.2, 1, 1, 1])
+    lc, r0, r1, r2, r3 = st.columns([1.2, 1, 1, 1, 1])
     default = v.resistance.strike if v.resistance else round(v.spot * 1.05, 2)
     level = lc.number_input("Price (target or stop)", min_value=0.0, value=float(default),
                             step=float(max(round(v.spot * 0.005, 0), 0.5)),
@@ -227,13 +261,16 @@ def render() -> None:
     if x is None:
         lc.caption("Needs an ATM straddle and a price away from spot.")
     else:
-        r1.metric("Reached before expiry", _pct(x.hist_touch),
+        r0.metric("Traded there", _pct(x.hist_touch_intraday),
                   f"{x.distance_pct:+.1f}% · {x.moves:.1f} moves", delta_color="off",
                   delta_arrow="off",
                   help="Share of past cases where a move this size (in ATM straddles) "
-                       "closed at or beyond the level on some day before expiry. Daily "
-                       "closes only -- an intraday touch is more likely than this. Up "
-                       "and down pooled.")
+                       "traded at or beyond the level on some day before expiry -- "
+                       "the day's high/low (estimated from the near future for "
+                       "stocks). What a stop or limit order would have met. Up and "
+                       "down pooled.")
+        r1.metric("Closed there", _pct(x.hist_touch),
+                  help="Same, but only counting daily closes at or beyond it.")
         r2.metric("Beyond it at expiry", _pct(x.hist_expiry),
                   help="Share of past cases where the expiry close was at or beyond it.")
         r3.metric("Model (IV)", _pct(x.model_expiry), "beyond at expiry",
@@ -242,7 +279,10 @@ def render() -> None:
                        "Out of sample it ran 2-4 points high for stocks.")
         if x.n:
             lc.caption(f"From {x.n:,} past {'stock' if v.kind == 'equity' else 'index'} "
-                       "observations, 5-10 sessions before expiry, Jan 2024 onward.")
+                       "observations, 5-10 sessions before monthly expiries."
+                       + (" For indices the model column has been better calibrated: "
+                          "the historical ones ran 4-8 points high out of sample."
+                          if v.kind == "index" else ""))
 
     with st.expander("Why these numbers", expanded=False):
         for r in v.reasons:

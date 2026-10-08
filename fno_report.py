@@ -27,9 +27,21 @@ class Result:
     reaches: list = field(default_factory=list)     # fno.Reach for asked-for levels
 
 
+CALIBRATION_PATH = Path(__file__).parent / "config" / "fno_calibration.json"
+
+
 def _cfg() -> dict:
+    """scoring.yaml, with the measured hit rates from the latest validation
+    run (config/fno_calibration.json) over the hand-entered ones."""
+    import json
     from scoring.timing import load_config
-    return load_config()
+    cfg = load_config()
+    if CALIBRATION_PATH.exists():
+        cal = json.loads(CALIBRATION_PATH.read_text())
+        rates = {kind: {int(k): v for k, v in t.items()}
+                 for kind, t in cal.get("range_hit_pct", {}).items()}
+        cfg.setdefault("fno", {})["range_hit_pct"] = rates
+    return cfg
 
 
 def reach_curve() -> dict | None:
@@ -43,7 +55,7 @@ def reaches(v: fno.FnoView, levels, curve: dict | None = None) -> list:
 
 
 def load(symbol: str, expiry: dt.date | None = None, save: bool = True,
-         cfg: dict | None = None, levels=()) -> Result:
+         cfg: dict | None = None, levels=(), with_context: bool = True) -> Result:
     """Live chain + futures from NSE, analysed. Saves a snapshot by default."""
     cfg = cfg or _cfg()
     chain = nsed.option_chain(symbol, expiry)
@@ -55,13 +67,83 @@ def load(symbol: str, expiry: dt.date | None = None, save: bool = True,
         lot = nsed.lot_size(chain.symbol, chain.expiry)
     except RuntimeError:
         lot = None
+    ctx = context(chain, cfg) if with_context else {}
     view = fno.analyse(chain.symbol, chain.strikes, chain.spot, chain.expiry,
                        chain.timestamp, today=dt.date.today(), fut=fut,
                        cfg=cfg, lot=lot, now=dt.datetime.now(),
-                       curve=(curve := reach_curve()))
+                       curve=(curve := reach_curve()),
+                       weekly=chain.expiry not in nsed.monthly_expiries(chain.expiries),
+                       **ctx)
+    view.conditional = fno.conditional_note(view, _conditional())
+    if view.conditional:
+        view.reasons.insert(1, view.conditional)
     if save:
         _save_snapshot(chain, fut)
     return Result(view, chain, reaches(view, levels, curve))
+
+
+def _conditional() -> dict | None:
+    import json
+    if not CALIBRATION_PATH.exists():
+        return None
+    return json.loads(CALIBRATION_PATH.read_text()).get("equity_conditional")
+
+
+def _quiet(fn, default):
+    """Context is optional: a failure loses one line of the view, not the view."""
+    try:
+        return fn()
+    except Exception as exc:          # noqa: BLE001 -- NSE fails in many ways
+        print(f"warning: {getattr(fn, '__name__', 'context')}: {exc}", file=sys.stderr)
+        return default
+
+
+def history_for(symbol: str, before: dt.date) -> pd.DataFrame:
+    """The symbol's daily rows from the F&O history (IV, closes), before a day."""
+    from data import fo_bhavcopy as fb
+    if not fb.DB_PATH.exists():
+        return pd.DataFrame()
+    con = fb.connect()
+    try:
+        return pd.read_sql_query(
+            "SELECT date, spot, iv_straddle FROM fo_spot WHERE symbol=? AND date<? "
+            "ORDER BY date", con, params=(symbol, before.isoformat()))
+    finally:
+        con.close()
+
+
+def context(chain: nsed.Chain, cfg: dict) -> dict:
+    """Everything analyse() needs beyond the chain: holidays, the IV and price
+    history behind IV percentile and realised vol, the next monthly's IV for
+    term structure, and announced results dates before expiry."""
+    today = dt.date.today()
+    hol = _quiet(lambda: nsed.holidays_between(today, chain.expiry), [])
+    hist = _quiet(lambda: history_for(chain.symbol, today), pd.DataFrame())
+    out = {"holidays": hol, "iv_history": None, "closes": None,
+           "iv_next": None, "results": None}
+    if not hist.empty:
+        last = dt.date.fromisoformat(hist["date"].iloc[-1])
+        # Both only from a history that reaches the last week (the Saturday
+        # job keeps it there). A percentile against a stale year, or realised
+        # vol from an old month, describes some other market.
+        if (today - last).days <= 7:
+            out["iv_history"] = hist["iv_straddle"]
+            out["closes"] = pd.concat([hist["spot"], pd.Series([chain.spot])],
+                                      ignore_index=True)
+
+    def next_iv():
+        nxt = [e for e in nsed.monthly_expiries(chain.expiries) if e > chain.expiry]
+        if not nxt:
+            return None
+        c2 = nsed.option_chain(chain.symbol, nxt[0])
+        return fno.straddle_iv(c2.spot, fno.straddle(c2.strikes, c2.spot),
+                               (nxt[0] - today).days)
+    out["iv_next"] = _quiet(next_iv, None)
+    if not chain.is_index:
+        from data.sources import nse_events
+        out["results"] = _quiet(
+            lambda: nse_events.upcoming(chain.symbol, today, chain.expiry), None)
+    return out
 
 
 def _save_snapshot(chain: nsed.Chain, fut: pd.DataFrame | None) -> None:
@@ -118,9 +200,24 @@ def _pct(p) -> str:
 def reach_line(x: fno.Reach) -> str:
     """One level's reach, in words."""
     s = (f"{_px(x.level)} ({x.distance_pct:+.1f}%, {x.moves:.1f} moves): "
-         f"reached on a close before expiry {_pct(x.hist_touch)}, "
+         f"traded there before expiry {_pct(x.hist_touch_intraday)}, "
+         f"closed there {_pct(x.hist_touch)}, "
          f"beyond it at expiry {_pct(x.hist_expiry)}")
     return s + f" (model {_pct(x.model_expiry)})"
+
+
+def vol_line(c: fno.VolContext) -> str:
+    """Volatility context in one line."""
+    parts = [f"Straddle IV {_n(c.iv, 1)}%"]
+    parts.append(f"IV percentile {_n(c.iv_pct, 0)}" if c.iv_pct is not None
+                 else "IV percentile - (" + ("F&O history not current: run_fno_backtest.py "
+                                             "--ingest" if c.iv_hist_n == 0 else
+                                             f"{c.iv_hist_n} days of history; needs 120") + ")")
+    parts.append(f"realised 20d {_n(c.rv20, 1)}{'%' if c.rv20 is not None else ''}"
+                 + (f" (IV/RV {c.iv_rv:.2f})" if c.iv_rv else ""))
+    parts.append(f"skew {c.skew:+.1f} pts" if c.skew is not None else "skew -")
+    parts.append(f"next month {c.term:+.1f} pts" if c.term is not None else "next month -")
+    return "Volatility: " + "   ".join(parts)
 
 
 def text(v: fno.FnoView, levels: list | None = None) -> str:
@@ -131,13 +228,18 @@ def text(v: fno.FnoView, levels: list | None = None) -> str:
     head += (f"  ·  expiry {v.expiry:%d-%b-%Y} ({v.sessions} sessions)"
              f"  ·  NSE {v.timestamp:%d-%b %H:%M}")
     L.append(head)
-    hit = (f"   held ~{v.range_hit_pct:.0f}% of the time since 2024"
+    since = "2024" if v.kind == "equity" else "2019"
+    hit = (f"   held ~{v.range_hit_pct:.0f}% of the time since {since}"
            if v.range_hit_pct is not None else "   (hit rate not measured)")
     L.append(f"Range to expiry: {_px(v.range_low)} – {_px(v.range_high)}"
              f"   = spot ± {v.range_from or '-'} {_px(v.straddle if v.range_from == 'straddle' else v.iv_move)}"
              + hit)
+    if v.conditional:
+        L.append("  " + v.conditional)
     L.append(f"ATM {_px(v.atm)}   ATM IV {_n(v.atm_iv, 1)}%   "
              f"1σ by IV ±{_px(v.iv_move)}")
+    if v.vol:
+        L.append(vol_line(v.vol))
     L.append("Positioning (no measured edge -- see docs/f_o/validation.md):")
     L.append(f"  Put wall  (support)     {_wall(v.support)}"
              + (f"   next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else ""))
@@ -153,6 +255,9 @@ def text(v: fno.FnoView, levels: list | None = None) -> str:
     walls = [x for x in (v.resistance_reach, v.support_reach) if x is not None]
     if walls or levels:
         L.append("Reach (how often a move this size got there; not a forecast of direction):")
+        if v.kind == "index":
+            L.append("  (indices: the model has been the better-calibrated column; the "
+                     "historical ones ran 4-8 points high out of sample)")
         L += [f"  {'call wall' if x.side == 'up' else 'put wall ':<9}  {reach_line(x)}"
               for x in walls]
         L += [f"  {'level':<9}  {reach_line(x)}" for x in (levels or [])]
@@ -186,11 +291,26 @@ def summary_row(v: fno.FnoView) -> dict:
         "call_wall_reach_pct": (100 * v.resistance_reach.hist_touch
                                 if v.resistance_reach and v.resistance_reach.hist_touch
                                 is not None else None),
+        "call_wall_reach_intraday_pct": (100 * v.resistance_reach.hist_touch_intraday
+                                         if v.resistance_reach and v.resistance_reach
+                                         .hist_touch_intraday is not None else None),
         "put_wall_reach_pct": (100 * v.support_reach.hist_touch
                                if v.support_reach and v.support_reach.hist_touch
                                is not None else None),
+        "put_wall_reach_intraday_pct": (100 * v.support_reach.hist_touch_intraday
+                                        if v.support_reach and v.support_reach
+                                        .hist_touch_intraday is not None else None),
         "iv_move": v.iv_move, "range_low": v.range_low, "range_high": v.range_high,
-        "range_from": v.range_from, "range_hit_pct": v.range_hit_pct, "lot": v.lot,
+        "range_from": v.range_from, "range_hit_pct": v.range_hit_pct,
+        "range_hit_note": v.conditional, "lot": v.lot,
+        "iv_straddle_pct": v.vol.iv if v.vol else None,
+        "iv_percentile": v.vol.iv_pct if v.vol else None,
+        "rv20_pct": v.vol.rv20 if v.vol else None,
+        "iv_rv": v.vol.iv_rv if v.vol else None,
+        "skew_pts": v.vol.skew if v.vol else None,
+        "term_pts": v.vol.term if v.vol else None,
+        "results_before_expiry": (", ".join(f"{d:%d-%b}" for d in v.vol.results)
+                                  if v.vol and v.vol.results else None),
         "warnings": " | ".join(v.warnings),
     }
     return {k: round(x, 2) if isinstance(x, float) else x for k, x in row.items()}
@@ -210,6 +330,8 @@ def chain_table(res: Result, window_pct: float | None = None) -> pd.DataFrame:
     if v.max_pain is not None:
         roles.setdefault(v.max_pain, []).append("max pain")
     df.insert(0, "role", df["strike"].map(lambda k: ", ".join(roles.get(k, []))))
+    s = fno.settings(_cfg())
+    df = fno.add_greeks(df, v.spot, v.days, s["risk_free_pct"])
     return df.reset_index(drop=True)
 
 
@@ -260,6 +382,8 @@ def write_excel(results: list[Result], path: Path | None = None) -> Path:
             ws.append([reason])
         for warning in v.warnings:
             ws.append(["! " + warning])
+        if v.vol:
+            ws.append([vol_line(v.vol)])
         for x in [v.resistance_reach, v.support_reach] + list(res.reaches):
             if x is not None:
                 ws.append(["Reach " + reach_line(x)])

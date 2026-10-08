@@ -236,6 +236,42 @@ def lot_size(symbol: str, expiry: dt.date) -> int | None:
     return int(hit["lot"].iloc[0]) if len(hit) else None
 
 
+HOLIDAYS_URL = "https://www.nseindia.com/api/holiday-master"
+
+
+def parse_holidays(payload: dict, segment: str = "FO") -> list[dt.date]:
+    return sorted(dt.datetime.strptime(h["tradingDate"], "%d-%b-%Y").date()
+                  for h in payload.get(segment, []))
+
+
+def trading_holidays(year: int | None = None) -> list[dt.date]:
+    """NSE's F&O trading holidays for a year (default: this year).
+
+    Past years are cached for good; the current year for a week, since NSE
+    occasionally adds a special holiday (elections, for instance)."""
+    import json
+    year = year or dt.date.today().year
+    age = 3650 if year < dt.date.today().year else 7
+    path = CACHE_DIR / f"holidays_{year}.json"
+    if path.exists() and (time.time() - path.stat().st_mtime) / 86400 < age:
+        payload = json.loads(path.read_text())
+    else:
+        payload = _json(HOLIDAYS_URL, {"type": "trading", "year": str(year)})
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload))
+    return parse_holidays(payload)
+
+
+def holidays_between(start: dt.date, end: dt.date) -> list[dt.date]:
+    out = []
+    for y in range(start.year, end.year + 1):
+        try:
+            out += trading_holidays(y)
+        except RuntimeError:
+            pass   # weekdays-only for that year beats no answer
+    return [h for h in out if start <= h <= end]
+
+
 def kind_of(symbol: str) -> str:
     """'index' or 'equity'; raises NotFnO for anything outside the F&O list."""
     u = fno_underlyings()
