@@ -60,12 +60,15 @@ def observe(con, cfg: dict) -> pd.DataFrame:
                     or (lot0 is not None and pd.notna(lot0)
                         and (path["lot"].dropna() != lot0).any())
                     or not (1 / MAX_CYCLE_RATIO < close / s0 < MAX_CYCLE_RATIO))
+        kind = hist["kind"].iloc[0]
         v = fno.analyse(sym, g.sort_values("strike").reset_index(drop=True), s0,
                         dt.date.fromisoformat(expiry),
-                        dt.datetime.fromisoformat(date + "T15:30:00"), cfg=cfg)
+                        dt.datetime.fromisoformat(date + "T15:30:00"), cfg=cfg,
+                        kind=kind)
+        old_lo, old_hi, _, _ = fno.expected_range(s0, v.straddle, v.support, v.resistance)
         rows.append({
             "date": date, "symbol": sym, "expiry": expiry,
-            "kind": hist["kind"].iloc[0], "sessions": int(g["sessions"].iloc[0]),
+            "kind": kind, "sessions": int(g["sessions"].iloc[0]),
             "spot": s0, "close": close,
             "path_min": float(path["spot"].min()) if len(path) else close,
             "path_max": float(path["spot"].max()) if len(path) else close,
@@ -77,6 +80,8 @@ def observe(con, cfg: dict) -> pd.DataFrame:
             "range_low": v.range_low if v.range_low is not None else np.nan,
             "range_high": v.range_high if v.range_high is not None else np.nan,
             "max_pain": v.max_pain if v.max_pain is not None else np.nan,
+            "old_low": old_lo if old_lo is not None else np.nan,
+            "old_high": old_hi if old_hi is not None else np.nan,
         })
     obs = pd.DataFrame(rows)
     if obs.empty:
@@ -99,8 +104,8 @@ def score(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
     o = obs[~obs["adjusted"]].copy()
     rel = lambda col: 100 * (o[col] / o["spot"] - 1)
     o["lo_c"], o["hi_c"] = rel("range_low"), rel("range_high")
+    o["lo_o"], o["hi_o"] = rel("old_low"), rel("old_high")
     o["sup"], o["res"] = rel("support"), rel("resistance")
-    o["mv"] = 100 * o["straddle"] / o["spot"]
 
     out = {}
     rng_rows, wall_rows, pcr_rows, mp_rows = [], [], [], []
@@ -127,9 +132,10 @@ def score(obs: pd.DataFrame) -> dict[str, pd.DataFrame]:
                 "closes_never_left_pct": 100 * held.mean(),
             })
 
-        block("combined (live default)", g.loc[idx, "lo_c"], g.loc[idx, "hi_c"])
+        block("±straddle (live)", g.loc[idx, "lo_c"], g.loc[idx, "hi_c"])
+        block("tighter of wall/straddle (pre-2026-10-08)", g.loc[idx, "lo_o"],
+              g.loc[idx, "hi_o"])
         block("walls only (S1-R1)", g.loc[idx, "sup"], g.loc[idx, "res"])
-        block("straddle only", -g.loc[idx, "mv"], g.loc[idx, "mv"])
 
         for name, col, cond in (("support held (close >= S1)", "sup", "ge"),
                                 ("resistance held (close <= R1)", "res", "le")):

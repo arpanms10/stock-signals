@@ -165,3 +165,34 @@ def test_snapshot_roundtrip_and_history(tmp_path):
     assert h["support"].iloc[0] == v.support.strike
     assert h["pcr_oi"].iloc[1] > h["pcr_oi"].iloc[0]
     assert h["support"].iloc[1] == 1160
+
+
+def test_stock_pcr_read_against_stock_norms():
+    # 0.6 is "bearish" for an index but ordinary for a stock.
+    assert fno.pcr_bias(0.6, S, "index") == "bearish"
+    assert fno.pcr_bias(0.6, S, "equity") == "neutral"
+    assert fno.pcr_bias(0.45, S, "equity") == "bearish"
+    assert fno.pcr_bias(0.9, S, "equity") == "bullish"
+    assert fno.pcr_bias(1.1, S, "equity") == "stretched"
+
+
+def test_range_hit_pct_takes_nearest_measured_offset():
+    assert fno.range_hit_pct("equity", 4, S) == 61
+    assert fno.range_hit_pct("equity", 13, S) == 63
+    assert fno.range_hit_pct("index", 25, S) == 58
+
+
+def test_live_range_is_straddle_not_walls():
+    v = _real("reliance", "RELIANCE")
+    assert v.range_from == "straddle"
+    assert v.range_low == pytest.approx(v.spot - v.straddle)
+    assert v.range_high == pytest.approx(v.spot + v.straddle)
+    assert v.range_hit_pct is not None
+
+
+def test_iv_fallback_range_has_no_hit_rate():
+    c = chain([(100, 10, 10, {"ce_iv": 20.0, "pe_iv": 20.0})])
+    v = fno.analyse("X", c, 100.0, dt.date(2027, 1, 1),
+                    dt.datetime(2026, 1, 1, 15, 30), kind="equity")
+    assert v.range_from == "IV" and v.range_hit_pct is None
+    assert v.range_low < 100 < v.range_high

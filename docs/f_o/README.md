@@ -25,38 +25,56 @@ until you press **Analyse**.
 
 A symbol without F&O contracts gets a clear message, not an empty result.
 
-## What it reads, and why
+## What it shows, and how far to trust it
 
-Option open interest shows where option **writers** have put money. Writers
-are mostly institutions selling premium, and they are paid as long as price
-stays on their side of the strike. That's what the analysis is built on, and
-it's also its limit: it describes **positioning, not a forecast**.
+The view has two parts, and [validation](validation.md) is why they are
+separate.
 
-| output | how | reading |
+**The range: spot ± the ATM straddle.** The ATM call plus put premium
+(bid/ask mid) is what the market charges for a move either way by expiry. It
+is shown with **how often the expiry close actually landed inside it**,
+measured from January 2024 to September 2026:
+
+| sessions to expiry | stocks | indices |
 |---|---|---|
-| **Support** | the put strike below spot with the most OI (within ±10%, and holding ≥5% of the puts there) | put writers lose below it, so they defend it |
-| **Resistance** | the call strike above spot with the most OI, same rules | call writers lose above it |
-| **PCR (OI)** | total put OI ÷ total call OI | above 1.2 means writers are defending the downside (bullish). Below 0.7, bearish. Above 1.6 is crowded, so treat it as a contrarian caution |
-| **PCR (today's ΔOI)** | put OI added today ÷ call OI added today | what writers did **today**. Blank when either side is unwinding, because a ratio of a gain and a loss means nothing. When present, it decides the headline bias |
-| **Max pain** | the expiry price at which option holders, in total, collect the least | where the price is said to gravitate near expiry |
-| **Expected move** | ATM call + ATM put premium (bid/ask mid), cross-checked against ATM IV × √(days/365) | what the market charges for a move either way |
-| **Range to expiry** | for each side, the **tighter** of the OI wall and spot ± the straddle | a wall inside the priced move is binding. A wall beyond it isn't, so the move sets that edge |
-| **Futures buildup** | sign of the futures price change against the sign of the OI change | long buildup, short buildup, short covering, long unwinding |
+| ~5 | 61% | 49% |
+| ~10 | 63% | 56% |
+| ~20 | 54% | 58% (small sample) |
 
-Every result comes with its reasons in plain sentences, and with warnings:
-expiry within 2 sessions (OI is distorted by rollover), a chain with no clear
-wall on one side, no ATM quote, or a chain more than 30 minutes old during
-market hours.
+So this is a band with roughly even odds, not a target. If there's no ATM
+quote, the range falls back to ±1σ from ATM IV and says that this hit rate
+hasn't been measured. The rates are in `fno.range_hit_pct` in
+`config/scoring.yaml`; re-run the validation to update them.
 
-Only strikes on the out-of-the-money side count as walls. A call written
-below spot is already in the money: it's a hedge or a covered position, not a
-ceiling.
+**Positioning: walls, PCR, max pain, futures buildup.** These are shown
+because they describe where option writers have put money, which is worth
+knowing. On about 14,000 stock and 360 index expiries, none of them told you
+where price ended up:
 
-The thresholds are in the `fno:` section of `config/scoring.yaml`.
+| output | how | what validation found |
+|---|---|---|
+| **Put wall** ("support") | the put strike below spot with the most OI (within ±10%, holding ≥5% of the puts there) | held exactly as often as any level the same distance below spot |
+| **Call wall** ("resistance") | the call strike above spot with the most OI, same rules | same |
+| **PCR (OI)** | put OI ÷ call OI, read against **its own kind's norms**: indices bearish < 0.7, bullish > 1.2, stretched > 1.6. Stocks bearish < 0.5, bullish > 0.8, stretched > 1.05 (their 20th/80th/97th percentiles; stock PCR runs much lower) | no direction in either |
+| **PCR (today's ΔOI)** | put OI added today ÷ call OI added today; blank when either side is unwinding | not tested (the history is end-of-day) |
+| **Max pain** | the expiry price at which option holders, in total, collect the least | a worse guess for the expiry close than today's price |
+| **Futures buildup** | sign of the futures price change against the sign of the OI change | not tested |
 
-## Does any of it work?
+Only out-of-the-money strikes count as walls. A call written below spot is
+already in the money: it's a hedge or a covered position, not a ceiling.
 
-That's measured, not assumed: [**validation**](validation.md).
+Warnings appear for expiry within 2 sessions (OI is distorted by rollover),
+a chain with no clear wall on one side, no ATM quote, or a chain more than 30
+minutes old during market hours. The thresholds are in the `fno:` section of
+`config/scoring.yaml`.
+
+### What changed after validation
+
+Until 2026-10-08 the range was the tighter of the OI wall and the straddle on
+each side, and the PCR thresholds were index ones for everything. Validation
+showed the walls only made the range narrower, never more accurate, and that
+index thresholds labelled 71% of stocks "bearish". Both were changed.
+`run_fno_backtest.py` still reports the old range for comparison.
 
 ## Snapshots
 

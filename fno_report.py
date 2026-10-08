@@ -106,19 +106,24 @@ def text(v: fno.FnoView) -> str:
     head += (f"  ·  expiry {v.expiry:%d-%b-%Y} ({v.sessions} sessions)"
              f"  ·  NSE {v.timestamp:%d-%b %H:%M}")
     L.append(head)
-    L.append(f"PCR (OI) {_n(v.pcr['oi'], 2)} {v.pcr_bias}   "
-             f"PCR (ΔOI today) {_n(v.pcr['chg_oi'], 2)} {v.chg_pcr_bias}   "
-             f"→ bias: {v.bias}")
-    L.append(f"Strongest support     {_wall(v.support)}"
+    hit = (f"   held ~{v.range_hit_pct:.0f}% of the time since 2024"
+           if v.range_hit_pct is not None else "   (hit rate not measured)")
+    L.append(f"Range to expiry: {_px(v.range_low)} – {_px(v.range_high)}"
+             f"   = spot ± {v.range_from or '-'} {_px(v.straddle if v.range_from == 'straddle' else v.iv_move)}"
+             + hit)
+    L.append(f"ATM {_px(v.atm)}   ATM IV {_n(v.atm_iv, 1)}%   "
+             f"1σ by IV ±{_px(v.iv_move)}")
+    L.append("Positioning (no measured edge -- see docs/f_o/validation.md):")
+    L.append(f"  Put wall  (support)     {_wall(v.support)}"
              + (f"   next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else ""))
-    L.append(f"Strongest resistance  {_wall(v.resistance)}"
+    L.append(f"  Call wall (resistance)  {_wall(v.resistance)}"
              + (f"   next {_px(v.resistances[1].strike)}" if len(v.resistances) > 1 else ""))
-    L.append(f"Max pain {_px(v.max_pain)}   ATM {_px(v.atm)}   ATM IV {_n(v.atm_iv, 1)}%   "
-             f"Expected move ±{_px(v.straddle)} (straddle), ±{_px(v.iv_move)} (1σ IV)")
-    L.append(f"Expected range to expiry: {_px(v.range_low)} – {_px(v.range_high)}"
-             f"   (low: {v.low_from or '-'}, high: {v.high_from or '-'})")
+    L.append(f"  PCR (OI) {_n(v.pcr['oi'], 2)} {v.pcr_bias}   "
+             f"PCR (ΔOI today) {_n(v.pcr['chg_oi'], 2)} {v.chg_pcr_bias}   "
+             f"vs {'stock' if v.kind == 'equity' else 'index'} norms")
+    L.append(f"  Max pain {_px(v.max_pain)}")
     if v.futures and v.futures.buildup:
-        L.append(f"Futures: price {v.futures.price_chg:+,.2f}, OI {v.futures.chg_oi:+,.0f}"
+        L.append(f"  Futures: price {v.futures.price_chg:+,.2f}, OI {v.futures.chg_oi:+,.0f}"
                  f" → {v.futures.buildup}")
     if v.lot:
         L.append(f"Lot size {v.lot}; OI is in contracts.")
@@ -140,14 +145,15 @@ def summary_row(v: fno.FnoView) -> dict:
         "futures": v.futures.price if v.futures else None,
         "basis": v.futures.basis if v.futures else None,
         "fut_buildup": v.futures.buildup if v.futures else None,
-        "pcr_oi": v.pcr["oi"], "pcr_chg_oi": v.pcr["chg_oi"], "bias": v.bias,
+        "pcr_oi": v.pcr["oi"], "pcr_chg_oi": v.pcr["chg_oi"],
+        "pcr_positioning": v.bias,
         "support_1": s[0].strike if s[0] else None,
         "support_2": s[1].strike if s[1] else None,
         "resistance_1": r[0].strike if r[0] else None,
         "resistance_2": r[1].strike if r[1] else None,
         "max_pain": v.max_pain, "atm_iv_pct": v.atm_iv, "straddle": v.straddle,
         "iv_move": v.iv_move, "range_low": v.range_low, "range_high": v.range_high,
-        "low_from": v.low_from, "high_from": v.high_from, "lot": v.lot,
+        "range_from": v.range_from, "range_hit_pct": v.range_hit_pct, "lot": v.lot,
         "warnings": " | ".join(v.warnings),
     }
     return {k: round(x, 2) if isinstance(x, float) else x for k, x in row.items()}
@@ -202,7 +208,9 @@ def write_excel(results: list[Result], path: Path | None = None) -> Path:
     ws.freeze_panes = "B2"
     autosize(ws)
     ws.cell(len(rows) + 3, 1, "Decision support, not investment advice. "
-            "OI is in contracts. Range = tighter of OI wall and spot ± ATM straddle, per side.")
+            "OI is in contracts. Range = spot ± ATM straddle; range_hit_pct is how often the "
+            "expiry close landed inside it since Jan 2024. Walls, PCR and max pain are "
+            "positioning: validation found no edge (docs/f_o/validation.md).")
 
     for res in results:
         v = res.view

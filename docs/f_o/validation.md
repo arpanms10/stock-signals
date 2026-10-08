@@ -76,21 +76,22 @@ it, on both nulls. For indices, one standard error is about 4 points, so
 of about 8 points or more would reliably show up, so a smaller index edge
 can't be ruled out. The stock sample has no such excuse.
 
-### The range: right about half the time, by construction
+### The range: the walls only made it narrower
 
 | | width | close inside at expiry | null | edge | closes never left it |
 |---|---|---|---|---|---|
-| stocks, live range, 5 out | 5.1% | 49.4% | 50.2% | −0.8 | 32.3% |
+| stocks, wall/straddle range, 5 out | 5.1% | 49.4% | 50.2% | −0.8 | 32.3% |
 | stocks, ±straddle, 5 out | 6.2% | 61.2% | 61.4% | −0.2 | 47.7% |
-| stocks, live range, 10 out | 6.6% | 46.4% | 47.1% | −0.7 | 24.2% |
-| indices, live range, 5 out | 2.9% | 46.8% | 46.3% | +0.5 | 31.6% |
+| stocks, wall/straddle range, 10 out | 6.6% | 46.4% | 47.1% | −0.7 | 24.2% |
+| indices, wall/straddle range, 5 out | 2.9% | 46.8% | 46.3% | +0.5 | 31.6% |
 | indices, ±straddle, 5 out | 3.3% | 49.3% | 51.9% | −2.7 | 38.1% |
-| indices, live range, 10 out | 3.8% | 45.5% | 49.7% | −4.1 | 26.2% |
+| indices, wall/straddle range, 10 out | 3.8% | 45.5% | 49.7% | −4.1 | 26.2% |
 
-The live range takes the tighter of the wall and the straddle on each side,
-so it is narrower than either. Narrower means it holds less often, and it
-holds exactly as often as its width predicts. The walls make the range
-narrower without making it more accurate.
+The wall/straddle range (the live default before 2026-10-08) took the
+tighter of the wall and the straddle on each side, so it was narrower than
+either. Narrower means it held less often, and it held exactly as often as
+its width predicts: the walls made the range narrower without making it
+more accurate.
 
 The straddle range covered 61% of stock expiries and about 50% of index
 expiries 5 sessions out. In theory, ±1 ATM straddle is about ±0.8 standard
@@ -144,10 +145,21 @@ where it is" more than half the time. It beat it 36–43% of the time.
 
 ## What it means for the live view
 
-OI walls describe where writers are positioned, and that is all they
-describe. The range is a band with roughly even odds, not a target. The
-straddle is the number that means what it says. Changes to the live view
-based on these results are tracked in the [F&O overview](README.md).
+Changed on 2026-10-08, from these results:
+
+- **The range is now spot ± straddle,** shown with its measured hit rate
+  (61–63% for stocks, about 50–56% for indices, 5–10 sessions out). The old
+  "tighter of wall or straddle" range held 46–49%, exactly what its narrower
+  width predicts, so the walls added nothing. Re-measured on the new
+  definition, the live range scores −0.1 / +0.3 points against its null for
+  stocks, as a fair price should.
+- **Walls, PCR and max pain are labelled "positioning, no measured edge".**
+- **Stock PCR is read against stock norms:** bearish below 0.5, bullish above
+  0.8, stretched above 1.05 (the 20th/80th/97th percentiles of stock PCR).
+  The labels now split about 23% / 62% / 15%, not 71% "bearish". They still
+  don't predict direction. 5 sessions out, "bearish" stocks rose 45% of the
+  time, "neutral" 46%, "bullish" 48%, "stretched" 54% (n=171), with no
+  consistent pattern at 10 or 20 sessions out.
 
 ---
 

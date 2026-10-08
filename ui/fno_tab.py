@@ -99,11 +99,11 @@ def _px(x) -> str:
 def render() -> None:
     st.subheader("F&O: where option writers have put their money")
     st.caption(
-        "Support is the strike below spot with the most put open interest; "
-        "resistance, the strike above with the most call OI. The range takes "
-        "the tighter of each wall and spot ± the ATM straddle. This describes "
-        "positioning, not a forecast. How often the range held is measured in "
-        "`docs/f_o/validation.md`.")
+        "The range is spot ± the ATM straddle -- the move the market is pricing -- "
+        "with how often the expiry close actually landed inside it since 2024. "
+        "Walls, PCR and max pain show where writers are positioned; tested on "
+        "~14,000 expiries, none of them predicted where price ended up "
+        "(`docs/f_o/validation.md`).")
 
     try:
         symbols = _underlyings()
@@ -144,7 +144,7 @@ def render() -> None:
     v = res.view
 
     st.markdown(
-        f"### {v.symbol} &nbsp; {c.pill(v.bias.upper(), BIAS_TONE[v.bias])}",
+        f"### {v.symbol} &nbsp; {c.pill(v.bias.upper() + ' positioning', BIAS_TONE[v.bias])}",
         unsafe_allow_html=True)
     st.caption(f"Expiry {v.expiry:%d-%b-%Y}, {v.sessions} sessions left · "
                f"NSE data as of {v.timestamp:%d-%b %H:%M}"
@@ -152,38 +152,55 @@ def render() -> None:
     for w in v.warnings:
         st.warning(w)
 
-    m = st.columns(6)
+    norms = "stock" if v.kind == "equity" else "index"
+    st.markdown("**Range to expiry**")
+    m = st.columns(5)
     m[0].metric("Spot", _px(v.spot))
-    m[1].metric("Futures", _px(v.futures.price) if v.futures else "--",
-                f"{v.futures.basis:+,.2f} basis" if v.futures else None,
+    m[1].metric("Range low", _px(v.range_low),
+                f"spot − {v.range_from}" if v.range_from else None,
                 delta_color="off", delta_arrow="off")
+    m[2].metric("Range high", _px(v.range_high),
+                f"spot + {v.range_from}" if v.range_from else None,
+                delta_color="off", delta_arrow="off")
+    m[3].metric("Held since 2024",
+                f"~{v.range_hit_pct:.0f}%" if v.range_hit_pct is not None else "--",
+                f"{'stocks' if v.kind == 'equity' else 'indices'}, this far out",
+                delta_color="off", delta_arrow="off",
+                help="Share of expiry closes inside spot ± ATM straddle, measured "
+                     "5/10/20 sessions before monthly expiries, Jan 2024 - Sep 2026.")
+    m[4].metric("Expected move", f"±{_px(v.straddle)}" if v.straddle else "--",
+                f"±{_px(v.iv_move)} by IV ({v.atm_iv:.1f}%)" if v.iv_move else None,
+                delta_color="off", delta_arrow="off",
+                help="ATM call + put premium (bid/ask mid): what the market charges "
+                     "for a move either way.")
+
+    st.markdown("**Positioning** &nbsp; " + c.pill("no measured edge", "neutral"),
+                unsafe_allow_html=True)
+    m = st.columns(6)
+    m[0].metric("Put wall", _px(v.support.strike) if v.support else "--",
+                f"next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else None,
+                delta_color="off", delta_arrow="off",
+                help="Largest put OI below spot, read as support. Held no more often "
+                     "than any level the same distance away.")
+    m[1].metric("Call wall", _px(v.resistance.strike) if v.resistance else "--",
+                f"next {_px(v.resistances[1].strike)}" if len(v.resistances) > 1 else None,
+                delta_color="off", delta_arrow="off",
+                help="Largest call OI above spot, read as resistance. Same caveat.")
     m[2].metric("PCR (OI)", f"{v.pcr['oi']:.2f}" if v.pcr["oi"] else "--",
-                v.pcr_bias, delta_color="off", delta_arrow="off")
+                f"{v.pcr_bias} ({norms})", delta_color="off", delta_arrow="off",
+                help="Stocks run far lower PCR than indices, so each is read against "
+                     "its own norms. Did not predict direction.")
     m[3].metric("PCR (today's ΔOI)",
                 f"{v.pcr['chg_oi']:.2f}" if v.pcr["chg_oi"] else "--",
                 v.chg_pcr_bias, delta_color="off", delta_arrow="off",
                 help="Put/call ratio of OI added today. Blank when a side is "
-                     "unwinding -- a ratio of a gain and a loss means nothing.")
-    m[4].metric("Max pain", _px(v.max_pain))
-    m[5].metric("ATM IV", f"{v.atm_iv:.1f}%" if v.atm_iv else "--")
-
-    m = st.columns(5)
-    m[0].metric("Strongest support", _px(v.support.strike) if v.support else "--",
-                f"next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else None,
+                     "unwinding -- a ratio of a gain and a loss means nothing. "
+                     "Untested: the history is end-of-day only.")
+    m[4].metric("Max pain", _px(v.max_pain),
+                help="Historically a worse guess for the expiry close than today's price.")
+    m[5].metric("Futures", _px(v.futures.price) if v.futures else "--",
+                (v.futures.buildup or f"{v.futures.basis:+,.2f} basis") if v.futures else None,
                 delta_color="off", delta_arrow="off")
-    m[1].metric("Strongest resistance",
-                _px(v.resistance.strike) if v.resistance else "--",
-                f"next {_px(v.resistances[1].strike)}" if len(v.resistances) > 1 else None,
-                delta_color="off", delta_arrow="off")
-    m[2].metric("Expected move", f"±{_px(v.straddle)}" if v.straddle else "--",
-                f"±{_px(v.iv_move)} by IV" if v.iv_move else None, delta_color="off", delta_arrow="off",
-                help="ATM straddle: what the market charges for a move either way.")
-    m[3].metric("Range low", _px(v.range_low), f"from {v.low_from}" if v.low_from else None,
-                delta_color="off", delta_arrow="off", help="The tighter of the support wall and "
-                "spot minus the expected move.")
-    m[4].metric("Range high", _px(v.range_high), f"from {v.high_from}" if v.high_from else None,
-                delta_color="off", delta_arrow="off", help="The tighter of the resistance wall and "
-                "spot plus the expected move.")
 
     with st.expander("Why these numbers", expanded=False):
         for r in v.reasons:
