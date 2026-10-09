@@ -294,14 +294,21 @@ def chain_of(norm: pd.DataFrame, symbol: str, expiry: dt.date,
 
 # ---------------------------------------------------------------- fetching
 
-def fetch_day(d: dt.date) -> pd.DataFrame:
-    """The day's file, normalised. Empty on a holiday (NSE answers 404)."""
+def fetch_day(d: dt.date) -> pd.DataFrame | None:
+    """The day's file, normalised.
+
+    Empty frame: NSE has no file for the day (404) -- a holiday, or not
+    published yet. None: the request FAILED (network, throttling, a page
+    instead of a zip). The two must not be confused: recording a failure as
+    "no data" leaves a permanent hole, because later runs skip days held."""
     try:
         r = nse.session().get(URL.format(d=d), timeout=60)
     except Exception:
+        return None
+    if r.status_code == 404:
         return pd.DataFrame()
     if r.status_code != 200 or r.content[:2] != b"PK":
-        return pd.DataFrame()
+        return None
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         raw = pd.read_csv(z.open(z.namelist()[0]), low_memory=False)
     return normalise(raw)
@@ -395,16 +402,37 @@ def ingest_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
     start = max(start, FIRST_DAY)
     # Expiries can sit up to a few months past `end`; holidays out to then.
     hol = holidays_between(start, end + dt.timedelta(days=120))
-    total, d = 0, start
+    total, d, failed = 0, start, []
     while d <= end:
         if d.weekday() < 5 and d.isoformat() not in done and d not in hol:
-            n, c = save_day(con, d, fetch_day(d), holidays=hol)
-            total += n
-            if verbose and n:
-                print(f"  {d}: {n} underlyings, {c} chains kept", flush=True)
+            norm = fetch_day(d)
+            if _keep(d, norm):
+                n, c = save_day(con, d, norm, holidays=hol)
+                total += n
+                if verbose and n:
+                    print(f"  {d}: {n} underlyings, {c} chains kept", flush=True)
+            elif norm is None:
+                failed.append(d)
             time.sleep(pause)
         d += dt.timedelta(days=1)
+    if failed and verbose:
+        print(f"  {len(failed)} day(s) failed to download and will be retried next run: "
+              + ", ".join(map(str, failed[:10])), flush=True)
     return total
+
+
+RECORD_EMPTY_AFTER_DAYS = 7
+
+
+def _keep(d: dt.date, norm) -> bool:
+    """Store this day? A failed request: no, retry next run. NSE has no file:
+    record it as empty only once it is a week old -- a weekday file that is
+    missing for a week is not coming; a recent one may just not be up yet."""
+    if norm is None:
+        return False
+    if norm.empty:
+        return (dt.date.today() - d).days > RECORD_EMPTY_AFTER_DAYS
+    return True
 
 
 # ----------------------------------------------------------------- reading
@@ -492,14 +520,17 @@ def normalise_old(raw: pd.DataFrame, closes: dict[str, float]) -> pd.DataFrame:
     }).reset_index(drop=True)
 
 
-def fetch_day_old(d: dt.date, closes: dict[str, float]) -> pd.DataFrame:
+def fetch_day_old(d: dt.date, closes: dict[str, float]) -> pd.DataFrame | None:
+    """As fetch_day: empty on 404, None when the request failed."""
     url = OLD_URL.format(d=d, mon=d.strftime("%b").upper())
     try:
         r = nse.session().get(url, timeout=60)
     except Exception:
+        return None
+    if r.status_code == 404:
         return pd.DataFrame()
     if r.status_code != 200 or r.content[:2] != b"PK":
-        return pd.DataFrame()
+        return None
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         raw = pd.read_csv(z.open(z.namelist()[0]), low_memory=False)
     return normalise_old(raw, closes)
@@ -528,6 +559,10 @@ def ingest_old_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
         o = by_day[d.isoformat()]
         closes = o["close"].dropna().to_dict()
         norm = fetch_day_old(d, closes)
+        if not _keep(d, norm):
+            if verbose:
+                print(f"  {d}: download failed, will retry next run", flush=True)
+            continue
         n, c = save_day(con, d, norm, holidays=hol, src="old")
         if n:
             # The index's real high/low, not one estimated from the future.

@@ -47,7 +47,8 @@ def one(con, rule, args, costs) -> dict:
     t = res.trades
     print(f"\n=== {rule.name} ===")
     if t.empty:
-        print(f"  no trades. Skipped: {res.skipped}")
+        why = "; ".join(f"{k} ({v})" if v > 1 else k for k, v in res.skipped.items())
+        print(f"  no trades: {why or 'nothing matched'}")
         return {}
     if not args.no_reconcile:
         print("  " + rc.summary(rc.options(t, k=args.reconcile)).replace("\n", "\n  "))
@@ -69,7 +70,15 @@ def one(con, rule, args, costs) -> dict:
     print(months.fillna("").to_string())
     if args.excel is not None:
         name = rule.name.replace(" ", "_").replace(":", "").replace("@", "")
-        path = rp.export(args.excel or rp.default_path(f"options_{name}"), {
+        if args.excel and args.compare:
+            # One workbook per rule: a single explicit path would be
+            # overwritten by every rule in the grid.
+            from pathlib import Path
+            p = Path(args.excel)
+            target = p.with_name(f"{p.stem}_{name}{p.suffix or '.xlsx'}")
+        else:
+            target = args.excel or rp.default_path(f"options_{name}")
+        path = rp.export(target, {
             "Metrics": rp.stats_frame({"rule": rule.name, **st}),
             "Trades": t, "Year x Month": months,
             "By symbol": rp.split_stats(t, "symbol"),
@@ -109,6 +118,10 @@ def main(argv=None) -> int:
         costs.slippage_pct = a.slippage_pct
     universe = (a.universe if a.universe in ("indices", "stocks", "all")
                 else [s.strip().upper() for s in a.universe.split(",")])
+    try:
+        ob.Rule(a.action, a.side, a.strike, a.sessions, a.cycle, universe).validate()
+    except ValueError as exc:
+        ap.error(str(exc))
 
     if a.compare:
         rows = []

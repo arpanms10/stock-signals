@@ -21,9 +21,15 @@ Execution, and what is assumed:
   * Entry at the day's CLOSE for that strike, and only if the strike traded
     that day (an untraded close is a carried or theoretical price). Slippage
     and every charge in backtest.costs.OptionCostModel are applied.
-  * Held to expiry; settled at intrinsic value against the underlying's
-    expiry-day close (stock options are physically settled since 2019; the
-    cash difference is the same). In-the-money expiry pays exercise STT.
+  * Held to expiry, valued at intrinsic against the underlying's expiry-day
+    close. How it is closed differs (see settle()):
+      - index options are cash-settled: an in-the-money long pays exercise
+        STT on the intrinsic value; a short pays nothing more;
+      - stock options are PHYSICALLY settled (since 2019) -- holding an
+        in-the-money one into expiry means delivering or taking the shares.
+        Traders square off instead, so an in-the-money stock option is
+        closed on expiry day at its intrinsic value: a normal sell (long)
+        or buy-back (short), with charges and slippage.
   * One lot per trade. P&L is per lot in rupees; also per unit, and as a %
     of premium. Before 2024 (old-format index history) the lot size is not
     in the file: the earliest known lot for that index is used for rupee
@@ -79,7 +85,11 @@ def target_kind(rule: str) -> tuple[str, float]:
         return rule, 0.0
     for prefix in ("moves:", "pct:"):
         if rule.startswith(prefix):
-            return prefix[:-1], float(rule[len(prefix):])
+            try:
+                return prefix[:-1], float(rule[len(prefix):])
+            except ValueError:
+                raise ValueError(f"strike rule {rule!r}: expected a number after "
+                                 f"'{prefix}', e.g. {prefix}-1") from None
     raise ValueError(f"unknown strike rule {rule!r}: atm | moves:+1 | pct:-3 | "
                      "put_wall | call_wall")
 
@@ -133,6 +143,30 @@ def pick_strike(chain: pd.DataFrame, spot: float, rule: Rule, cfg: dict | None =
     if abs(best - target) > tol:
         return None, "nearest traded strike too far from target"
     return best, target
+
+
+def settle(action: str, kind: str, entry: float, intrinsic: float, lot: int,
+           costs: OptionCostModel) -> tuple[float, float, str]:
+    """(P&L per unit, total costs, how it closed) for one lot held to expiry.
+
+    `entry` is the entry fill (slippage already in). Entry charges are
+    included here too, so this is the whole round trip."""
+    if action == "buy":
+        cost = costs.buy_cost(entry, lot)
+        if intrinsic <= 0:
+            return -entry, cost, "expired worthless"
+        if kind == "index":
+            return intrinsic - entry, cost + costs.exercise_cost(intrinsic, lot), "cash-settled"
+        out = costs.fill(intrinsic, "sell")
+        return out - entry, cost + costs.sell_cost(out, lot), "squared off"
+    cost = costs.sell_cost(entry, lot)
+    if intrinsic <= 0:
+        return entry, cost, "expired worthless"
+    if kind == "index":
+        # Assigned and cash-settled; exercise STT falls on the buyer.
+        return entry - intrinsic, cost, "cash-settled"
+    back = costs.fill(intrinsic, "buy")
+    return entry - back, cost + costs.buy_cost(back, lot), "squared off"
 
 
 def run(con, rule: Rule, costs: OptionCostModel | None = None,
@@ -195,16 +229,8 @@ def run(con, rule: Rule, costs: OptionCostModel | None = None,
             continue
         lot = int(lot)
         intrinsic = max(close - strike, 0.0) if rule.side == "CE" else max(strike - close, 0.0)
-        if rule.action == "buy":
-            entry = costs.fill(premium, "buy")
-            cost = costs.buy_cost(entry, lot) + costs.exercise_cost(intrinsic, lot)
-            per_unit = intrinsic - entry
-        else:
-            entry = costs.fill(premium, "sell")
-            # A short in-the-money option is assigned: the exercise STT falls
-            # on the buyer, not the writer.
-            cost = costs.sell_cost(entry, lot)
-            per_unit = entry - intrinsic
+        entry = costs.fill(premium, rule.action)
+        per_unit, cost, how = settle(rule.action, kind, entry, intrinsic, lot, costs)
         pnl = per_unit * lot - cost
         rows.append({
             "symbol": sym, "kind": kind, "cycle": rule.cycle, "src": hist.loc[date, "src"],
@@ -213,11 +239,23 @@ def run(con, rule: Rule, costs: OptionCostModel | None = None,
             "side": rule.side, "action": rule.action,
             "close_premium": premium, "entry_fill": round(entry, 2),
             "expiry_close": close, "intrinsic": round(intrinsic, 2),
-            "lot": lot, "costs": round(cost, 2),
+            "lot": lot, "costs": round(cost, 2), "closed": how,
             "pnl_per_unit": round(per_unit, 2), "pnl": round(pnl, 2),
             "return_on_premium_pct": round(100 * pnl / (entry * lot), 1) if entry else None,
             "lot_estimated": bool(pd.isna(lot0)),
         })
+    if not rows and not skipped:
+        known = set(spot["symbol"])
+        if not isinstance(rule.universe, str) or rule.universe not in ("indices", "stocks", "all"):
+            names = rule.universe if not isinstance(rule.universe, str) else [rule.universe]
+            missing = [n for n in names if n.upper() not in known]
+            if missing:
+                skipped["not in the F&O history: " + ", ".join(m.upper() for m in missing)] = 1
+        if rule.cycle == "weekly" and not skipped:
+            skipped["weekly expiries exist for indices only (stocks are monthly)"] = 1
+        if not skipped:
+            skipped[f"no stored chains {rule.sessions} sessions before a {rule.cycle} "
+                    "expiry (stored: 20/10/5 monthly, 4/2/1 weekly)"] = 1
     trades = pd.DataFrame(rows)
     if not trades.empty:
         trades["entry_date"] = pd.to_datetime(trades["entry_date"])

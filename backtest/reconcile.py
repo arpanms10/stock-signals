@@ -45,8 +45,12 @@ def _sample(trades: pd.DataFrame, k: int, seed: int) -> pd.DataFrame:
     return trades.sample(k, random_state=seed)
 
 
+EMPTY = pd.DataFrame(columns=["symbol", "instr", "expiry", "strike", "opt", "close", "vol", "spot"])
+
+
 def _day_files(day: dt.date, src: str, symbol: str):
-    """(option rows normalised, underlying close) for one day, from source."""
+    """(option rows normalised, underlying close) for one day, from source.
+    A failed download comes back empty, so its checks fail -- loudly."""
     from data import fo_bhavcopy as fb
     if src == "old":
         from jugaad_data.nse import index_df
@@ -59,10 +63,11 @@ def _day_files(day: dt.date, src: str, symbol: str):
                     spot = float(df["CLOSE"].iloc[0])
             except Exception:
                 pass
-        return fb.fetch_day_old(day, {symbol: spot}), spot
+        norm = fb.fetch_day_old(day, {symbol: spot})
+        return (EMPTY if norm is None else norm), spot
     norm = fb.fetch_day(day)
-    if norm.empty:
-        return norm, np.nan
+    if norm is None or norm.empty:
+        return EMPTY, np.nan
     s = norm.loc[norm["symbol"] == symbol, "spot"]
     return norm, float(s.median()) if len(s) else np.nan
 
@@ -98,12 +103,13 @@ def options(trades: pd.DataFrame, k: int = 5, seed: int = 7, costs=None) -> pd.D
         prem = float(o["close"].iloc[0])
         intr = (max(spot_exp - t.strike, 0) if t.side == "CE" else max(t.strike - spot_exp, 0)) \
             if pd.notna(spot_exp) else np.nan
-        if t.action == "buy":
-            fill = costs.fill(prem, "buy")
-            pnl = (intr - fill) * t.lot - costs.buy_cost(fill, t.lot) - costs.exercise_cost(intr, t.lot)
+        from backtest.option_backtest import settle
+        fill = costs.fill(prem, t.action)
+        if pd.notna(intr):
+            per_unit, c, _ = settle(t.action, t.kind, fill, intr, t.lot, costs)
+            pnl = per_unit * t.lot - c
         else:
-            fill = costs.fill(prem, "sell")
-            pnl = (fill - intr) * t.lot - costs.sell_cost(fill, t.lot)
+            pnl = np.nan
         check(t, "P&L rebuilt from source", t.pnl, round(pnl, 2),
               ok=pd.notna(pnl) and abs(t.pnl - pnl) <= 0.05 * t.lot + 0.5)
     return pd.DataFrame(rows)

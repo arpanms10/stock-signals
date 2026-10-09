@@ -33,6 +33,24 @@ Five NSE traps handled here, all of which fail silently rather than raising:
 
 Ingestion flags any unexplained move above 35% as a suspect bar.
 
+A sixth trap was in the ingestion itself, found 2026-10-08: **a failed
+download was recorded as a day with no data, and never retried.**
+`fetch_day()` turned any error (a dropped connection, throttling) into an
+empty day, and `ingest_range` marks every day it handles as done, so the
+next run skipped it. On top of that, the old-format archive is missing
+some early-2024 dates (2024-06-12 answers 404) that exist in the UDiFF
+format, which was only tried from July 2024. Together they left **249
+weekday trading days, about 9% since 2016, recorded as empty.**
+
+Fixed: `fetch_day` tries both formats. It returns an empty day only when
+neither has a file, and `None` when a request failed. A failed day is
+never recorded, and a missing one is recorded only once it is a week old,
+since a recent file may not be published yet. `repair_false_empty_days()`
+cleared the false markers, and a re-ingest refilled 227 of the 249 days.
+The other 22 exist in neither format, including 10 days in 2020–23 when
+the index traded: gaps in NSE's own archive. Backtest results computed
+before this fix ran on the holey history.
+
 A fifth trap was self-inflicted and worth recording: **OBV is a cumulative sum
 from an arbitrary origin**, so its percent change is not well defined -- near a
 zero crossing it explodes, and the value depends on how much history happened to
@@ -65,8 +83,28 @@ Warnings appear at the top of the advisor and as a banner in the dashboard.
 PYTHONPATH=. .venv/bin/python run_backfill.py --years 10
 ```
 
-Incremental and safe to re-run — it fetches only the gaps, at both ends of what
-is already stored. Add `--symbols RELIANCE TCS` to limit it.
+Incremental and safe to re-run. With no arguments it refreshes your
+watchlist, your holdings and every symbol already in the price table. Add
+`--symbols RELIANCE TCS` to limit it.
+
+**How it fetches.** Recent gaps come from NSE's full daily market file
+(`sec_bhavdata_full`): one download per missed trading day covers every stock,
+with the same fields the per-symbol history returns (open, high, low, close,
+previous close, VWAP, volume, trades, delivery quantity and %). Corporate
+actions come in one request for the whole window. Catching up four days for
+~500 symbols takes about 20 seconds instead of 30–50 minutes.
+
+The per-symbol path is still used for what the daily files can't cover:
+new symbols, gaps longer than 30 sessions, the back-fill to `--years`, and
+any symbol more than 5 sessions behind the rest (usually a suspended
+stock). `--per-symbol` forces the old behaviour for everything. A day whose
+file fails to download stops the daily pass there, so no hole is left
+behind it; those symbols fall back to per-symbol fetching. A day with no
+file (a holiday, or today before NSE publishes in the evening) is skipped.
+
+The dashboard runs the same command from **Refresh prices** in the
+sidebar, or **Refresh now** on a stale-prices warning, and reloads the page
+when it finishes.
 
 ---
 

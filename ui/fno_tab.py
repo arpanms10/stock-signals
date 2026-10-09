@@ -169,13 +169,13 @@ def _option_panel(v, res) -> None:
     if not near:
         return
     a, b, d = st.columns([1, 1.4, 1])
-    side = a.radio("Type", ["Put (PE)", "Call (CE)"], horizontal=True, key=f"oc_side_{v.symbol}")
+    side = a.radio("Type", ["Put (PE)", "Call (CE)"], horizontal=True, key=f"oc_side_{v.symbol}_{v.expiry}")
     side = "PE" if side.startswith("Put") else "CE"
     default = min(near, key=lambda k: abs(k - v.spot))
     strike = b.selectbox("Strike", near, index=near.index(default),
                          format_func=lambda k: f"{k:,.0f}" if k >= 100 else f"{k:,.2f}",
-                         key=f"oc_strike_{v.symbol}")
-    lots = d.number_input("Lots", min_value=1, value=1, step=1, key=f"oc_lots_{v.symbol}")
+                         key=f"oc_strike_{v.symbol}_{v.expiry}")
+    lots = d.number_input("Lots", min_value=1, value=1, step=1, key=f"oc_lots_{v.symbol}_{v.expiry}")
     oc = fno.option_check(v, t, strike, side, int(lots), fno_report.reach_curve(),
                           fno.settings(fno_report._cfg())["risk_free_pct"])
     if oc is None or oc.mid is None:
@@ -358,7 +358,7 @@ def render() -> None:
     default = v.resistance.strike if v.resistance else round(v.spot * 1.05, 2)
     level = lc.number_input("Price (target or stop)", min_value=0.0, value=float(default),
                             step=float(max(round(v.spot * 0.005, 0), 0.5)),
-                            key=f"fno_level_{v.symbol}")
+                            key=f"fno_level_{v.symbol}_{v.expiry}")
     x = fno_report.reaches(v, [level])
     x = x[0] if x else None
     if x is None:

@@ -105,19 +105,21 @@ scheduling is the fix, but the advice needs to be executable first.
 
 | | 9-year CAGR |
 |---|---|
-| Momentum rotation, 9-1 (main) | **11.7%** |
-| Momentum rotation, 12-1 (alongside) | 12.4% |
-| NIFTY 500 index | 10.4% |
-| Random-pick control | 4.0% |
+| Momentum rotation, 9-1 (main) | **11.4%** |
+| Momentum rotation, 12-1 (alongside) | 11.3% |
+| NIFTY 500 index | 10.3% |
+| Random-pick control | 3.8% |
 | v1 signal rules (retired) | 1.3% |
 
 Momentum beat all 10 random controls drawn from the same universe, by 7.6
-points on average (3.0 standard deviations), so the ranking carries real
-information. **But it beats the index by only about 2 points a year**, with a
-**−43% maximum drawdown against the index's −37%**, and a Sharpe of 0.55. The
-rebalance dates alone move the CAGR between 10.9% and 15.9% (12.5% on
-average); the 12-month lookback averages the same, so neither is proven
-better and both are shown.
+points on average (3.2 standard deviations), so the ranking carries real
+information. **But it beats the index by only about 1.5 points a year**, with
+a **−42% drawdown against the index's −38%**, and a Sharpe of 0.52. Across
+rebalance dates it returned 11.1% to 12.1% (11.7% on average); the 12-month
+lookback averaged 10.4%, behind on every start date but ahead in both halves
+when split, so both are shown. Figures re-run 2026-10-08 on the repaired
+market history (about 9% of trading days had been missing; see
+[validation](docs/validation.md)).
 
 Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%,
 measured with the old regime rule on) and dropped the random control from
@@ -173,9 +175,10 @@ a table. Three months of that is worth more than ten years of backtest.
 
 ### 4. The drawdown, not the return, is the real problem
 
-−43% is worse than the index's −37%. A 6.5-point edge on one run (15.6% on
-average across start dates, against the index's 10.4%) helps, but the fall is
-still the part most people cannot sit through.
+−42% is worse than the index's −38%. An edge of about 1.5 points a year
+(11.7% on average across start dates, against the index's ~10.1%) does not
+pay for a deeper fall, and the fall is the part most people cannot sit
+through.
 
 **Fix:** volatility targeting — scale gross exposure to hit a target portfolio
 volatility. Best-evidenced improvement to momentum's Sharpe, and a structural

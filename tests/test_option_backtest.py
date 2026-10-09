@@ -98,3 +98,37 @@ def test_reconcile_flags_a_wrong_close(tmp_path, monkeypatch):
     bad = rc.options(trades, k=1)
     assert not bad.set_index("check").loc["option close on entry day", "ok"]
     assert "FAILURES" in rc.summary(bad)
+
+
+def test_settle_index_vs_stock():
+    c = OptionCostModel()
+    # Index, long, in the money: cash-settled with exercise STT, no sell order.
+    pu, cost, how = ob.settle("buy", "index", 10.0, 30.0, 50, c)
+    assert how == "cash-settled" and pu == 20.0
+    assert cost == pytest.approx(c.buy_cost(10.0, 50) + c.exercise_cost(30.0, 50))
+    # Stock, long, in the money: squared off at intrinsic minus slippage.
+    pu, cost, how = ob.settle("buy", "equity", 10.0, 30.0, 50, c)
+    out = c.fill(30.0, "sell")
+    assert how == "squared off" and pu == pytest.approx(out - 10.0)
+    assert cost == pytest.approx(c.buy_cost(10.0, 50) + c.sell_cost(out, 50))
+    # Stock, short, in the money: bought back above intrinsic.
+    pu, cost, how = ob.settle("sell", "equity", 10.0, 30.0, 50, c)
+    back = c.fill(30.0, "buy")
+    assert how == "squared off" and pu == pytest.approx(10.0 - back)
+    # Out of the money: nothing to close, either kind.
+    assert ob.settle("sell", "equity", 10.0, 0.0, 50, c)[2] == "expired worthless"
+
+
+def test_no_trades_explains_why(tmp_path):
+    con = make_db(tmp_path)
+    r = ob.run(con, ob.Rule(universe=["ZZZ"]))
+    assert any("not in the F&O history: ZZZ" in k for k in r.skipped)
+    r = ob.run(con, ob.Rule(universe=["IDX"], cycle="weekly", sessions=2))
+    assert any("weekly expiries exist for indices only" in k for k in r.skipped)
+    r = ob.run(con, ob.Rule(universe=["IDX"], sessions=7))
+    assert any("no stored chains 7 sessions" in k for k in r.skipped)
+
+
+def test_bad_strike_rule_message():
+    with pytest.raises(ValueError, match="expected a number"):
+        ob.target_kind("moves:abc")

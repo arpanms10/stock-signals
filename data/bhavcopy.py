@@ -88,27 +88,71 @@ def _normalise_udiff(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def fetch_day(d: dt.date) -> pd.DataFrame:
-    """One trading day for the whole market. Empty frame on holidays."""
+EMPTY_COLS = ["symbol", "close", "volume", "turnover"]
+
+
+def _is_missing(exc: Exception) -> bool:
+    """NSE has no file in that format (vs a failed request)."""
+    import zipfile
+    resp = getattr(exc, "response", None)
+    if resp is not None and getattr(resp, "status_code", None) == 404:
+        return True
+    # The UDiFF endpoint answers with a non-zip page for dates it lacks.
+    return isinstance(exc, zipfile.BadZipFile)
+
+
+def fetch_day(d: dt.date) -> pd.DataFrame | None:
+    """One trading day for the whole market.
+
+    Empty frame: neither file format exists for the day (a holiday, or not
+    published yet). None: a request FAILED -- network, throttling -- and the
+    day must be retried, not recorded as empty. That confusion once left
+    ~9% of trading days since 2016 recorded as "no data" and never refetched.
+
+    Both formats are tried, the date's usual one first: UDiFF exists from
+    January 2024 while the old archive has gaps in early 2024 (2024-06-12 is
+    404 there but present in UDiFF).
+    """
     from jugaad_data.nse import bhavcopy_raw, bhavcopy_udiff_raw
 
-    fn = bhavcopy_udiff_raw if d >= UDIFF_SWITCH else bhavcopy_raw
-    try:
-        raw = fn(d)
-    except Exception:
-        return pd.DataFrame(columns=["symbol", "close", "volume", "turnover"])
-    if not raw:
-        return pd.DataFrame(columns=["symbol", "close", "volume", "turnover"])
-    text = raw.decode(errors="ignore") if isinstance(raw, bytes) else raw
-    try:
-        df = pd.read_csv(io.StringIO(text))
-    except Exception:
-        return pd.DataFrame(columns=["symbol", "close", "volume", "turnover"])
+    order = ([(bhavcopy_udiff_raw, _normalise_udiff), (bhavcopy_raw, _normalise_old)]
+             if d >= UDIFF_SWITCH else
+             [(bhavcopy_raw, _normalise_old), (bhavcopy_udiff_raw, _normalise_udiff)])
+    failed = False
+    for fn, normalise in order:
+        try:
+            raw = fn(d)
+        except Exception as exc:          # noqa: BLE001 -- jugaad raises many kinds
+            failed = failed or not _is_missing(exc)
+            continue
+        if not raw:
+            continue
+        text = raw.decode(errors="ignore") if isinstance(raw, bytes) else raw
+        try:
+            df = pd.read_csv(io.StringIO(text))
+        except Exception:
+            failed = True
+            continue
+        if df.empty:
+            continue
+        out = normalise(df).dropna(subset=["symbol", "close"])
+        return out[out["close"] > 0].drop_duplicates(subset="symbol")
+    return None if failed else pd.DataFrame(columns=EMPTY_COLS)
+
+
+RECORD_EMPTY_AFTER_DAYS = 7
+
+
+def keep_day(d: dt.date, df: pd.DataFrame | None) -> bool:
+    """Store this day? A failed request: no, retry next run. No file in
+    either format: record it as empty only once it is a week old -- a
+    weekday that is still missing after a week is not coming; a recent one
+    may just not be published yet."""
+    if df is None:
+        return False
     if df.empty:
-        return df
-    out = (_normalise_udiff(df) if d >= UDIFF_SWITCH else _normalise_old(df))
-    out = out.dropna(subset=["symbol", "close"])
-    return out[out["close"] > 0].drop_duplicates(subset="symbol")
+        return (dt.date.today() - d).days > RECORD_EMPTY_AFTER_DAYS
+    return True
 
 
 def save_day(con, d: dt.date, df: pd.DataFrame) -> int:
@@ -223,7 +267,7 @@ def backfill_isins(con, max_days: int = 400, pause: float = 0.3,
         tried.add(day)
         df = fetch_day(dt.date.fromisoformat(day))
         fetched += 1
-        if not df.empty and "isin" in df.columns:
+        if df is not None and not df.empty and "isin" in df.columns:
             got = record_isins(con, zip(df["symbol"], df["isin"]))
             con.commit()
             if verbose:
@@ -241,18 +285,41 @@ def ingest_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
                  verbose: bool = True) -> int:
     """Download every trading day in a range. Skips days already held."""
     done = have_days(con)
-    total, d = 0, start
+    total, d, failed = 0, start, []
     while d <= end:
         if d.weekday() >= 5 or d.isoformat() in done:
             d += dt.timedelta(days=1)
             continue
-        n = save_day(con, d, fetch_day(d))
-        total += n
-        if verbose and n:
-            print(f"  {d}: {n} stocks", flush=True)
+        df = fetch_day(d)
+        if keep_day(d, df):
+            n = save_day(con, d, df)
+            total += n
+            if verbose and n:
+                print(f"  {d}: {n} stocks", flush=True)
+        elif df is None:
+            failed.append(d)
         time.sleep(pause)
         d += dt.timedelta(days=1)
+    if failed and verbose:
+        print(f"  {len(failed)} day(s) failed to download and will be retried next run: "
+              + ", ".join(map(str, failed[:10])), flush=True)
     return total
+
+
+def repair_false_empty_days(con, holidays: set[dt.date], verbose: bool = True) -> list[str]:
+    """Forget 'no data' markers on weekdays that are not exchange holidays,
+    so the next ingest refetches them. Only the marker row is removed --
+    no price data exists for those days to lose."""
+    rows = [r[0] for r in con.execute("SELECT date FROM market_days WHERE rows = 0")]
+    suspect = [x for x in rows
+               if dt.date.fromisoformat(x).weekday() < 5
+               and dt.date.fromisoformat(x) not in holidays]
+    con.executemany("DELETE FROM market_days WHERE date = ? AND rows = 0",
+                    [(x,) for x in suspect])
+    con.commit()
+    if verbose:
+        print(f"  cleared {len(suspect)} 'no data' markers on non-holiday weekdays")
+    return suspect
 
 
 def liquidity_ranks(con, on_date: dt.date) -> dict[str, int]:

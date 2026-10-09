@@ -38,9 +38,16 @@ straddle out.
 ## How a trade is simulated
 - **Entry** at that strike's closing price on the entry day, only if it
   traded that day. An untraded close is a carried or theoretical price.
-- **Held to expiry,** settled at intrinsic value against the underlying's
-  expiry-day close. Stock options are physically settled; the cash
-  difference is the same.
+- **Held to expiry,** valued at intrinsic value against the underlying's
+  expiry-day close, and closed the way it would be in practice:
+  - **index options** are cash-settled; an in-the-money long pays exercise
+    STT of 0.125% of intrinsic value;
+  - **stock options** are physically settled since 2019, so holding an
+    in-the-money one into expiry means delivering or taking the shares.
+    Traders square off instead, so an in-the-money stock option is sold
+    (long) or bought back (short) on expiry day at intrinsic value, with
+    normal charges and slippage. The trade log's `closed` column says which
+    happened.
 - **Costs and slippage per order** (`backtest/costs.py`, `OptionCostModel`,
   Zerodha's F&O schedule): ₹20 brokerage, exchange and SEBI fees, GST,
   stamp duty on buys, and STT of 0.1% of premium on sells. A long option
@@ -110,30 +117,31 @@ What these rules would have done after costs, not what to trade.
 
 ## Stocks (monthly, entry 10 sessions out, Jan 2024 – Sep 2026)
 
-From `--compare --universe stocks`. That's about 6,500 trades per rule
+From `--compare --universe stocks`, with in-the-money stock options
+squared off on expiry day (about 18% of trades). That's about 6,500 trades per rule
 across ~200 stocks, and the automatic check passed for every rule. Use the
 **average per trade**: the totals add up one lot in every stock every month,
 which isn't a portfolio anyone holds.
 
 | rule | trades | win rate | profit factor | average per trade (₹/lot) |
 |---|---|---|---|---|
-| buy CE ATM | 6,612 | 32.1% | 0.88 | −1,283 |
-| buy PE ATM | 6,625 | 33.1% | 0.79 | −2,074 |
-| buy CE 1 straddle above | 6,450 | 15.7% | 0.73 | −1,435 |
-| buy PE 1 straddle below | 6,444 | 14.2% | 0.61 | −1,790 |
-| sell CE 1 straddle above | 6,450 | 84.2% | 1.29 | +1,149 |
-| sell PE 1 straddle below | 6,444 | 85.5% | 1.53 | +1,522 |
-| sell CE ATM | 6,612 | 67.3% | 1.08 | +760 |
-| sell PE ATM | 6,625 | 66.5% | 1.19 | +1,583 |
+| buy CE ATM | 6,612 | 32.0% | 0.86 | −1,484 |
+| buy PE ATM | 6,625 | 32.9% | 0.78 | −2,252 |
+| buy CE 1 straddle above | 6,450 | 15.7% | 0.72 | −1,496 |
+| buy PE 1 straddle below | 6,444 | 14.1% | 0.60 | −1,839 |
+| sell CE 1 straddle above | 6,450 | 84.1% | 1.27 | +1,087 |
+| sell PE 1 straddle below | 6,444 | 85.4% | 1.51 | +1,472 |
+| sell CE ATM | 6,612 | 67.2% | 1.06 | +554 |
+| sell PE ATM | 6,625 | 66.3% | 1.17 | +1,401 |
 
 The same pattern as indices, more strongly: buying lost after costs and
 selling made money, in every rule.
 
 | profit factor by year | 2024 | 2025 | 2026 |
 |---|---|---|---|
-| sell PE 1 straddle below | 1.46 | 1.79 | 1.38 |
-| buy PE 1 straddle below | 0.65 | 0.52 | 0.68 |
-| sell CE 1 straddle above | 1.29 | 1.11 | 1.62 |
+| sell PE 1 straddle below | 1.43 | 1.75 | 1.36 |
+| buy PE 1 straddle below | 0.64 | 0.51 | 0.67 |
+| sell CE 1 straddle above | 1.27 | 1.10 | 1.60 |
 
 - **Consistent across all three years, but they're only three years.**
   Stock history starts in 2024, so the sample has no stretch like 2022–23,
@@ -141,10 +149,10 @@ selling made money, in every rule.
 - **Losses arrive together.** About 200 short options expire on the same
   day, so a broad fall hits them all at once. For selling the put one
   straddle below, 27% of expiries lost on average across stocks; the worst
-  were Dec-2024 (−₹8,267 per stock-lot) and Oct-2024 (−₹8,084).
-- **The single-stock tail is severe.** The worst short put lost **₹2.18
-  lakh on one lot** (IEX), about 50× the median trade (+₹4,345). The worst
-  short call lost ₹1.69 lakh (INDIACEM). A bought option can't lose more
+  were Dec-2024 (−₹8,429 per stock-lot) and Oct-2024 (−₹8,243).
+- **The single-stock tail is severe.** The worst short put lost **₹2.21
+  lakh on one lot** (IEX), about 50× the median trade (+₹4,344). The worst
+  short call lost ₹1.71 lakh (INDIACEM). A bought option can't lose more
   than its premium: the worst bought put lost ₹28,036.
 - **Margin.** Short stock options tie up a lot of margin per lot, so
   return on capital is far below these per-lot figures.
