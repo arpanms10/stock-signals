@@ -144,6 +144,9 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
   vol_lookback: 60                 # sessions used to estimate realised vol
   vol_max_leverage: 1.0            # never above fully invested -- no borrowing
   vol_min_exposure: 0.3            # floor, so a vol spike does not go to cash
+  cash_yield_pct: 0.0              # backtest: yield on idle cash. 0 is
+                                   # harsh on vol targeting; ~6.5 is a
+                                   # liquid fund
   min_price: 20.0                  # rupees. Momentum divided by volatility
                                    # ranks a pumped penny stock first; a price
                                    # floor is the cheapest guard against it

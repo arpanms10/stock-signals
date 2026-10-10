@@ -73,7 +73,11 @@ def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
 
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         start_capital: float = 1_000_000, costs: CostModel | None = None,
-        universe_size: int = 200, shuffle_seed: int | None = None) -> PortfolioResult:
+        universe_size: int = 200, shuffle_seed: int | None = None,
+        universe_skip: int = 0) -> PortfolioResult:
+    """universe_skip drops the most liquid names first: skip 200, size 300
+    is liquidity ranks 201-500, a universe the momentum settings were not
+    tuned on."""
     costs = costs or CostModel()
     m = cfg.get("momentum_strategy", {})
     n_hold = m.get("n_hold", 15)
@@ -131,10 +135,14 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     stopped: set[str] = set()           # since the last rebalance: no refill
     last_ranked: list[str] = []
     n_stops = 0
+    # Idle cash (vol targeting, stops) earns a liquid-fund yield if set.
+    cash_growth = (1 + m.get("cash_yield_pct", 0.0) / 100) ** (1 / 252)
 
     for i, ts in enumerate(dates):
         today = ts.date()
         row = px.loc[ts]
+        if i and cash > 0:
+            cash *= cash_growth
 
         # --- execute the previous decision at today's prices ---------------
         if pending is not None:
@@ -258,9 +266,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         if due and i + 1 < len(dates):
             last_rebal = today
             eligible = set(liquid_universe(
-                con, today, universe_size,
+                con, today, universe_skip + universe_size,
                 min_price=m.get("min_price", 0.0),
-                min_turnover_cr=m.get("min_turnover_cr", 0.0)))
+                min_turnover_cr=m.get("min_turnover_cr", 0.0))[universe_skip:])
             snap = ram.loc[ts]
             max_ext = m.get("max_extension_pct", 0.0)
             cand = []
