@@ -60,8 +60,8 @@ def _run(con, monkeypatch, **stop):
 
 def _short_sma(load):
     """Prepend 200 flat-ish bars below the series so the 200 DMA exists."""
-    def wrapped(con, start, end):
-        px = load(con, start, end)
+    def wrapped(con, start, end, *a):
+        px = load(con, start, end, *a)
         pre = pd.DataFrame(50.0, columns=px.columns,
                            index=pd.bdate_range(end=px.index[0] - pd.Timedelta(days=1),
                                                 periods=200))

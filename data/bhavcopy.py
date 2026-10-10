@@ -43,7 +43,40 @@ CREATE TABLE IF NOT EXISTS market_days (
     rows INTEGER,
     fetched_at TEXT
 );
+-- Trade-for-trade series (BE, BZ). NSE moves a stock there for surveillance
+-- and back again; it still trades and can still be sold. Kept apart from
+-- `market` so nothing that ranks or builds a universe ever sees it -- only
+-- the backtest reads it, to value and exit a holding that moved there.
+CREATE TABLE IF NOT EXISTS market_t2t (
+    date TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    series TEXT,
+    close REAL,
+    volume REAL,
+    turnover REAL,
+    PRIMARY KEY (date, symbol)
+);
+CREATE TABLE IF NOT EXISTS t2t_days (
+    date TEXT PRIMARY KEY,
+    rows INTEGER
+);
+-- Splits and bonuses for the whole market, from NSE's corporate-actions
+-- feed. `market` holds raw closes; the backtest divides prices before each
+-- ex-date by `factor` so a 1:1 bonus is not read as a 50% crash.
+CREATE TABLE IF NOT EXISTS market_actions (
+    symbol TEXT NOT NULL,
+    ex_date TEXT NOT NULL,
+    factor REAL NOT NULL,
+    kind TEXT,
+    subject TEXT NOT NULL,
+    PRIMARY KEY (symbol, ex_date, subject)
+);
+CREATE TABLE IF NOT EXISTS market_actions_synced (
+    through TEXT
+);
 """
+
+T2T_SERIES = ("BE", "BZ")
 
 UDIFF_SWITCH = dt.date(2024, 7, 8)
 
@@ -51,7 +84,7 @@ UDIFF_SWITCH = dt.date(2024, 7, 8)
 def connect(db_path: Path | str) -> sqlite3.Connection:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path, timeout=30)
     con.executescript(SCHEMA)
     return con
 
@@ -62,11 +95,12 @@ def _isin_column(df: pd.DataFrame, col: str) -> pd.Series:
     return df[col].astype(str).str.strip().str.upper().replace({"NAN": None, "": None})
 
 
-def _normalise_old(df: pd.DataFrame) -> pd.DataFrame:
+def _normalise_old(df: pd.DataFrame, series=("EQ",)) -> pd.DataFrame:
     df.columns = [c.strip().upper() for c in df.columns]
-    df = df[df["SERIES"].astype(str).str.strip() == "EQ"]
+    df = df[df["SERIES"].astype(str).str.strip().isin(series)]
     out = pd.DataFrame({
         "symbol": df["SYMBOL"].astype(str).str.strip().str.upper(),
+        "series": df["SERIES"].astype(str).str.strip(),
         "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
         "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
         "turnover": pd.to_numeric(df.get("TOTTRDVAL"), errors="coerce"),
@@ -75,11 +109,12 @@ def _normalise_old(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _normalise_udiff(df: pd.DataFrame) -> pd.DataFrame:
+def _normalise_udiff(df: pd.DataFrame, series=("EQ",)) -> pd.DataFrame:
     df.columns = [c.strip() for c in df.columns]
-    df = df[df["SctySrs"].astype(str).str.strip() == "EQ"]
+    df = df[df["SctySrs"].astype(str).str.strip().isin(series)]
     out = pd.DataFrame({
         "symbol": df["TckrSymb"].astype(str).str.strip().str.upper(),
+        "series": df["SctySrs"].astype(str).str.strip(),
         "close": pd.to_numeric(df.get("ClsPric"), errors="coerce"),
         "volume": pd.to_numeric(df.get("TtlTradgVol"), errors="coerce"),
         "turnover": pd.to_numeric(df.get("TtlTrfVal"), errors="coerce"),
@@ -101,7 +136,7 @@ def _is_missing(exc: Exception) -> bool:
     return isinstance(exc, zipfile.BadZipFile)
 
 
-def fetch_day(d: dt.date) -> pd.DataFrame | None:
+def fetch_day(d: dt.date, series=("EQ",)) -> pd.DataFrame | None:
     """One trading day for the whole market.
 
     Empty frame: neither file format exists for the day (a holiday, or not
@@ -135,8 +170,9 @@ def fetch_day(d: dt.date) -> pd.DataFrame | None:
             continue
         if df.empty:
             continue
-        out = normalise(df).dropna(subset=["symbol", "close"])
-        return out[out["close"] > 0].drop_duplicates(subset="symbol")
+        out = normalise(df, series).dropna(subset=["symbol", "close"])
+        out = out[out["close"] > 0].sort_values("series", key=lambda x: x != "EQ")
+        return out.drop_duplicates(subset="symbol")
     return None if failed else pd.DataFrame(columns=EMPTY_COLS)
 
 
@@ -277,6 +313,107 @@ def backfill_isins(con, max_days: int = 400, pause: float = 0.3,
     return len(unmapped_symbols(con))
 
 
+def save_t2t_day(con, d: dt.date, df: pd.DataFrame) -> int:
+    """Store a day's trade-for-trade rows and mark the day done."""
+    t = df[df["series"].isin(T2T_SERIES)] if "series" in df.columns else df.iloc[0:0]
+    rows = [(d.isoformat(), r.symbol, r.series, r.close, r.volume, r.turnover)
+            for r in t.itertuples()]
+    con.executemany("INSERT OR REPLACE INTO market_t2t (date, symbol, series, close,"
+                    " volume, turnover) VALUES (?,?,?,?,?,?)", rows)
+    if "isin" in t.columns:
+        record_isins(con, zip(t["symbol"], t["isin"]))
+    con.execute("INSERT OR REPLACE INTO t2t_days (date, rows) VALUES (?,?)",
+                (d.isoformat(), len(rows)))
+    con.commit()
+    return len(rows)
+
+
+def backfill_t2t(con, pause: float = 0.35, verbose: bool = True) -> int:
+    """Fetch BE/BZ rows for trading days ingested before they were kept."""
+    todo = [r[0] for r in con.execute(
+        "SELECT date FROM market_days WHERE rows > 0 "
+        "AND date NOT IN (SELECT date FROM t2t_days) ORDER BY date")]
+    total, failed = 0, []
+    for k, day in enumerate(todo, 1):
+        df = fetch_day(dt.date.fromisoformat(day), T2T_SERIES)
+        if df is None or df.empty:
+            failed.append(day)       # retried next run; a trading day has rows
+        else:
+            total += save_t2t_day(con, dt.date.fromisoformat(day), df)
+        if verbose and k % 100 == 0:
+            print(f"  t2t {k}/{len(todo)} ({day}): {total:,} rows, "
+                  f"{len(failed)} failed", flush=True)
+        time.sleep(pause)
+    if verbose:
+        print(f"  t2t done: {total:,} rows over {len(todo) - len(failed)} days, "
+              f"{len(failed)} to retry", flush=True)
+    return total
+
+
+def sync_actions(con, start: dt.date, end: dt.date, verbose: bool = True) -> int:
+    """Fetch every split/bonus in [start, end], a year per request."""
+    from . import corporate_actions as ca
+    n, frm = 0, start
+    while frm <= end:
+        to = min(end, dt.date(frm.year, 12, 31))
+        actions, _ = ca.fetch_all(frm, to)
+        con.executemany(
+            "INSERT OR REPLACE INTO market_actions (symbol, ex_date, factor, kind, subject) "
+            "VALUES (?,?,?,?,?)",
+            [(a.symbol, a.ex_date.isoformat(), a.factor, a.kind, a.subject) for a in actions])
+        n += len(actions)
+        if verbose:
+            print(f"  actions {frm} .. {to}: {len(actions)}", flush=True)
+        frm = to + dt.timedelta(days=1)
+        time.sleep(0.5)
+    con.execute("DELETE FROM market_actions_synced")
+    con.execute("INSERT INTO market_actions_synced VALUES (?)", (end.isoformat(),))
+    con.commit()
+    return n
+
+
+def actions_synced_through(con) -> dt.date | None:
+    r = con.execute("SELECT through FROM market_actions_synced").fetchone()
+    return dt.date.fromisoformat(r[0]) if r else None
+
+
+def load_actions(con) -> pd.DataFrame:
+    """One row per (symbol, ex_date), factors on the same day compounded
+    (Bajaj Finance, Jun 2025: a bonus and a split on one ex-date)."""
+    df = pd.read_sql_query("SELECT symbol, ex_date, factor FROM market_actions", con)
+    if df.empty:
+        return df
+    return (df.groupby(["symbol", "ex_date"], as_index=False)["factor"].prod())
+
+
+def symbol_aliases(con) -> dict[str, str]:
+    """Old symbol -> current symbol, for companies that changed ticker.
+
+    Linked through the ISIN, which survives a rename (ZOMATO -> ETERNAL,
+    MOTHERSUMI -> MOTHERSON). Without this a rename reads as a delisting:
+    the holding is force-sold and the new ticker has no history to rank on
+    for a year. Two tickers that traded on the same day are never linked.
+    """
+    spans = con.execute(
+        "SELECT i.isin, s.symbol, s.first, s.last FROM instruments i JOIN ("
+        "  SELECT symbol, MIN(date) first, MAX(date) last FROM ("
+        "    SELECT symbol, date FROM market UNION ALL "
+        "    SELECT symbol, date FROM market_t2t) GROUP BY symbol"
+        ") s ON s.symbol = i.symbol "
+        "WHERE i.isin IN (SELECT isin FROM instruments GROUP BY isin "
+        "HAVING COUNT(*) > 1) ORDER BY i.isin, s.first").fetchall()
+    chains: dict[str, list[tuple[str, str, str]]] = {}
+    for isin, sym, first, last in spans:
+        chains.setdefault(isin, []).append((sym, first, last))
+    alias: dict[str, str] = {}
+    for links in chains.values():
+        if any(b[1] <= a[2] for a, b in zip(links, links[1:])):
+            continue                                     # overlapping: not a rename
+        for sym, _, _ in links[:-1]:
+            alias[sym] = links[-1][0]
+    return alias
+
+
 def have_days(con) -> set[str]:
     return {r[0] for r in con.execute("SELECT date FROM market_days")}
 
@@ -290,9 +427,12 @@ def ingest_range(con, start: dt.date, end: dt.date, pause: float = 0.35,
         if d.weekday() >= 5 or d.isoformat() in done:
             d += dt.timedelta(days=1)
             continue
-        df = fetch_day(d)
+        df = fetch_day(d, ("EQ",) + T2T_SERIES)
         if keep_day(d, df):
-            n = save_day(con, d, df)
+            eq = df[df["series"] == "EQ"] if "series" in df.columns else df
+            n = save_day(con, d, eq)
+            if not df.empty:
+                save_t2t_day(con, d, df)
             total += n
             if verbose and n:
                 print(f"  {d}: {n} stocks", flush=True)

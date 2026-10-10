@@ -31,27 +31,48 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
-from data.bhavcopy import EQUITY_ISIN_PREFIX, require_equity_symbols
+from data.bhavcopy import (EQUITY_ISIN_PREFIX, load_actions, require_equity_symbols,
+                           symbol_aliases)
 from strategy import momentum as mom
 
 TRADING_DAYS_MONTH = 21
 
 
-def load_wide(con, start: dt.date, end: dt.date) -> pd.DataFrame:
-    """Close prices as a date x symbol matrix. NaN means "not trading"."""
+def load_wide(con, start: dt.date, end: dt.date,
+              aliases: dict[str, str] | None = None) -> pd.DataFrame:
+    """Close prices as a date x symbol matrix. NaN means "not trading".
+
+    Continuous series, which raw bhavcopy closes are not:
+      - a renamed company is one column, under its current ticker;
+      - days in the trade-for-trade series (BE/BZ) are included, so a
+        holding moved there is still priced rather than "delisted";
+      - prices before a split or bonus are divided by its factor.
+    """
+    p = (start.isoformat(), end.isoformat())
     df = pd.read_sql_query(
-        "SELECT date, symbol, close FROM market WHERE date >= ? AND date <= ?",
-        con, params=(start.isoformat(), end.isoformat()))
+        "SELECT date, symbol, close, 0 AS t2t FROM market WHERE date >= ? AND date <= ? "
+        "UNION ALL SELECT date, symbol, close, 1 FROM market_t2t "
+        "WHERE date >= ? AND date <= ?", con, params=p + p)
     if df.empty:
         return df
+    aliases = symbol_aliases(con) if aliases is None else aliases
+    df["symbol"] = df["symbol"].map(lambda x: aliases.get(x, x))
+    df = df.sort_values("t2t").drop_duplicates(["date", "symbol"])     # EQ first
     df["date"] = pd.to_datetime(df["date"])
-    return df.pivot_table(index="date", columns="symbol", values="close",
-                          aggfunc="last").sort_index()
+    wide = df.pivot(index="date", columns="symbol", values="close").sort_index()
+    acts = load_actions(con)
+    if not acts.empty:
+        acts["symbol"] = acts["symbol"].map(lambda x: aliases.get(x, x))
+        for a in acts[acts["symbol"].isin(wide.columns)].itertuples():
+            before = wide.index < pd.Timestamp(a.ex_date)
+            wide.loc[before, a.symbol] = wide.loc[before, a.symbol] / a.factor
+    return wide
 
 
 def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
                     min_days: int = 40, min_price: float = 0.0,
-                    min_turnover_cr: float = 0.0) -> list[str]:
+                    min_turnover_cr: float = 0.0,
+                    aliases: dict[str, str] | None = None) -> list[str]:
     """Most liquid names as of a date, computed only from prior data."""
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
     # ETFs pass any liquidity filter and, being low-volatility, dominate a
@@ -59,16 +80,23 @@ def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
     # infinite Sharpe. Only ISIN-confirmed company equity is eligible, and an
     # unbuilt instrument map is an error, not a reason to skip the filter.
     require_equity_symbols(con)
-    cur = con.execute(
-        "SELECT m.symbol, AVG(m.turnover) t, COUNT(*) n, AVG(m.close) p "
+    rows = con.execute(
+        "SELECT m.symbol, SUM(m.turnover), COUNT(*), SUM(m.close) "
         "FROM market m JOIN instruments i ON i.symbol = m.symbol "
         "WHERE m.date <= ? AND m.date > ? AND m.turnover > 0 "
-        "AND i.isin LIKE ? "
-        "GROUP BY m.symbol HAVING n >= ? AND p >= ? AND t >= ? "
-        "ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%", min_days,
-         min_price, min_turnover_cr * 1e7, top_n))
-    return [r[0] for r in cur.fetchall()]
+        "AND i.isin LIKE ? GROUP BY m.symbol",
+        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%")).fetchall()
+    # A rename inside the window must not split one company into two
+    # half-histories that each miss min_days. Prices stay raw here: the
+    # floor is about what the stock cost at the time.
+    aliases = symbol_aliases(con) if aliases is None else aliases
+    agg: dict[str, list[float]] = {}
+    for sym, t, n, p in rows:
+        a = agg.setdefault(aliases.get(sym, sym), [0.0, 0, 0.0])
+        a[0] += t; a[1] += n; a[2] += p
+    ok = [(s, t / n) for s, (t, n, p) in agg.items()
+          if n >= min_days and p / n >= min_price and t / n >= min_turnover_cr * 1e7]
+    return [s for s, _ in sorted(ok, key=lambda x: -x[1])[:top_n]]
 
 
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
@@ -87,7 +115,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     rebal_days = m.get("rebalance_days", 21)
 
     # Warm-up: momentum needs lookback + skip bars before it can rank anything.
-    px = load_wide(con, start - dt.timedelta(days=int((lb + vol_w) * 1.6)), end)
+    aliases = symbol_aliases(con)
+    px = load_wide(con, start - dt.timedelta(days=int((lb + vol_w) * 1.6)), end, aliases)
     if px.empty:
         return PortfolioResult(pd.Series(dtype=float), pd.Series(dtype=float))
 
@@ -274,7 +303,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             eligible = set(liquid_universe(
                 con, today, universe_skip + universe_size,
                 min_price=m.get("min_price", 0.0),
-                min_turnover_cr=m.get("min_turnover_cr", 0.0))[universe_skip:])
+                min_turnover_cr=m.get("min_turnover_cr", 0.0),
+                aliases=aliases)[universe_skip:])
             snap = ram.loc[ts]
             max_ext = m.get("max_extension_pct", 0.0)
             cand = []
