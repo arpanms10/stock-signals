@@ -120,6 +120,13 @@ momentum_strategy:                 # NOTE: distinct from the `momentum:`
   exit_rank: 30                    # ... and only sell after falling past 30
                                    # (the gap stops boundary names churning)
   rebalance_days: 21               # monthly
+  stop: none                       # trailing stop between rebalances:
+                                   # none | pct | atr (backtest only)
+  stop_pct: 15.0                   # pct: below the highest close since entry
+  stop_atr_mult: 3.0               # atr: ATR multiples below that high
+  stop_atr_window: 14              # ATR from close-to-close moves
+  stop_refill: cash                # cash = wait for the rebalance; next =
+                                   # buy the next-ranked name from it
   risk_off_scale: 1.0              # names held when the index is below its
                                    # 200 DMA, as a fraction of n_hold. Was 0.5;
                                    # tested 2026-10-04 (docs/validation.md): it
