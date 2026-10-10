@@ -17,6 +17,9 @@ dependencies = [
     "openpyxl>=3.1",
     # Yahoo fallback in fetch_fundamentals.py: ROE, ROCE, debt/equity, P/E, CFO.
     "yfinance>=1.7",
+    # Reads PPFAS's older .xls portfolio disclosures (run_mf_ppfas.py); the
+    # newer .xlsx ones go through openpyxl.
+    "xlrd>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +30,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["indicators", "scoring", "signals", "backtest", "data"]
+packages = ["indicators", "scoring", "signals", "backtest", "data", "mf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -108,6 +108,7 @@ what you held is deliberately not in it.
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
+| [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |
 | [**Code layout**](docs/layout.md) | Where things live |
 | [ROADMAP](ROADMAP.md) | What is built, and what is still wrong with it |
 
