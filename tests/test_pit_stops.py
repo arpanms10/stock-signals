@@ -60,8 +60,8 @@ def _run(con, monkeypatch, **stop):
 
 def _short_sma(load):
     """Prepend 200 flat-ish bars below the series so the 200 DMA exists."""
-    def wrapped(con, start, end):
-        px = load(con, start, end)
+    def wrapped(con, start, end, *a):
+        px = load(con, start, end, *a)
         pre = pd.DataFrame(50.0, columns=px.columns,
                            index=pd.bdate_range(end=px.index[0] - pd.Timedelta(days=1),
                                                 periods=200))
@@ -93,3 +93,27 @@ def test_refill_buys_the_next_ranked_name(market, monkeypatch):
 def test_wide_stop_does_not_fire(market, monkeypatch):
     res = _run(market, monkeypatch, stop="pct", stop_pct=40.0)
     assert res.metrics["stops_fired"] == 0
+
+
+def test_universe_skip_and_cash_yield(market):
+    """Skipping past every name leaves the book in cash, which earns only
+    the configured yield."""
+    bench = pd.DataFrame(columns=["date", "close"])
+    args = (market, START + dt.timedelta(days=60), START + dt.timedelta(days=200), bench)
+    idle = pit.run(*args[:1], _cfg(), *args[1:], universe_size=3, universe_skip=3)
+    assert idle.holdings_log == [] and idle.equity.nunique() == 1
+    paid = pit.run(*args[:1], _cfg(cash_yield_pct=6.5), *args[1:], universe_size=3,
+                   universe_skip=3)
+    growth = paid.equity.iloc[-1] / paid.equity.iloc[0]
+    assert growth == pytest.approx(1.065 ** ((len(paid.equity) - 1) / 252))
+
+
+def test_missing_price_is_valued_at_last_close(market):
+    """AAA stops printing for a week mid-hold: the book must not mark it at 0."""
+    market.execute("DELETE FROM market WHERE symbol='AAA' AND date BETWEEN ? AND ?",
+                   ((START + dt.timedelta(days=95)).isoformat(),
+                    (START + dt.timedelta(days=101)).isoformat()))
+    bench = pd.DataFrame(columns=["date", "close"])
+    res = pit.run(market, _cfg(), START + dt.timedelta(days=60),
+                  START + dt.timedelta(days=200), bench, universe_size=3)
+    assert res.equity.pct_change().min() > -0.2      # only the real -13% days

@@ -55,6 +55,9 @@ def main() -> None:
     ap.add_argument("--capital", type=float, default=1_000_000)
     ap.add_argument("--db", default="data/market.db")
     ap.add_argument("--universe-size", type=int, default=200)
+    ap.add_argument("--universe-skip", type=int, default=0,
+                    help="drop the N most liquid names first (200 with "
+                         "--universe-size 300 = liquidity ranks 201-500)")
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)
     ap.add_argument("--shuffle", type=int, default=0)
@@ -86,6 +89,10 @@ def main() -> None:
                          "the next-ranked name from the last one")
     ap.add_argument("--vol-target", action="store_true",
                     help="scale exposure to a target portfolio volatility")
+    ap.add_argument("--vol-target-pct", type=float, default=None,
+                    help="override momentum_strategy.vol_target_pct")
+    ap.add_argument("--cash-yield-pct", type=float, default=None,
+                    help="annual yield on idle cash (default 0)")
     ap.add_argument("--export", nargs="?", const="", default=None, metavar="PATH",
                     help="write the equity curve, monthly returns and holdings log to Excel")
     args = ap.parse_args()
@@ -97,7 +104,8 @@ def main() -> None:
         cfg["momentum_strategy"] = {**cfg["momentum_strategy"], "vol_target": True}
     for key in ("skip_months", "lookback_months", "score", "rebalance_days",
                 "selection", "compare_lookback_months", "risk_off_scale",
-                "stop", "stop_pct", "stop_atr_mult", "stop_refill"):
+                "stop", "stop_pct", "stop_atr_mult", "stop_refill",
+                "vol_target_pct", "cash_yield_pct"):
         if getattr(args, key) is not None:
             cfg = dict(cfg)
             cfg["momentum_strategy"] = {**cfg["momentum_strategy"],
@@ -127,12 +135,13 @@ def main() -> None:
     start = dt.date.fromisoformat(args.start) if args.start else first + dt.timedelta(days=430)
     end = dt.date.fromisoformat(args.end) if args.end else last
     print(f"Market data: {first} .. {last} ({len(days)} days)")
-    print(f"Backtest:    {start} .. {end}   universe = top {args.universe_size} by liquidity, "
+    print(f"Backtest:    {start} .. {end}   universe = liquidity ranks "
+          f"{args.universe_skip + 1}-{args.universe_skip + args.universe_size}, "
           f"rebuilt at every rebalance")
 
     bench = store.load_index(store.connect(), cfg["signals"]["regime_index"])
     res = pit.run(con, cfg, start, end, bench, args.capital, CostModel(),
-                  args.universe_size)
+                  args.universe_size, universe_skip=args.universe_skip)
     show("Momentum, point-in-time universe (no survivorship bias)", res.metrics)
     _report(res, args)
 
@@ -141,7 +150,8 @@ def main() -> None:
         vals = []
         for seed in range(1, args.shuffle + 1):
             m = pit.run(con, cfg, start, end, bench, args.capital, CostModel(),
-                        args.universe_size, shuffle_seed=seed).metrics
+                        args.universe_size, shuffle_seed=seed,
+                        universe_skip=args.universe_skip).metrics
             vals.append(m.get("cagr_pct", 0.0))
             print(f"  seed {seed}: {m.get('cagr_pct'):>7.2f}%")
         mean, sd = float(np.mean(vals)), float(np.std(vals))
