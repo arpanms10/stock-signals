@@ -29,6 +29,11 @@ def in_session(now: dt.datetime, holidays) -> bool:
             and dt.time(9, 15) <= now.time() <= dt.time(15, 30))
 
 
+def _signed(n: float) -> str:
+    """-57194 -> '-57.2k', 7519 -> '+7.5k', 54 -> '+54'."""
+    return f"{n / 1000:+.1f}k" if abs(n) >= 1000 else f"{n:+.0f}"
+
+
 def day_frames(day: dt.date):
     """(summary, timeline) for one day's snapshots, monthly expiry only.
 
@@ -72,6 +77,9 @@ def day_frames(day: dt.date):
             "pcr_first": a["pcr_oi"], "pcr_last": b["pcr_oi"],
             "pcr_chg": chg(a["pcr_oi"], b["pcr_oi"]),
             "chg_oi_pcr_last": b["pcr_chg_oi"],
+            # Raw call/put OI added (or shed) today, so a blank ratio still
+            # shows what writers did. Contracts, at the last snapshot.
+            "chg_oi_call_put": f"{_signed(b['ce_chg_oi'])} / {_signed(b['pe_chg_oi'])}",
             "put_wall": f"{a['support']:g} -> {b['support']:g}"
             if pd.notna(a["support"]) and pd.notna(b["support"]) else None,
             "call_wall": f"{a['resistance']:g} -> {b['resistance']:g}"
@@ -99,9 +107,11 @@ def report(day: dt.date, excel: bool = False) -> int:
     print(f"F&O intraday, {day:%a %d-%b-%Y}: {len(summ)} underlyings, NSE update times "
           f"{times[0]}-{times[-1]} ({len(times)} distinct)")
     print("Change-in-OI PCR is untested (docs/f_o/validation.md) -- this is the data "
-          "that will test it, not a signal.\n")
+          "that will test it, not a signal.")
+    print("chg_oi_call_put is today's call / put OI change in contracts; the PCR is "
+          "blank when either side shed OI.\n")
     cols = ["symbol", "snapshots", "first", "last", "spot", "spot_chg_pct", "pcr_first",
-            "pcr_last", "chg_oi_pcr_last", "put_wall", "call_wall", "straddle_chg_pct"]
+            "pcr_last", "chg_oi_pcr_last", "chg_oi_call_put", "put_wall", "call_wall", "straddle_chg_pct"]
     print(summ[cols].round(2).to_string(index=False))
     moved = summ[summ["walls_moved"]]
     if len(moved):
