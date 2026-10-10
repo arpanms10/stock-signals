@@ -48,6 +48,17 @@ def test_demerger_fall_is_adjusted_out(con):
     assert px["NEWNAME"].pct_change().iloc[-1] == pytest.approx(0.0)
 
 
+def test_unrecorded_split_is_inferred_but_a_crash_is_not():
+    idx = pd.bdate_range("2025-01-01", periods=60)
+    close = pd.DataFrame({"SPLIT": [100.0] * 30 + [10.5] * 30,       # 10:1, no record
+                          "CRASH": [100.0] * 30 + [45.0] * 30})      # no volume shift
+    vol = pd.DataFrame({"SPLIT": [1e5] * 30 + [1e6] * 30,
+                        "CRASH": [1e5] * 30 + [1.1e5] * 30})
+    close.index = vol.index = idx
+    found = pit.infer_unrecorded_actions(close, vol)
+    assert [(s, d) for s, d, _ in found] == [("SPLIT", idx[30])]
+
+
 def test_split_is_back_adjusted(con):
     px = pit.load_wide(con, D[0], D[-1])
     assert px["SPLITCO"].tolist() == [100.0, 100.0, 101.0, 101.0, 101.0]

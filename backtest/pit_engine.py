@@ -49,12 +49,15 @@ def load_wide(con, start: dt.date, end: dt.date,
       - prices before a split or bonus are divided by its factor;
       - the fall on a demerger's ex-date is taken as value passed to the
         spun-off company (NSE publishes no ratio), so it is adjusted out the
-        same way. The new company's own later returns are not captured.
+        same way. The new company's own later returns are not captured;
+      - a split or bonus missing from NSE's feed (JSW Steel's 10:1 in 2017)
+        is inferred, see infer_unrecorded_actions().
     """
     p = (start.isoformat(), end.isoformat())
     df = pd.read_sql_query(
-        "SELECT date, symbol, close, 0 AS t2t FROM market WHERE date >= ? AND date <= ? "
-        "UNION ALL SELECT date, symbol, close, 1 FROM market_t2t "
+        "SELECT date, symbol, close, volume, 0 AS t2t FROM market "
+        "WHERE date >= ? AND date <= ? "
+        "UNION ALL SELECT date, symbol, close, volume, 1 FROM market_t2t "
         "WHERE date >= ? AND date <= ?", con, params=p + p)
     if df.empty:
         return df
@@ -63,6 +66,7 @@ def load_wide(con, start: dt.date, end: dt.date,
     df = df.sort_values("t2t").drop_duplicates(["date", "symbol"])     # EQ first
     df["date"] = pd.to_datetime(df["date"])
     wide = df.pivot(index="date", columns="symbol", values="close").sort_index()
+    vol = df.pivot(index="date", columns="symbol", values="volume").sort_index()
     acts = load_actions(con)
     if not acts.empty:
         acts["symbol"] = acts["symbol"].map(lambda x: aliases.get(x, x))
@@ -82,7 +86,40 @@ def load_wide(con, start: dt.date, end: dt.date,
         if 0.1 < ratio < 0.97:       # only a fall is the demerger; a rise is the market
             before = wide.index < ex
             wide.loc[before, sym] = wide.loc[before, sym] * ratio
+    for sym, ex, ratio in infer_unrecorded_actions(wide, vol):
+        wide.loc[wide.index < ex, sym] = wide.loc[wide.index < ex, sym] * ratio
     return wide
+
+
+def infer_unrecorded_actions(wide: pd.DataFrame, vol: pd.DataFrame,
+                             window: int = 20) -> list[tuple[str, pd.Timestamp, float]]:
+    """Splits and bonuses NSE's feed is missing, from the price and volume.
+
+    Run after the recorded actions are applied, so what is left is a fall
+    the feed cannot explain. It is treated as a corporate action when the
+    close fell below 0.55 of the previous one AND the traded quantity rose
+    at least 1.3x and stayed there (a split multiplies the share count).
+    A real crash rarely does both: YES Bank 2020 fell to 0.44 on lower
+    volume; DHFL, Jet Airways, ZEEL and the Reliance ADAG names fell to
+    0.57-0.70. Testing falls near 2/3 as well let those real crashes in, so
+    a 1:2 bonus missing from the feed is left alone. The fall is adjusted
+    out at the observed ratio.
+    """
+    r = wide / wide.ffill().shift(1)
+    hits = r.stack()
+    hits = hits[hits < 0.55]
+    out = []
+    for (d, sym), ratio in hits.items():
+        col = wide[sym]
+        prev = col[col.index < d].dropna()
+        if prev.empty or (d - prev.index[-1]).days > 7:
+            continue
+        v = vol[sym].dropna()
+        before = v[v.index < d].tail(window).median()
+        after = v[v.index >= d].head(window).median()
+        if before and not pd.isna(after) and after / before >= 1.3:
+            out.append((sym, d, float(ratio)))
+    return out
 
 
 def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
