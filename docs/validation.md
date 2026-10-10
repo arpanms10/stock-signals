@@ -68,6 +68,66 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
+## Momentum: trailing stop between rebalances (2026-10-10)
+
+Question: the list is rebuilt monthly, so a stock that falls mid-month is held
+until the next rebalance. Would a trailing stop help, and at what distance?
+
+`run_pit_momentum.py --stop pct|atr` trails the highest close since entry.
+A stop is judged on the close and sold at the **next session's close**, the
+same lag the rebalance has. After a stop, the cash either waits for the next
+rebalance (`--stop-refill cash`) or buys the best name from the last ranking
+that isn't held, wasn't stopped since, and is above its 200 DMA (`next`).
+Current setup otherwise (9-month, 15 stocks, top 200, full costs). Variants
+were compared on **2017-12 to 2022-12** (four start dates a week apart) and
+then all were run on the **2023-01 to 2026-10 holdout** (four starts).
+
+| stop | train CAGR avg (range) | train worst fall | holdout CAGR avg (range) | holdout worst fall | stops / yr |
+|---|---|---|---|---|---|
+| **none** | **9.8** (8.7 - 11.3) | -46% | **13.1** (10.3 - 16.0) | -40% | 0 |
+| 10%, cash | 9.0 (5.6 - 11.7) | -35% | 6.5 (3.2 - 10.9) | -44% | 72 |
+| 15%, cash | 9.1 (5.7 - 12.2) | -34% | 9.3 (6.4 - 12.5) | -43% | 41 |
+| 20%, cash | 8.1 (5.8 - 10.0) | -40% | 10.7 (9.5 - 12.1) | -42% | 24 |
+| 25%, cash | 7.9 (5.8 - 10.2) | -42% | 12.9 (10.6 - 15.8) | -39% | 13 |
+| 30%, cash | 8.9 (7.2 - 11.2) | -41% | 11.4 (10.3 - 13.3) | -42% | 9 |
+| 15%, next | 7.7 (2.6 - 10.2) | -43% | 11.2 (8.2 - 13.4) | -43% | 45 |
+| 20%, next | 10.4 (8.6 - 12.1) | -46% | 11.1 (9.7 - 12.4) | -44% | 25 |
+| 25%, next | 8.7 (7.8 - 10.5) | -52% | 12.2 (9.6 - 16.7) | -41% | 15 |
+| 4.5x ATR, cash | 6.7 (2.9 - 10.7) | -35% | 8.0 (4.9 - 13.3) | -40% | 109 |
+| 3.5x ATR, cash | 3.6 (-2.9 - 9.5) | -33% | 3.3 (-4.2 - 10.4) | -41% | 133 |
+
+NIFTY 500 over the same starts: about 10.7% (train) and 9.5% (holdout).
+10% next and the 2.5x / next-refill ATR variants were worse still.
+
+**Verdict: no stop. The config stays `stop: none`.**
+
+- **No stop beat holding to the rebalance in both periods.** The best on
+  train, 20% with refill, won by 0.6 points on 2 of 4 starts, then lost on
+  all 4 holdout starts (11.1% vs 13.1%).
+- **The one real benefit didn't survive.** Tight stops (10-15%, cash) cut
+  the train worst fall from -46% to about -35%, for under a point of CAGR.
+  On the holdout the same stops lost 4-7 points a year and the worst fall
+  was *deeper* (-43/-44% vs -40%). Selling, then sitting in cash while the
+  stock and the market rebound, didn't protect against the falls that
+  mattered here.
+- **Momentum stocks are volatile enough that tight stops just churn.** A
+  15% stop fired ~41 times a year across 15 positions -- each holding
+  stopped out almost three times a year -- and costs rose by ~0.5 point.
+- **Refilling with the next-ranked name didn't help** on average; it adds
+  trading on a ranking up to a month old.
+- **ATR stops did worst**, but that test is weaker: the market table has
+  closes only, so ATR is built from close-to-close moves, which is smaller
+  than a true high/low ATR. Even 4.5x fired 100+ times a year.
+- Caveat: selling at the next close is harsher than a resting stop order
+  for a fast fall, and kinder for a gap. Wider stops (25-30%) fire rarely
+  and land close to no stop either way, so they cost little and gave nothing
+  measurable here.
+
+The monthly rebalance already works as a slow stop: a stock that has really
+broken drops out of the ranking (`exit_rank: 30`) or below its 200 DMA and is
+sold at the next rebalance. What the ranking doesn't protect against is the
+portfolio-wide fall (-40% to -46%), and per-stock stops didn't fix that.
+
 ## Momentum, re-run on the repaired market history (2026-10-08)
 
 Everything below this section was run on a market history that, it turned
