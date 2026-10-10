@@ -36,6 +36,14 @@ def test_day_report_tracks_first_to_last(tmp_path, monkeypatch):
     assert round(r["spot_chg_pct"], 2) == 1.0
     assert r["pcr_last"] > r["pcr_first"]
     assert len(timeline) == 2
+    ce, pe = timeline.iloc[-1][["ce_chg_oi", "pe_chg_oi"]]
+    assert r["chg_oi_call_put"] == f"{sf._signed(ce)} / {sf._signed(pe)}"
+
+
+def test_signed_counts():
+    assert sf._signed(-57194) == "-57.2k"
+    assert sf._signed(7519) == "+7.5k"
+    assert sf._signed(54) == "+54"
 
 
 def test_keep_awake_until_close():
@@ -64,6 +72,7 @@ def test_missing_walls_are_not_moved(tmp_path, monkeypatch):
         store.save_option_snapshot(con, c)
     hist = pd.DataFrame({"ts": pd.to_datetime(["2026-10-08 10:00", "2026-10-08 10:30"]),
                          "spot": [1.0, 1.0], "pcr_oi": [1.0, 1.0], "pcr_chg_oi": [None, None],
+                         "ce_chg_oi": [-5.0, -5.0], "pe_chg_oi": [3.0, 3.0],
                          "support": [np.nan, np.nan], "resistance": [5.0, 5.0],
                          "max_pain": [1.0, 1.0], "straddle": [1.0, 1.0],
                          "range_low": [0.0, 0.0], "range_high": [2.0, 2.0]})
