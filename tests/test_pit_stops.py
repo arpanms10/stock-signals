@@ -106,3 +106,14 @@ def test_universe_skip_and_cash_yield(market):
                    universe_skip=3)
     growth = paid.equity.iloc[-1] / paid.equity.iloc[0]
     assert growth == pytest.approx(1.065 ** ((len(paid.equity) - 1) / 252))
+
+
+def test_missing_price_is_valued_at_last_close(market):
+    """AAA stops printing for a week mid-hold: the book must not mark it at 0."""
+    market.execute("DELETE FROM market WHERE symbol='AAA' AND date BETWEEN ? AND ?",
+                   ((START + dt.timedelta(days=95)).isoformat(),
+                    (START + dt.timedelta(days=101)).isoformat()))
+    bench = pd.DataFrame(columns=["date", "close"])
+    res = pit.run(market, _cfg(), START + dt.timedelta(days=60),
+                  START + dt.timedelta(days=200), bench, universe_size=3)
+    assert res.equity.pct_change().min() > -0.2      # only the real -13% days

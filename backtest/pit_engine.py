@@ -92,6 +92,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         return PortfolioResult(pd.Series(dtype=float), pd.Series(dtype=float))
 
     rets = px.pct_change()
+    # A holding with no price today (suspended, moved out of the EQ series)
+    # is still owned: value it at its last close, never at zero.
+    last_px = px.ffill()
     mom_matrix = px.shift(sk) / px.shift(lb) - 1
     vol = rets.rolling(vol_w, min_periods=vol_w // 2).std() * np.sqrt(252)
     ram = mom_matrix / vol.replace(0, np.nan)
@@ -150,7 +153,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             pending = None
             prices_now = {s: float(row[s]) for s in set(list(shares) + target)
                           if s in row.index and not pd.isna(row[s]) and row[s] > 0}
-            portfolio = cash + sum(q * prices_now.get(s, 0.0) for s, q in shares.items())
+            marks = last_px.loc[ts]
+            portfolio = cash + sum(q * prices_now.get(s, float(marks.get(s, 0.0)))
+                                   for s, q in shares.items())
             weight = (portfolio * exposure / len(target)) if target else 0.0
             traded = 0.0
 
@@ -235,8 +240,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                     cash += float(last.iloc[-1]) * shares[s] * 0.95   # haircut
                     del shares[s]
 
-        value = cash + sum(q * float(row[s]) for s, q in shares.items()
-                           if s in row.index and not pd.isna(row[s]))
+        marks = last_px.loc[ts]
+        value = cash + sum(q * float(marks[s]) for s, q in shares.items()
+                           if not pd.isna(marks.get(s, np.nan)))
         equity_rows.append((today, value))
 
         # --- rebalance -----------------------------------------------------
