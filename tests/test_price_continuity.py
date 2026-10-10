@@ -40,6 +40,14 @@ def con(tmp_path):
     return con
 
 
+def test_demerger_fall_is_adjusted_out(con):
+    con.execute("INSERT INTO market_demergers VALUES (?,?,?)",
+                ("NEWNAME", D[4].isoformat(), "Demerger"))
+    _day(con, D[4], [("NEWNAME", 27.0, "INE002A01011")])        # 53 -> 27
+    px = pit.load_wide(con, D[0], D[-1])
+    assert px["NEWNAME"].pct_change().iloc[-1] == pytest.approx(0.0)
+
+
 def test_split_is_back_adjusted(con):
     px = pit.load_wide(con, D[0], D[-1])
     assert px["SPLITCO"].tolist() == [100.0, 100.0, 101.0, 101.0, 101.0]

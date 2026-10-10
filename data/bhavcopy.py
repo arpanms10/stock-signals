@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS market_actions (
     subject TEXT NOT NULL,
     PRIMARY KEY (symbol, ex_date, subject)
 );
+-- Demergers carry no ratio in NSE's feed. load_wide() treats the fall on
+-- the ex-date as value handed to the spun-off company, not a loss.
+CREATE TABLE IF NOT EXISTS market_demergers (
+    symbol TEXT NOT NULL,
+    ex_date TEXT NOT NULL,
+    subject TEXT,
+    PRIMARY KEY (symbol, ex_date)
+);
 CREATE TABLE IF NOT EXISTS market_actions_synced (
     through TEXT
 );
@@ -357,6 +365,9 @@ def sync_actions(con, start: dt.date, end: dt.date, verbose: bool = True) -> int
     while frm <= end:
         to = min(end, dt.date(frm.year, 12, 31))
         actions, _ = ca.fetch_all(frm, to)
+        dem = ca.fetch_demergers(frm, to)
+        con.executemany("INSERT OR REPLACE INTO market_demergers VALUES (?,?,?)",
+                        [(sym, ex.isoformat(), subj) for sym, ex, subj in dem])
         con.executemany(
             "INSERT OR REPLACE INTO market_actions (symbol, ex_date, factor, kind, subject) "
             "VALUES (?,?,?,?,?)",
@@ -375,6 +386,10 @@ def sync_actions(con, start: dt.date, end: dt.date, verbose: bool = True) -> int
 def actions_synced_through(con) -> dt.date | None:
     r = con.execute("SELECT through FROM market_actions_synced").fetchone()
     return dt.date.fromisoformat(r[0]) if r else None
+
+
+def load_demergers(con) -> list[tuple[str, str]]:
+    return con.execute("SELECT symbol, ex_date FROM market_demergers").fetchall()
 
 
 def load_actions(con) -> pd.DataFrame:

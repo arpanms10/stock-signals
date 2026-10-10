@@ -31,8 +31,8 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
-from data.bhavcopy import (EQUITY_ISIN_PREFIX, load_actions, require_equity_symbols,
-                           symbol_aliases)
+from data.bhavcopy import (EQUITY_ISIN_PREFIX, load_actions, load_demergers,
+                           require_equity_symbols, symbol_aliases)
 from strategy import momentum as mom
 
 TRADING_DAYS_MONTH = 21
@@ -46,7 +46,10 @@ def load_wide(con, start: dt.date, end: dt.date,
       - a renamed company is one column, under its current ticker;
       - days in the trade-for-trade series (BE/BZ) are included, so a
         holding moved there is still priced rather than "delisted";
-      - prices before a split or bonus are divided by its factor.
+      - prices before a split or bonus are divided by its factor;
+      - the fall on a demerger's ex-date is taken as value passed to the
+        spun-off company (NSE publishes no ratio), so it is adjusted out the
+        same way. The new company's own later returns are not captured.
     """
     p = (start.isoformat(), end.isoformat())
     df = pd.read_sql_query(
@@ -66,6 +69,19 @@ def load_wide(con, start: dt.date, end: dt.date,
         for a in acts[acts["symbol"].isin(wide.columns)].itertuples():
             before = wide.index < pd.Timestamp(a.ex_date)
             wide.loc[before, a.symbol] = wide.loc[before, a.symbol] / a.factor
+    for sym, ex in load_demergers(con):
+        sym = aliases.get(sym, sym)
+        if sym not in wide.columns:
+            continue
+        col = wide[sym].dropna()
+        ex = pd.Timestamp(ex)
+        prev, on = col[col.index < ex], col[col.index >= ex]
+        if prev.empty or on.empty or (on.index[0] - ex).days > 5:
+            continue
+        ratio = on.iloc[0] / prev.iloc[-1]
+        if 0.1 < ratio < 0.97:       # only a fall is the demerger; a rise is the market
+            before = wide.index < ex
+            wide.loc[before, sym] = wide.loc[before, sym] * ratio
     return wide
 
 
