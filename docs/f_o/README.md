@@ -233,7 +233,9 @@ The Saturday job (`run_weekly.py`) now also:
    index history and results dates, then re-runs the validation. That
    rewrites `config/fno_calibration.json` (the hit rates the range quotes)
    and `config/fno_reach.json` (the reach curves), so neither goes stale or
-   needs editing by hand.
+   needs editing by hand. Both are local build outputs, not in git (like
+   `data/fo_history.db` they are built from); a fresh checkout gets them
+   from the first `run_fno_backtest.py --ingest`.
 
 `--ingest-old` adds the 2019–2023 index history; it only needs running once.
 
