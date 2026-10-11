@@ -68,7 +68,90 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
-## Momentum: trailing stop between rebalances (2026-10-10)
+## Momentum on a continuous price history (2026-10-11)
+
+> **Supersedes every momentum figure below this section.** Those were run on
+> raw bhavcopy closes: a split or bonus on a held stock was booked as a loss
+> (a 1:1 bonus = -50%), a demerger as a loss, a ticker change or a spell in
+> the trade-for-trade series as a forced sale at -5%, and a day with no
+> price valued the holding at zero. All five are fixed ([data](data.md)).
+> The live ranking was never affected; only `run_pit_momentum.py` was.
+
+Same setup as before: top 200 by liquidity, monthly, 15 stocks, full costs,
+`risk_off_scale: 1.0`, four start dates a week apart, data to 2026-10-09.
+
+| | CAGR avg (range, 4 starts) | worst fall | Sharpe | 2017-12 to 2022-04 | 2022-05 on |
+|---|---|---|---|---|---|
+| **9-month (main)** | **23.0** (20.0 - 24.4) | -36 to -42% | 1.0 | 23.3 | 23.2 |
+| 12-month | 20.2 (18.8 - 22.4) | -42 to -45% | 0.9 | 20.6 | 20.4 |
+| random picks, same universe (10 seeds) | 9.3 (4.8 - 13.1) | -38 to -50% | 0.5 | | |
+| NIFTY 500 | 10.2 | -38% | | | |
+
+- **The old numbers badly understated momentum.** 11.7% becomes 23.0%, and
+  random picks rise only from 3.8% to 9.3%. Momentum stocks are exactly the
+  ones that split and issue bonuses (their prices have run up), so they
+  were hit hardest by reading those as crashes. 19 held positions went
+  through one, HDFCBANK, BAJFINANCE and BRITANNIA among them.
+- **The ranking carries real information.** The default start beats every
+  random pick, by 14.9 points (4.9 sd). It also holds in both halves (23.3%
+  and 23.2%).
+- **Checked for the opposite error.** A wrong adjustment would create a fake
+  jump *up*. Every daily move above 15% on a held position was listed and
+  checked: all are real (the Adani falls of Jan-Feb 2023, 4 June 2024,
+  circuit limits); the one on an ex-date (EASEMYTRIP, 3:1 bonus plus 2:1
+  split) is a real +20% day after the factor of 8.
+- **9 months still leads 12** on all four starts.
+- **The fall is no smaller.** -36% to -42% against the index's -38%.
+
+What this does not include, so the figures are still better than an
+account would see: **tax** (most gains here are short-term, 20% STCG since
+July 2024), **slippage** beyond 0.05% a side, and the spun-off company in a
+demerger. Dividends are missing too, which works the other way (about 1%
+a year, on the index as well).
+
+### Momentum works outside the universe it was tuned on: ranks 201-500
+
+The settings (9-1 lookback, 15 names, exit rank 30) were all chosen on the
+top 200. Liquidity ranks 201-500 were never used, so they are the cleanest
+test available (`--universe-skip 200 --universe-size 300`):
+
+| ranks 201-500 | CAGR avg (range) | worst fall | Sharpe |
+|---|---|---|---|
+| momentum | **28.1** (22.9 - 30.8) | -34 to -37% | 1.16 |
+| random picks (10 seeds) | 11.8 (8.2 - 15.7) | -56 to -61% | 0.63 |
+
+16 points over random picks from the same names, about 6.5 sd. The edge is
+not an artefact of tuning on the top 200.
+
+### Volatility targeting: not adopted (2026-10-11)
+
+ROADMAP §4: momentum's falls, not its return, are the problem. Volatility
+targeting scales gross exposure to aim at a target portfolio volatility
+(`vol_target`). Tested on ranks 201-500, declared beforehand at the config's
+15% target; 12% and 20% shown for sensitivity only. Idle cash earns a 6.5%
+liquid-fund rate (`--cash-yield-pct 6.5`); at 0% the test would be unfair to
+it.
+
+| ranks 201-500 | CAGR avg (range) | avg worst fall | worst fall | worst 6 months | volatility | Sharpe |
+|---|---|---|---|---|---|---|
+| **off** | **28.1** (22.9 - 30.8) | -35.4% | -37.1% | -23.8% | 24.6% | 1.16 |
+| 15% target | 22.3 (17.2 - 24.4) | -32.8% | -34.9% | -20.0% | 19.7% | 1.15 |
+| 12% target | 20.9 (15.6 - 23.5) | -30.4% | -35.3% | -18.7% | 17.9% | 1.18 |
+| 20% target | 23.9 (18.8 - 26.5) | -34.8% | -36.5% | -21.7% | 21.9% | 1.12 |
+| 15% target, idle cash at 0% | 20.9 | -33.2% | -36.2% | -20.7% | 19.7% | 1.09 |
+
+The top 200 (where it was tuned, for reference): off 23.0%, worst fall -36
+to -42%; 15% target 18.9%, -33 to -43%.
+
+**Verdict: no.** It does what it says -- volatility falls from 25% to 20% --
+but that costs **about 6 points of CAGR for 2.6 points off the average
+worst fall**, and Sharpe doesn't improve (1.16 vs 1.15). The worst fall
+barely moves (-37.1% to -34.9%) because exposure is set monthly from the
+last 60 days' volatility: a sudden fall like March 2020 is half over before
+the book has shrunk. On the top 200 the worst fall got deeper on one start.
+`vol_target: false` stays.
+
+## Momentum: trailing stop between rebalances (re-run 2026-10-11)
 
 Question: the list is rebuilt monthly, so a stock that falls mid-month is held
 until the next rebalance. Would a trailing stop help, and at what distance?
@@ -78,57 +161,55 @@ A stop is judged on the close and sold at the **next session's close**, the
 same lag the rebalance has. After a stop, the cash either waits for the next
 rebalance (`--stop-refill cash`) or buys the best name from the last ranking
 that isn't held, wasn't stopped since, and is above its 200 DMA (`next`).
-Current setup otherwise (9-month, 15 stocks, top 200, full costs). Variants
-were compared on **2017-12 to 2022-12** (four start dates a week apart) and
-then all were run on the **2023-01 to 2026-10 holdout** (four starts).
+Current setup otherwise (9-month, 15 stocks, top 200, full costs), on the
+continuous history above. Compared on **2017-12 to 2022-12**, then run on
+**2023-01 to 2026-10**, four start dates each. That second period is **not
+a clean holdout**: earlier experiments were judged on it (see the v1
+section above). It is a second look, not a test.
 
-| stop | train CAGR avg (range) | train worst fall | holdout CAGR avg (range) | holdout worst fall | stops / yr |
+| stop | 2017-22 CAGR avg (range) | worst fall | 2023-26 CAGR avg (range) | worst fall | stops / yr |
 |---|---|---|---|---|---|
-| **none** | **9.8** (8.7 - 11.3) | -46% | **13.1** (10.3 - 16.0) | -40% | 0 |
-| 10%, cash | 9.0 (5.6 - 11.7) | -35% | 6.5 (3.2 - 10.9) | -44% | 72 |
-| 15%, cash | 9.1 (5.7 - 12.2) | -34% | 9.3 (6.4 - 12.5) | -43% | 41 |
-| 20%, cash | 8.1 (5.8 - 10.0) | -40% | 10.7 (9.5 - 12.1) | -42% | 24 |
-| 25%, cash | 7.9 (5.8 - 10.2) | -42% | 12.9 (10.6 - 15.8) | -39% | 13 |
-| 30%, cash | 8.9 (7.2 - 11.2) | -41% | 11.4 (10.3 - 13.3) | -42% | 9 |
-| 15%, next | 7.7 (2.6 - 10.2) | -43% | 11.2 (8.2 - 13.4) | -43% | 45 |
-| 20%, next | 10.4 (8.6 - 12.1) | -46% | 11.1 (9.7 - 12.4) | -44% | 25 |
-| 25%, next | 8.7 (7.8 - 10.5) | -52% | 12.2 (9.6 - 16.7) | -41% | 15 |
-| 4.5x ATR, cash | 6.7 (2.9 - 10.7) | -35% | 8.0 (4.9 - 13.3) | -40% | 109 |
-| 3.5x ATR, cash | 3.6 (-2.9 - 9.5) | -33% | 3.3 (-4.2 - 10.4) | -41% | 133 |
+| **none** | **20.0** (17.1 - 21.9) | -42% | **26.2** (24.1 - 27.8) | -41% | 0 |
+| 10%, cash | 17.0 (10.6 - 22.5) | -27% | 17.3 (13.7 - 22.0) | -33% | 75 |
+| 15%, cash | 17.8 (15.9 - 19.8) | -31% | 22.8 (18.7 - 24.8) | -35% | 42 |
+| 20%, cash | 19.8 (17.8 - 21.3) | -36% | 24.6 (23.0 - 26.3) | -41% | 23 |
+| 25%, cash | 19.1 (18.5 - 20.6) | -36% | 26.3 (23.2 - 28.6) | -37% | 14 |
+| 30%, cash | 19.4 (17.5 - 21.0) | -34% | 24.5 (23.1 - 25.6) | -41% | 8 |
+| 15%, next | 16.8 (13.0 - 21.8) | -40% | 25.1 (21.1 - 29.0) | -36% | 47 |
+| 20%, next | 21.1 (20.4 - 21.6) | -39% | 27.1 (24.5 - 30.3) | -39% | 25 |
+| 25%, next | 19.9 (18.1 - 21.5) | -43% | 27.2 (24.3 - 30.2) | -39% | 15 |
+| 4.5x ATR, cash | 12.5 (4.8 - 19.7) | -34% | 17.2 (14.3 - 21.0) | -33% | 110 |
 
-NIFTY 500 over the same starts: about 10.7% (train) and 9.5% (holdout).
-10% next and the 2.5x / next-refill ATR variants were worse still.
+NIFTY 500 over the same starts: 10.7% and 9.8%. Tighter ATR multiples and
+10% with refill were worse.
 
 **Verdict: no stop. The config stays `stop: none`.**
 
-- **No stop beat holding to the rebalance in both periods.** The best on
-  train, 20% with refill, won by 0.6 points on 2 of 4 starts, then lost on
-  all 4 holdout starts (11.1% vs 13.1%).
-- **The one real benefit didn't survive.** Tight stops (10-15%, cash) cut
-  the train worst fall from -46% to about -35%, for under a point of CAGR.
-  On the holdout the same stops lost 4-7 points a year and the worst fall
-  was *deeper* (-43/-44% vs -40%). Selling, then sitting in cash while the
-  stock and the market rebound, didn't protect against the falls that
-  mattered here.
-- **Momentum stocks are volatile enough that tight stops just churn.** A
-  15% stop fired ~41 times a year across 15 positions -- each holding
-  stopped out almost three times a year -- and costs rose by ~0.5 point.
-- **Refilling with the next-ranked name didn't help** on average; it adds
-  trading on a ranking up to a month old.
+- **Tight stops buy a smaller fall at a high price.** 10-15% with cash cut
+  the 2017-22 worst fall from -42% to -27/-31%, but cost 2-3 points a year
+  there and 3-9 points in 2023-26. They fire 40-75 times a year across 15
+  positions.
+- **20% with refill is the only variant ahead in both periods**, by 1.1 and
+  0.9 points, beating no-stop on 2 and 3 of 4 starts. That is within the
+  spread between start dates, it was the best of 17 tried, and the second
+  period isn't clean. Not enough to adopt; a candidate to watch in live
+  data.
 - **ATR stops did worst**, but that test is weaker: the market table has
-  closes only, so ATR is built from close-to-close moves, which is smaller
-  than a true high/low ATR. Even 4.5x fired 100+ times a year.
+  closes only, so ATR comes from close-to-close moves and runs small.
 - Caveat: selling at the next close is harsher than a resting stop order
-  for a fast fall, and kinder for a gap. Wider stops (25-30%) fire rarely
-  and land close to no stop either way, so they cost little and gave nothing
-  measurable here.
+  for a fast fall, and kinder for a gap.
 
-The monthly rebalance already works as a slow stop: a stock that has really
-broken drops out of the ranking (`exit_rank: 30`) or below its 200 DMA and is
-sold at the next rebalance. What the ranking doesn't protect against is the
-portfolio-wide fall (-40% to -46%), and per-stock stops didn't fix that.
+The monthly rebalance already works as a slow stop: a broken stock falls
+out of the ranking (`exit_rank: 30`) or below its 200 DMA and is sold at the
+next rebalance. The portfolio-wide fall (-36% to -42%) is what neither stops
+nor volatility targeting fixed.
 
 ## Momentum, re-run on the repaired market history (2026-10-08)
+
+> **Superseded (2026-10-11)**: this and every section below ran on raw
+> closes that read splits, bonuses, demergers and ticker changes as losses.
+> Their absolute CAGRs understate momentum by about half; comparisons
+> between variants may still hold but have not been re-checked.
 
 Everything below this section was run on a market history that, it turned
 out, had **249 trading days (about 9% since 2016) recorded as empty**: failed

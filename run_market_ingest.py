@@ -45,6 +45,19 @@ def main() -> None:
         if left:
             print(f"  !! {left:,} symbols still unmapped -- they are treated "
                   f"as non-equity and never ranked")
+    # Splits and bonuses: the full history once, then a rolling window that
+    # also catches ex-dates announced ahead.
+    through = bc.actions_synced_through(con)
+    frm = start if through is None else through - dt.timedelta(days=45)
+    print(f"Syncing splits/bonuses from {frm}")
+    bc.sync_actions(con, frm, today + dt.timedelta(days=60), verbose=through is None)
+
+    # Trade-for-trade (BE/BZ) prices, for days ingested before they were kept.
+    left = con.execute("SELECT COUNT(*) FROM market_days WHERE rows > 0 AND date "
+                       "NOT IN (SELECT date FROM t2t_days)").fetchone()[0]
+    if left:
+        print(f"Fetching trade-for-trade rows for {left:,} days")
+        bc.backfill_t2t(con, verbose=left > 50)
     snap = ins.snapshot(con)
     print(f"instruments: {snap['equities']:,} equities, {snap['funds']:,} "
           f"excluded (config/etfs.csv), {snap['funds_active']:,} still trading")
