@@ -128,36 +128,32 @@ rank ignored; the safe default for anything bought before this existed).
 
 ## Results
 
-| | 9-year CAGR |
+| | 9-year CAGR, avg of 4 start dates |
 |---|---|
-| Momentum rotation, 9-1 (main) | **11.4%** |
-| Momentum rotation, 12-1 (alongside) | 11.3% |
-| NIFTY 500 index | 10.3% |
-| Random-pick control | 3.8% |
+| Momentum rotation, 9-1 (main) | **23.0%** (20.0 - 24.4) |
+| Momentum rotation, 12-1 (alongside) | 20.2% |
+| NIFTY 500 index | 10.2% |
+| Random-pick control | 9.3% |
 | v1 signal rules *(retired)* | 1.3% |
 
-After realistic Indian costs — STT, stamp duty, exchange fees, GST, slippage.
-Momentum beat all 10 random controls drawn from the same universe, by 7.6
-points on average (3.2 standard deviations), so the ranking carries real
-information. **But it beats the index by only about 1.5 points a year**, with
-a **−42% drawdown against the index's −38%**, and a Sharpe of 0.52. Across
-rebalance dates it returned 11.1% to 12.1% (11.7% on average); the 12-month
-lookback averaged 10.4%, behind on every start date but ahead in both halves
-when split, so both are shown. Figures re-run 2026-10-08 on the repaired
-market history (about 9% of trading days had been missing; see
-[validation](docs/validation.md)).
+After realistic Indian costs -- STT, stamp duty, exchange fees, GST, slippage
+-- but **before tax** (most gains are short-term). Momentum beat all 10
+random controls drawn from the same universe by about 15 points (4.9
+standard deviations), held up in both halves of the period, and returned
+28% on liquidity ranks 201-500, a universe none of its settings were tuned
+on. **The fall is the weak point: -36% to -42%, against the index's -38%.**
+Neither a trailing stop nor volatility targeting fixed it; both cost more
+return than they saved.
 
-Removing survivorship bias cost 14 points of apparent return (30.8% → 16.9%,
-measured with the old regime rule on) and dropped the random control from
-17.2% to 5.0% — that collapse is the bias measured directly.
+*Corrected 2026-10-11:* earlier figures (11.4%, and everything before it)
+ran on raw prices that read every split, bonus and demerger in a held stock
+as a loss, and a ticker change or a spell in the trade-for-trade series as
+a forced sale. See [data](docs/data.md) and [validation](docs/validation.md).
+The live ranking was never affected.
 
-*Corrected 2026-10-04:* the earlier 14.5% was run with ETFs leaking into the
-universe; see [validation](docs/validation.md). The earlier "8.4 standard
-deviations" did not reproduce even with the ETFs left in (2.6 with 10 seeds).
-The main ranking moved from 12 to 9 months the same day. Later that day the
-16.9% headline was also withdrawn: it depended on holding half as many stocks
-in RISK-OFF, a rule that did not reduce drawdowns and was switched off; see
-[validation](docs/validation.md).
+Removing survivorship bias, measured on the old history, cost 14 points of
+apparent return (30.8% → 16.9%) and dropped the random control from 17.2% to
+5.0% -- the bias measured directly.
 
 **Honest split: roughly 70% of this framework's value is monitoring and
 discipline; perhaps 30% is momentum alpha.** Two ideas that sounded good and
