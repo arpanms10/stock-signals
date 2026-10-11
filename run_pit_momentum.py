@@ -75,6 +75,15 @@ def main() -> None:
     ap.add_argument("--risk-off-scale", type=float, default=None,
                     help="override momentum_strategy.risk_off_scale "
                          "(1.0 = ignore the market regime)")
+    ap.add_argument("--stop", choices=["none", "pct", "atr"], default=None,
+                    help="trailing stop between rebalances (default none)")
+    ap.add_argument("--stop-pct", type=float, default=None,
+                    help="with --stop pct: percent below the highest close since entry")
+    ap.add_argument("--stop-atr-mult", type=float, default=None,
+                    help="with --stop atr: ATR multiples below that high")
+    ap.add_argument("--stop-refill", choices=["cash", "next"], default=None,
+                    help="after a stop: hold cash to the next rebalance, or buy "
+                         "the next-ranked name from the last one")
     ap.add_argument("--vol-target", action="store_true",
                     help="scale exposure to a target portfolio volatility")
     ap.add_argument("--export", nargs="?", const="", default=None, metavar="PATH",
@@ -87,7 +96,8 @@ def main() -> None:
         cfg = dict(cfg)
         cfg["momentum_strategy"] = {**cfg["momentum_strategy"], "vol_target": True}
     for key in ("skip_months", "lookback_months", "score", "rebalance_days",
-                "selection", "compare_lookback_months", "risk_off_scale"):
+                "selection", "compare_lookback_months", "risk_off_scale",
+                "stop", "stop_pct", "stop_atr_mult", "stop_refill"):
         if getattr(args, key) is not None:
             cfg = dict(cfg)
             cfg["momentum_strategy"] = {**cfg["momentum_strategy"],
@@ -97,6 +107,11 @@ def main() -> None:
           f"skipping the latest {ms['skip_months']}, score {ms.get('score', 'ram')}, "
           f"rebalance every {ms['rebalance_days']} sessions, "
           f"risk-off scale {ms.get('risk_off_scale', 1.0)}")
+    if ms.get("stop", "none") != "none":
+        dist = (f"{ms.get('stop_pct', 15.0):g}%" if ms["stop"] == "pct"
+                else f"{ms.get('stop_atr_mult', 3.0):g} x ATR")
+        print(f"Stop:        trailing {dist} below the highest close since entry, "
+              f"then {ms.get('stop_refill', 'cash')}")
     if ms.get("selection") == "overlap":
         print(f"Selection:   overlap -- top {ms.get('enter_rank', ms['n_hold'])} on "
               f"BOTH {ms['lookback_months']}- and "

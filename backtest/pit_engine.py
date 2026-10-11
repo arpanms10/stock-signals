@@ -13,6 +13,14 @@ and that cost is the honest part of the number.
 
 Prices come from the same bhavcopy table, so a delisted stock simply stops
 having rows -- which the engine treats as a forced exit at its last price.
+
+Optional trailing stop between rebalances (momentum_strategy.stop): "pct"
+trails the highest close since entry by stop_pct, "atr" by stop_atr_mult x an
+ATR built from close-to-close moves (the table has no high/low). A stop is
+judged on the close and sold at the next session's close, the same lag the
+rebalance has. The freed cash either waits for the next rebalance
+(stop_refill: cash) or buys the best-ranked name from the last rebalance that
+is not held, not stopped since, and still above its 200 DMA (next).
 """
 from __future__ import annotations
 
@@ -97,6 +105,11 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         ram_alt = (px.shift(sk) / px.shift(alt_lb * TRADING_DAYS_MONTH) - 1) \
             / vol.replace(0, np.nan)
     sma200 = px.rolling(200, min_periods=200).mean()
+    stop_kind = m.get("stop", "none")
+    refill = m.get("stop_refill", "cash")
+    if stop_kind == "atr":
+        w = m.get("stop_atr_window", 14)
+        atr = px.diff().abs().rolling(w, min_periods=w).mean()
 
     dates = [d for d in px.index if d.date() >= start]
     if not dates:
@@ -113,6 +126,11 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     equity_rows, turnover, holdings_log = [], [], []
     total_costs = 0.0
     last_rebal: dt.date | None = None
+    peak: dict[str, float] = {}         # highest close since entry
+    stop_exits: list[str] = []          # judged at a close, sold next session
+    stopped: set[str] = set()           # since the last rebalance: no refill
+    last_ranked: list[str] = []
+    n_stops = 0
 
     for i, ts in enumerate(dates):
         today = ts.date()
@@ -164,6 +182,42 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             if portfolio > 0:
                 turnover.append(traded / portfolio)
             holdings_log.append((today, sorted(shares)))
+            peak = {s: peak.get(s, prices_now[s]) for s in shares if s in prices_now}
+            stopped.clear()
+            stop_exits = []
+
+        # --- stops judged at yesterday's close -----------------------------
+        for s in stop_exits:
+            if s not in shares or s not in row.index or pd.isna(row[s]) or row[s] <= 0:
+                continue
+            fill = costs.fill_price(float(row[s]), "sell")
+            c = costs.sell_cost(fill, shares[s])
+            proceeds = fill * shares[s] - c
+            cash += proceeds
+            total_costs += c
+            del shares[s]
+            peak.pop(s, None)
+            n_stops += 1
+            if refill != "next":
+                continue
+            ma = sma200.loc[ts]
+            repl = next((r for r in last_ranked
+                         if r not in shares and r not in stopped and r in row.index
+                         and not pd.isna(row[r]) and row[r] > 0
+                         and not pd.isna(ma.get(r, np.nan)) and row[r] > ma[r]), None)
+            if repl is None:
+                continue
+            fill = costs.fill_price(float(row[repl]), "buy")
+            rate = costs.buy_cost(fill, proceeds / fill) / proceeds if proceeds > 0 else 0.0
+            qty = proceeds / (fill * (1 + rate))
+            c = costs.buy_cost(fill, qty)
+            if qty <= 0 or fill * qty + c > cash:
+                continue
+            cash -= fill * qty + c
+            total_costs += c
+            shares[repl] = qty
+            peak[repl] = float(row[repl])
+        stop_exits = []
 
         # --- a holding that stops trading is a delisting, not a free ride ---
         for s in list(shares):
@@ -179,6 +233,28 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
 
         # --- rebalance -----------------------------------------------------
         due = last_rebal is None or (today - last_rebal).days >= rebal_days * 7 / 5
+
+        # --- trailing stops: on a rebalance day the rebalance decides -------
+        if stop_kind != "none":
+            for s in shares:
+                p = row.get(s, np.nan)
+                if pd.isna(p):
+                    continue
+                p = float(p)
+                peak[s] = max(peak.get(s, p), p)
+                if due:
+                    continue
+                if stop_kind == "pct":
+                    level = peak[s] * (1 - m.get("stop_pct", 15.0) / 100)
+                else:
+                    a = atr.loc[ts].get(s, np.nan)
+                    if pd.isna(a):
+                        continue
+                    level = peak[s] - m.get("stop_atr_mult", 3.0) * float(a)
+                if p <= level:
+                    stop_exits.append(s)
+                    stopped.add(s)
+
         if due and i + 1 < len(dates):
             last_rebal = today
             eligible = set(liquid_universe(
@@ -213,6 +289,7 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 ranked = sorted(cand, key=lambda s: -score[s])
             else:
                 ranked = sorted(cand, key=lambda s: -snap[s])
+            last_ranked = ranked
 
             risk_on = True
             if not bench_idx.empty:
@@ -272,6 +349,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         sorted(set(bench_idx.index) & {d.date() for d in dates}))
     if not bcurve.empty:
         bcurve.index = pd.to_datetime(bcurve.index)
-    return PortfolioResult(equity, bcurve, turnover, holdings_log,
-                           _metrics(equity, bcurve, turnover, total_costs,
-                                    len(turnover)), total_costs)
+    metrics = _metrics(equity, bcurve, turnover, total_costs, len(turnover))
+    if stop_kind != "none" and metrics:
+        metrics["stops_fired"] = n_stops
+        metrics["stops_per_year"] = round(n_stops / metrics["years"], 1)
+    return PortfolioResult(equity, bcurve, turnover, holdings_log, metrics, total_costs)
