@@ -470,7 +470,7 @@ def history(snaps: pd.DataFrame, cfg: dict | None = None) -> pd.DataFrame:
 
     `snaps` is store.load_option_snapshots(): strike rows with ts and spot.
     """
-    cols = ["ts", "spot", "pcr_oi", "pcr_chg_oi", "support", "resistance",
+    cols = ["ts", "spot", "pcr_oi", "pcr_chg_oi", "ce_chg_oi", "pe_chg_oi", "support", "resistance",
             "max_pain", "straddle", "range_low", "range_high"]
     if snaps is None or snaps.empty:
         return pd.DataFrame(columns=cols)
@@ -485,6 +485,7 @@ def history(snaps: pd.DataFrame, cfg: dict | None = None) -> pd.DataFrame:
         lo = spot - strad if strad is not None else None
         hi = spot + strad if strad is not None else None
         out.append({"ts": ts, "spot": spot, "pcr_oi": p["oi"], "pcr_chg_oi": p["chg_oi"],
+                    "ce_chg_oi": p["ce_chg_oi"], "pe_chg_oi": p["pe_chg_oi"],
                     "support": sup[0].strike if sup else None,
                     "resistance": res[0].strike if res else None,
                     "max_pain": max_pain(g), "straddle": strad,
