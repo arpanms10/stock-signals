@@ -31,10 +31,16 @@ data/cache/
 # config/fundamentals.csv <- fetch_fundamentals.py
 # config/equities.csv, config/etfs.csv <- instruments.snapshot()
 # config/watchlist.csv <- seeded from the NIFTY index lists
+# config/fno_calibration.json, config/fno_reach.json <- run_fno_backtest.py,
+#   rebuilt weekly by run_weekly.py from data/fo_history.db. The live F&O
+#   view reads them; without them it falls back to scoring.yaml's hand-entered
+#   hit rates and shows no reach probabilities.
 config/fundamentals.csv
 config/equities.csv
 config/etfs.csv
 config/watchlist.csv
+config/fno_calibration.json
+config/fno_reach.json
 
 # --- Environment and noise ---------------------------------------------
 .venv/
