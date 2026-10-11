@@ -31,27 +31,101 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
-from data.bhavcopy import EQUITY_ISIN_PREFIX, require_equity_symbols
+from data.bhavcopy import (EQUITY_ISIN_PREFIX, load_actions, load_demergers,
+                           require_equity_symbols, symbol_aliases)
 from strategy import momentum as mom
 
 TRADING_DAYS_MONTH = 21
 
 
-def load_wide(con, start: dt.date, end: dt.date) -> pd.DataFrame:
-    """Close prices as a date x symbol matrix. NaN means "not trading"."""
+def load_wide(con, start: dt.date, end: dt.date,
+              aliases: dict[str, str] | None = None) -> pd.DataFrame:
+    """Close prices as a date x symbol matrix. NaN means "not trading".
+
+    Continuous series, which raw bhavcopy closes are not:
+      - a renamed company is one column, under its current ticker;
+      - days in the trade-for-trade series (BE/BZ) are included, so a
+        holding moved there is still priced rather than "delisted";
+      - prices before a split or bonus are divided by its factor;
+      - the fall on a demerger's ex-date is taken as value passed to the
+        spun-off company (NSE publishes no ratio), so it is adjusted out the
+        same way. The new company's own later returns are not captured;
+      - a split or bonus missing from NSE's feed (JSW Steel's 10:1 in 2017)
+        is inferred, see infer_unrecorded_actions().
+    """
+    p = (start.isoformat(), end.isoformat())
     df = pd.read_sql_query(
-        "SELECT date, symbol, close FROM market WHERE date >= ? AND date <= ?",
-        con, params=(start.isoformat(), end.isoformat()))
+        "SELECT date, symbol, close, volume, 0 AS t2t FROM market "
+        "WHERE date >= ? AND date <= ? "
+        "UNION ALL SELECT date, symbol, close, volume, 1 FROM market_t2t "
+        "WHERE date >= ? AND date <= ?", con, params=p + p)
     if df.empty:
         return df
+    aliases = symbol_aliases(con) if aliases is None else aliases
+    df["symbol"] = df["symbol"].map(lambda x: aliases.get(x, x))
+    df = df.sort_values("t2t").drop_duplicates(["date", "symbol"])     # EQ first
     df["date"] = pd.to_datetime(df["date"])
-    return df.pivot_table(index="date", columns="symbol", values="close",
-                          aggfunc="last").sort_index()
+    wide = df.pivot(index="date", columns="symbol", values="close").sort_index()
+    vol = df.pivot(index="date", columns="symbol", values="volume").sort_index()
+    acts = load_actions(con)
+    if not acts.empty:
+        acts["symbol"] = acts["symbol"].map(lambda x: aliases.get(x, x))
+        for a in acts[acts["symbol"].isin(wide.columns)].itertuples():
+            before = wide.index < pd.Timestamp(a.ex_date)
+            wide.loc[before, a.symbol] = wide.loc[before, a.symbol] / a.factor
+    for sym, ex in load_demergers(con):
+        sym = aliases.get(sym, sym)
+        if sym not in wide.columns:
+            continue
+        col = wide[sym].dropna()
+        ex = pd.Timestamp(ex)
+        prev, on = col[col.index < ex], col[col.index >= ex]
+        if prev.empty or on.empty or (on.index[0] - ex).days > 5:
+            continue
+        ratio = on.iloc[0] / prev.iloc[-1]
+        if 0.1 < ratio < 0.97:       # only a fall is the demerger; a rise is the market
+            before = wide.index < ex
+            wide.loc[before, sym] = wide.loc[before, sym] * ratio
+    for sym, ex, ratio in infer_unrecorded_actions(wide, vol):
+        wide.loc[wide.index < ex, sym] = wide.loc[wide.index < ex, sym] * ratio
+    return wide
+
+
+def infer_unrecorded_actions(wide: pd.DataFrame, vol: pd.DataFrame,
+                             window: int = 20) -> list[tuple[str, pd.Timestamp, float]]:
+    """Splits and bonuses NSE's feed is missing, from the price and volume.
+
+    Run after the recorded actions are applied, so what is left is a fall
+    the feed cannot explain. It is treated as a corporate action when the
+    close fell below 0.55 of the previous one AND the traded quantity rose
+    at least 1.3x and stayed there (a split multiplies the share count).
+    A real crash rarely does both: YES Bank 2020 fell to 0.44 on lower
+    volume; DHFL, Jet Airways, ZEEL and the Reliance ADAG names fell to
+    0.57-0.70. Testing falls near 2/3 as well let those real crashes in, so
+    a 1:2 bonus missing from the feed is left alone. The fall is adjusted
+    out at the observed ratio.
+    """
+    r = wide / wide.ffill().shift(1)
+    hits = r.stack()
+    hits = hits[hits < 0.55]
+    out = []
+    for (d, sym), ratio in hits.items():
+        col = wide[sym]
+        prev = col[col.index < d].dropna()
+        if prev.empty or (d - prev.index[-1]).days > 7:
+            continue
+        v = vol[sym].dropna()
+        before = v[v.index < d].tail(window).median()
+        after = v[v.index >= d].head(window).median()
+        if before and not pd.isna(after) and after / before >= 1.3:
+            out.append((sym, d, float(ratio)))
+    return out
 
 
 def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
                     min_days: int = 40, min_price: float = 0.0,
-                    min_turnover_cr: float = 0.0) -> list[str]:
+                    min_turnover_cr: float = 0.0,
+                    aliases: dict[str, str] | None = None) -> list[str]:
     """Most liquid names as of a date, computed only from prior data."""
     frm = (on_date - dt.timedelta(days=lookback_days)).isoformat()
     # ETFs pass any liquidity filter and, being low-volatility, dominate a
@@ -59,21 +133,32 @@ def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
     # infinite Sharpe. Only ISIN-confirmed company equity is eligible, and an
     # unbuilt instrument map is an error, not a reason to skip the filter.
     require_equity_symbols(con)
-    cur = con.execute(
-        "SELECT m.symbol, AVG(m.turnover) t, COUNT(*) n, AVG(m.close) p "
+    rows = con.execute(
+        "SELECT m.symbol, SUM(m.turnover), COUNT(*), SUM(m.close) "
         "FROM market m JOIN instruments i ON i.symbol = m.symbol "
         "WHERE m.date <= ? AND m.date > ? AND m.turnover > 0 "
-        "AND i.isin LIKE ? "
-        "GROUP BY m.symbol HAVING n >= ? AND p >= ? AND t >= ? "
-        "ORDER BY t DESC LIMIT ?",
-        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%", min_days,
-         min_price, min_turnover_cr * 1e7, top_n))
-    return [r[0] for r in cur.fetchall()]
+        "AND i.isin LIKE ? GROUP BY m.symbol",
+        (on_date.isoformat(), frm, EQUITY_ISIN_PREFIX + "%")).fetchall()
+    # A rename inside the window must not split one company into two
+    # half-histories that each miss min_days. Prices stay raw here: the
+    # floor is about what the stock cost at the time.
+    aliases = symbol_aliases(con) if aliases is None else aliases
+    agg: dict[str, list[float]] = {}
+    for sym, t, n, p in rows:
+        a = agg.setdefault(aliases.get(sym, sym), [0.0, 0, 0.0])
+        a[0] += t; a[1] += n; a[2] += p
+    ok = [(s, t / n) for s, (t, n, p) in agg.items()
+          if n >= min_days and p / n >= min_price and t / n >= min_turnover_cr * 1e7]
+    return [s for s, _ in sorted(ok, key=lambda x: -x[1])[:top_n]]
 
 
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         start_capital: float = 1_000_000, costs: CostModel | None = None,
-        universe_size: int = 200, shuffle_seed: int | None = None) -> PortfolioResult:
+        universe_size: int = 200, shuffle_seed: int | None = None,
+        universe_skip: int = 0) -> PortfolioResult:
+    """universe_skip drops the most liquid names first: skip 200, size 300
+    is liquidity ranks 201-500, a universe the momentum settings were not
+    tuned on."""
     costs = costs or CostModel()
     m = cfg.get("momentum_strategy", {})
     n_hold = m.get("n_hold", 15)
@@ -83,11 +168,15 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     rebal_days = m.get("rebalance_days", 21)
 
     # Warm-up: momentum needs lookback + skip bars before it can rank anything.
-    px = load_wide(con, start - dt.timedelta(days=int((lb + vol_w) * 1.6)), end)
+    aliases = symbol_aliases(con)
+    px = load_wide(con, start - dt.timedelta(days=int((lb + vol_w) * 1.6)), end, aliases)
     if px.empty:
         return PortfolioResult(pd.Series(dtype=float), pd.Series(dtype=float))
 
     rets = px.pct_change()
+    # A holding with no price today (suspended, moved out of the EQ series)
+    # is still owned: value it at its last close, never at zero.
+    last_px = px.ffill()
     mom_matrix = px.shift(sk) / px.shift(lb) - 1
     vol = rets.rolling(vol_w, min_periods=vol_w // 2).std() * np.sqrt(252)
     ram = mom_matrix / vol.replace(0, np.nan)
@@ -131,10 +220,14 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     stopped: set[str] = set()           # since the last rebalance: no refill
     last_ranked: list[str] = []
     n_stops = 0
+    # Idle cash (vol targeting, stops) earns a liquid-fund yield if set.
+    cash_growth = (1 + m.get("cash_yield_pct", 0.0) / 100) ** (1 / 252)
 
     for i, ts in enumerate(dates):
         today = ts.date()
         row = px.loc[ts]
+        if i and cash > 0:
+            cash *= cash_growth
 
         # --- execute the previous decision at today's prices ---------------
         if pending is not None:
@@ -142,7 +235,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             pending = None
             prices_now = {s: float(row[s]) for s in set(list(shares) + target)
                           if s in row.index and not pd.isna(row[s]) and row[s] > 0}
-            portfolio = cash + sum(q * prices_now.get(s, 0.0) for s, q in shares.items())
+            marks = last_px.loc[ts]
+            portfolio = cash + sum(q * prices_now.get(s, float(marks.get(s, 0.0)))
+                                   for s, q in shares.items())
             weight = (portfolio * exposure / len(target)) if target else 0.0
             traded = 0.0
 
@@ -227,8 +322,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                     cash += float(last.iloc[-1]) * shares[s] * 0.95   # haircut
                     del shares[s]
 
-        value = cash + sum(q * float(row[s]) for s, q in shares.items()
-                           if s in row.index and not pd.isna(row[s]))
+        marks = last_px.loc[ts]
+        value = cash + sum(q * float(marks[s]) for s, q in shares.items()
+                           if not pd.isna(marks.get(s, np.nan)))
         equity_rows.append((today, value))
 
         # --- rebalance -----------------------------------------------------
@@ -258,9 +354,10 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         if due and i + 1 < len(dates):
             last_rebal = today
             eligible = set(liquid_universe(
-                con, today, universe_size,
+                con, today, universe_skip + universe_size,
                 min_price=m.get("min_price", 0.0),
-                min_turnover_cr=m.get("min_turnover_cr", 0.0)))
+                min_turnover_cr=m.get("min_turnover_cr", 0.0),
+                aliases=aliases)[universe_skip:])
             snap = ram.loc[ts]
             max_ext = m.get("max_extension_pct", 0.0)
             cand = []

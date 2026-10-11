@@ -116,6 +116,24 @@ def fetch_all(from_date: dt.date, to_date: dt.date,
     return sorted(actions, key=lambda a: (a.symbol, a.ex_date)), rights
 
 
+_DEMERGER_RE = re.compile(r"demerg", re.I)
+
+
+def fetch_demergers(from_date: dt.date, to_date: dt.date) -> list[tuple[str, dt.date, str]]:
+    """(symbol, ex_date, subject) for every demerger in a window. NSE gives
+    no ratio, so the caller has to infer the price effect."""
+    params = {"index": "equities",
+              "from_date": from_date.strftime("%d-%m-%Y"),
+              "to_date": to_date.strftime("%d-%m-%Y")}
+    out = []
+    for r in nse.get(CA_URL, params=params).json():
+        subject = (r.get("subject") or "").strip()
+        ex = _parse_ex_date(r.get("exDate", ""))
+        if ex and _DEMERGER_RE.search(subject):
+            out.append((str(r.get("symbol", "")).strip().upper(), ex, subject))
+    return out
+
+
 def find_rights(symbol: str, from_date: dt.date, to_date: dt.date) -> list[str]:
     """Rights issues also move price but need the subscription price to adjust
     properly. We surface them for your judgement rather than guess."""

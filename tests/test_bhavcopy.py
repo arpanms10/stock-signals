@@ -46,8 +46,20 @@ def test_both_formats_produce_identical_columns():
     """NSE switched format mid-history; nothing downstream should notice."""
     a = bc._normalise_old(old_format())
     b = bc._normalise_udiff(udiff_format())
-    assert list(a.columns) == list(b.columns) == ["symbol", "close", "volume", "turnover",
-                                               "isin"]
+    assert list(a.columns) == list(b.columns) == ["symbol", "series", "close", "volume",
+                                               "turnover", "isin"]
+
+
+def test_trade_for_trade_rows_go_to_their_own_table(tmp_path):
+    """BE/BZ rows are kept for the backtest but never reach `market`."""
+    con = bc.connect(tmp_path / "m.db")
+    df = bc._normalise_old(old_format(), ("EQ",) + bc.T2T_SERIES)
+    assert sorted(df["symbol"]) == ["RELIANCE", "TCS", "TINYCO"]
+    d = dt.date(2023, 1, 2)
+    bc.save_day(con, d, df[df["series"] == "EQ"])
+    assert bc.save_t2t_day(con, d, df) == 1
+    assert {r[0] for r in con.execute("SELECT symbol FROM market")} == {"RELIANCE", "TCS"}
+    assert con.execute("SELECT symbol, series FROM market_t2t").fetchall() == [("TINYCO", "BE")]
 
 
 def test_isin_survives_normalisation():
@@ -213,7 +225,7 @@ def test_failed_day_is_not_marked_done(tmp_path, monkeypatch):
     import datetime as dt
     from data import bhavcopy as bc
     con = bc.connect(tmp_path / "m.db")
-    monkeypatch.setattr(bc, "fetch_day", lambda d: None)
+    monkeypatch.setattr(bc, "fetch_day", lambda d, series=("EQ",): None)
     bc.ingest_range(con, dt.date(2023, 1, 2), dt.date(2023, 1, 3), pause=0, verbose=False)
     assert bc.have_days(con) == set()                 # will be retried
 
