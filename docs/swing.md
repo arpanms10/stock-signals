@@ -18,6 +18,24 @@ The dashboard's **Swing** tab shows the same scan (top 10, or the full list
 with the toggle), the methodology, and the latest backtest. Nothing is
 computed until **Scan** is pressed; the result is cached for the day.
 
+## Recording the picks
+
+```bash
+PYTHONPATH=. .venv/bin/python record_swing.py               # today's top 10
+PYTHONPATH=. .venv/bin/python record_swing.py --update      # outcomes only
+```
+
+`history/swing_picks.xlsx` keeps what the tab actually suggested: the top 10
+for each price date and universe, with the entry, stop and targets as shown.
+Each date is recorded once; a second run on the same data keeps the first,
+and `--force` replaces it. Every run also plays unsettled picks forward
+through the prices since, with the recorded plan. Each pick is then marked
+*not triggered* (the buy-stop expired), *open* (valued at the last close, not
+a result yet) or *closed*, with the exit reason and the result in R and %
+after costs. The **Summary** sheet totals the closed trades by setup. This
+forward record is the evidence that can confirm or overturn the backtest. The
+Swing tab's **Save top 10** button does the same.
+
 ## How a suggestion is made
 
 A swing trade holds for days to a few weeks, with the stop, targets and time

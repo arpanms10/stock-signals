@@ -51,6 +51,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 200
 | `record_fno.py` | Monthly F&O forward log → `history/fno_ranges.xlsx`, scored at expiry |
 | `run_option_backtest.py` | What a simple option rule would have done, after costs (`--compare`, `--excel`) |
 | `run_swing.py` | Swing setups in the Nifty 200/500, scored, with a trade plan (`--all`, `--capital`, `--backtest`) |
+| `record_swing.py` | Save the day's top 10 swing picks to `history/swing_picks.xlsx`, and score earlier ones as they play out |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).

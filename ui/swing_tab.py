@@ -315,6 +315,23 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
             "Position": st.column_config.NumberColumn(format="₹%d"),
         })
 
+    if not sug.empty and st.button(
+            f"Save top {min(s['top_n'], len(sug))} to history/swing_picks.xlsx",
+            key="swing_save",
+            help="Appends these picks once per price date (a second save on the "
+                 "same data keeps the first), and fills in how earlier picks "
+                 "played out. Same as running record_swing.py."):
+        import record_swing
+        n, df = record_swing.record(v, cfg, s["top_n"],
+                                    bench_close=record_swing.benchmark_close(cfg, v.as_of))
+        settled = int((df["outcome"] == "closed").sum())
+        if n:
+            st.success(f"Saved {n} picks for {v.as_of:%d-%b-%Y}. The file holds "
+                       f"{len(df)} picks, {settled} of them closed.")
+        else:
+            st.info(f"{v.as_of:%d-%b-%Y} is already recorded; kept as it was. "
+                    f"Outcomes of earlier picks were updated.")
+
     st.divider()
     st.markdown("**Trade plan**")
     pick = st.selectbox("Stock", view["symbol"].tolist(), key="swing_pick")
