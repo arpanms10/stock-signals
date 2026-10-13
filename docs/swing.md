@@ -18,6 +18,49 @@ The dashboard's **Swing** tab shows the same scan (top 10, or the full list
 with the toggle), the methodology, and the latest backtest. Nothing is
 computed until **Scan** is pressed; the result is cached for the day.
 
+## The forward record
+
+```bash
+PYTHONPATH=. .venv/bin/python run_swing_daily.py               # refresh + record (what the job runs)
+PYTHONPATH=. .venv/bin/python record_swing.py                  # record one scan now
+PYTHONPATH=. .venv/bin/python record_swing.py --update         # rebuild the workbook only
+PYTHONPATH=. .venv/bin/python run_swing.py --recorded          # replay the recorded scans
+PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily   # weekdays 19:30
+```
+
+What the tab suggested on a day can't be rebuilt later, because the code,
+the config and the index membership all move on. So every scan is written
+down once, in full, as plain CSV under `history/swing/` (`swing_store.py`):
+
+| File | One row per | Holds |
+|---|---|---|
+| `runs.csv` | scan (price date × universe) | market backdrop, breadth, NIFTY 500 close, code commit (and whether code was uncommitted), the exact `swing:` settings as JSON |
+| `scans/YYYY-MM.csv` | eligible stock in a scan | rank, suggested or not, setup, results date, score and each component, entry / stop / targets, the day's OHLCV and every input the score used |
+| `members.csv` | member, when the universe changes | the index list as it stood, so later backtests have a point-in-time universe instead of today's list applied backwards |
+
+These files only grow. A price date and universe already recorded are left
+alone; only `--force` replaces that one scan. A new month starts a new file.
+Recording the Nifty 200 and Nifty 500 (`swing.record_universes`) adds about
+10 MB of CSV a year.
+
+**Outcomes are not stored.** They follow from prices and the recorded plan,
+so they are recomputed whenever needed, each with the settings of the scan
+it came from. A later change to `scoring.yaml` doesn't re-score old picks,
+and a new exit rule can be replayed over the same recorded entries.
+
+`history/swing_picks.xlsx` is a report rebuilt from the record on every run:
+the top 10 of each scan, with outcomes (*not triggered*, *open* or *closed*)
+and a Summary sheet. Edits made in Excel are overwritten. The Swing tab's
+**Save top 10 to Excel** button, next to Scan, records the scan and rebuilds
+the workbook. The Backtest view shows the forward record above the
+historical backtest.
+
+**Keeping it gap-free.** `install_schedule.py --swing-daily` runs
+`run_swing_daily.py` every weekday at 19:30. It catches Nifty 500 prices up
+and records each universe. A missed run (Mac asleep) fires on wake, and a
+holiday or second run writes nothing new. The job never touches git: commit
+`history/swing/` yourself, for example with each week's other changes.
+
 ## How a suggestion is made
 
 A swing trade holds for days to a few weeks, with the stop, targets and time

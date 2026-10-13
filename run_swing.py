@@ -4,6 +4,7 @@
     PYTHONPATH=. .venv/bin/python run_swing.py --universe nifty500 --all
     PYTHONPATH=. .venv/bin/python run_swing.py --capital 1000000    # with share counts
     PYTHONPATH=. .venv/bin/python run_swing.py --backtest           # writes config/swing_calibration.json
+    PYTHONPATH=. .venv/bin/python run_swing.py --recorded           # replay the recorded scans
 
 The backtest plays out every signal since --start with the plan the
 suggestions show, after costs, and asks whether the score adds anything over
@@ -97,7 +98,22 @@ def main() -> None:
                     help="skip the NSE results-calendar lookup")
     ap.add_argument("--backtest", action="store_true")
     ap.add_argument("--start", default="2018-01-01", help="backtest start")
+    ap.add_argument("--recorded", action="store_true",
+                    help="replay the scans recorded in history/swing/ instead: "
+                         "what was seen on the day, with the universe as it was")
     args = ap.parse_args()
+
+    if args.recorded:
+        import swing_store as ss
+        res = ss.replay()
+        if "error" in res:
+            raise SystemExit(res["error"])
+        print(f"\n=== Recorded swing scans: {res['scans']} scans, {res['dates']} ===")
+        print(f"  {res['rows']} eligible rows; outcomes so far: {res['outcomes']}")
+        print("  Closed trades only, each with its own scan's plan (avg R after costs):")
+        for k, g in res["groups"].items():
+            print(f"  {k:>14}: {g}")
+        return
 
     cfg = timing.load_config()
     universe = args.universe or cfg["swing"]["universe"]

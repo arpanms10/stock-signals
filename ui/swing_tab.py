@@ -84,7 +84,36 @@ def _static(df: pd.DataFrame, fmt: dict[str, str]) -> None:
     st.table(out.set_index(key))
 
 
+def _forward() -> None:
+    """The live record: what was actually suggested, and how it has gone."""
+    import record_swing
+    st.markdown("**Forward record** (picks actually suggested, from "
+                "history/swing_picks.xlsx)")
+    if not record_swing.HISTORY.exists():
+        st.caption("Nothing recorded yet. Use **Save top 10 to Excel** after a "
+                   "scan, or install the daily job "
+                   "(`install_schedule.py --swing-daily`).")
+        return
+    try:
+        p = pd.read_excel(record_swing.HISTORY, sheet_name="Picks")
+        s = pd.read_excel(record_swing.HISTORY, sheet_name="Summary")
+    except (OSError, ValueError):
+        st.caption("history/swing_picks.xlsx could not be read.")
+        return
+    first, last = pd.to_datetime(p["price_date"]).min(), pd.to_datetime(p["price_date"]).max()
+    st.caption(f"{p['price_date'].nunique()} scan dates, {first:%d-%b-%Y} to "
+               f"{last:%d-%b-%Y}. Outcomes are replayed with each scan's own plan. "
+               "Only closed trades count as results; this is the evidence that "
+               "will confirm or overturn the backtest below.")
+    _static(s.rename(columns={"group": "", "trades": "Trades", "win_pct": "Win %",
+                              "avg_r": "Avg R", "avg_ret_pct": "Avg %"}),
+            {"Trades": "{:,.0f}", "Win %": "{:.1f}%", "Avg R": "{:+.3f}",
+             "Avg %": "{:+.2f}%"})
+    st.divider()
+
+
 def _backtest(cal: dict | None) -> None:
+    _forward()
     if not cal:
         st.info("No backtest on file yet. Run `run_swing.py --backtest`, or use "
                 "**Rerun swing backtest** in the sidebar.")
@@ -192,7 +221,7 @@ def render() -> None:
                "today, scored, each with an entry, a stop and targets. How it "
                "works and how it has done are below the list.")
 
-    a, b, d, go = st.columns([1.4, 1.6, 1.2, 1])
+    a, b, d, go, save = st.columns([1.4, 1.6, 1.2, 1, 1.2])
     universes = list(sr.UNIVERSES)
     universe = a.selectbox("Universe", universes, index=universes.index(s["universe"]),
                            format_func=LABELS.get, key="swing_universe")
@@ -208,6 +237,37 @@ def render() -> None:
         st.session_state["swing_req"] = universe
     req = st.session_state.get("swing_req")
 
+    # The scan runs before the Save button is drawn, so the button can be
+    # enabled on the same run that produced the picks, not one click later.
+    v = _scan(req) if req else None
+    n_sug = 0
+    if v is not None and not v.table.empty:
+        n_sug = int(v.table["suggest"].sum())
+        if s.get("regime_gate") and v.regime and v.regime.state != "favourable":
+            n_sug = 0
+    n_save = min(s["top_n"], n_sug)
+    save.write("")
+    if save.button(f"Save top {n_save or s['top_n']} to Excel", width="stretch",
+                   key="swing_save", disabled=not n_save,
+                   help="Records this scan -- every eligible stock, not only the "
+                        "top -- in history/swing/ (once per price date), then "
+                        "rebuilds history/swing_picks.xlsx: the top picks of every "
+                        "recorded scan and how each has played out. Available "
+                        "after a scan with at least one suggestion."):
+        import record_swing
+        n, df = record_swing.record(v, cfg,
+                                    bench_close=record_swing.benchmark_close(cfg, v.as_of))
+        closed = int((df["outcome"] == "closed").sum())
+        where = (f"history/swing_picks.xlsx now holds {len(df)} picks across "
+                 f"{df['price_date'].nunique()} scan dates, {closed} closed.")
+        if n:
+            st.success(f"Recorded the {LABELS[v.universe]} scan of {v.as_of:%d-%b-%Y} "
+                       f"({n} eligible stocks, {n_sug} with a setup). {where}")
+        else:
+            st.info(f"The {LABELS[v.universe]} scan of {v.as_of:%d-%b-%Y} was already "
+                    f"recorded and is kept as first saved. Outcomes were refreshed: "
+                    f"{where}")
+
     cal = sr.calibration()
     tab_list, tab_method, tab_bt = st.tabs(["Suggestions", "Methodology", "Backtest"])
     with tab_method:
@@ -216,7 +276,7 @@ def render() -> None:
         _backtest(cal)
 
     with tab_list:
-        if not req:
+        if v is None:
             st.info(f"Press **Scan** to rank the {LABELS[universe]}. It takes about "
                     "half a minute (longer for the Nifty 500) and is cached for the day.")
             return
@@ -226,7 +286,7 @@ def render() -> None:
         if st.button("Rescan", key="swing_rescan",
                      help="Recompute after a data refresh"):
             _scan.clear()
-        v = _scan(req)
+            st.rerun()
         if v.table.empty:
             st.warning("Nothing eligible. Is the price history current? "
                        "Use **Refresh prices** in the sidebar.")
