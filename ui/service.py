@@ -338,6 +338,9 @@ SCRIPTS = {
     # F&O: the bhavcopy history behind IV percentile, realised vol and the
     # validation's hit rates and reach curves (rewritten on every run).
     "Refresh F&O history + validation": ["run_fno_backtest.py", "--ingest"],
+    # Swing: replays every signal since 2018 and rewrites the summary the
+    # Swing tab's Backtest section shows (config/swing_calibration.json).
+    "Rerun swing backtest": ["run_swing.py", "--backtest"],
 }
 
 

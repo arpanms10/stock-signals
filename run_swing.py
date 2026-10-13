@@ -30,9 +30,8 @@ def show_scan(v: sr.SwingView, cfg: dict, capital: float, show_all: bool) -> Non
     print(f"\nSwing scan -- {v.universe.upper()}, data through {v.as_of}")
     if v.regime:
         print(f"  regime: {v.regime.state.upper()} -- {v.regime.note}")
-        if v.regime.state != "favourable":
-            print("  !! Long swing setups fail more often in this backdrop; "
-                  "see the backtest's regime split.")
+        print("  (context only: the backtest's regime split shows whether it "
+              "has mattered)")
     if not v.results_checked:
         print("  (results calendar unavailable -- the results-week filter was skipped)")
     t = sr.suggestion_rows(v.table, capital, cfg)
