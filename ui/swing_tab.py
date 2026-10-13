@@ -192,7 +192,7 @@ def render() -> None:
                "today, scored, each with an entry, a stop and targets. How it "
                "works and how it has done are below the list.")
 
-    a, b, d, go = st.columns([1.4, 1.6, 1.2, 1])
+    a, b, d, go, save = st.columns([1.4, 1.6, 1.2, 1, 1.2])
     universes = list(sr.UNIVERSES)
     universe = a.selectbox("Universe", universes, index=universes.index(s["universe"]),
                            format_func=LABELS.get, key="swing_universe")
@@ -208,6 +208,35 @@ def render() -> None:
         st.session_state["swing_req"] = universe
     req = st.session_state.get("swing_req")
 
+    # The scan runs before the Save button is drawn, so the button can be
+    # enabled on the same run that produced the picks, not one click later.
+    v = _scan(req) if req else None
+    n_sug = 0
+    if v is not None and not v.table.empty:
+        n_sug = int(v.table["suggest"].sum())
+        if s.get("regime_gate") and v.regime and v.regime.state != "favourable":
+            n_sug = 0
+    n_save = min(s["top_n"], n_sug)
+    save.write("")
+    if save.button(f"Save top {n_save or s['top_n']} to Excel", width="stretch",
+                   key="swing_save", disabled=not n_save,
+                   help="Appends the scanned picks to history/swing_picks.xlsx, "
+                        "once per price date, and fills in how earlier picks "
+                        "played out. Available after a scan with at least one "
+                        "suggestion."):
+        import record_swing
+        n, df = record_swing.record(v, cfg, s["top_n"],
+                                    bench_close=record_swing.benchmark_close(cfg, v.as_of))
+        closed = int((df["outcome"] == "closed").sum())
+        if n:
+            st.success(f"Saved {n} {LABELS[v.universe]} picks for {v.as_of:%d-%b-%Y} "
+                       f"to history/swing_picks.xlsx. It now holds {len(df)} picks "
+                       f"across {df['price_date'].nunique()} dates, {closed} closed.")
+        else:
+            st.info(f"{v.as_of:%d-%b-%Y} ({LABELS[v.universe]}) is already in "
+                    f"history/swing_picks.xlsx and was kept as first saved. "
+                    f"Outcomes of earlier picks were updated.")
+
     cal = sr.calibration()
     tab_list, tab_method, tab_bt = st.tabs(["Suggestions", "Methodology", "Backtest"])
     with tab_method:
@@ -216,7 +245,7 @@ def render() -> None:
         _backtest(cal)
 
     with tab_list:
-        if not req:
+        if v is None:
             st.info(f"Press **Scan** to rank the {LABELS[universe]}. It takes about "
                     "half a minute (longer for the Nifty 500) and is cached for the day.")
             return
@@ -226,7 +255,7 @@ def render() -> None:
         if st.button("Rescan", key="swing_rescan",
                      help="Recompute after a data refresh"):
             _scan.clear()
-        v = _scan(req)
+            st.rerun()
         if v.table.empty:
             st.warning("Nothing eligible. Is the price history current? "
                        "Use **Refresh prices** in the sidebar.")
@@ -314,23 +343,6 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                                   f"of capital (max {s['max_position_pct']:.0f}% in one name)"),
             "Position": st.column_config.NumberColumn(format="₹%d"),
         })
-
-    if not sug.empty and st.button(
-            f"Save top {min(s['top_n'], len(sug))} to history/swing_picks.xlsx",
-            key="swing_save",
-            help="Appends these picks once per price date (a second save on the "
-                 "same data keeps the first), and fills in how earlier picks "
-                 "played out. Same as running record_swing.py."):
-        import record_swing
-        n, df = record_swing.record(v, cfg, s["top_n"],
-                                    bench_close=record_swing.benchmark_close(cfg, v.as_of))
-        settled = int((df["outcome"] == "closed").sum())
-        if n:
-            st.success(f"Saved {n} picks for {v.as_of:%d-%b-%Y}. The file holds "
-                       f"{len(df)} picks, {settled} of them closed.")
-        else:
-            st.info(f"{v.as_of:%d-%b-%Y} is already recorded; kept as it was. "
-                    f"Outcomes of earlier picks were updated.")
 
     st.divider()
     st.markdown("**Trade plan**")

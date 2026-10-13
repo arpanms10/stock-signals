@@ -34,7 +34,7 @@ through the prices since, with the recorded plan. Each pick is then marked
 a result yet) or *closed*, with the exit reason and the result in R and %
 after costs. The **Summary** sheet totals the closed trades by setup. This
 forward record is the evidence that can confirm or overturn the backtest. The
-Swing tab's **Save top 10** button does the same.
+Swing tab's **Save top 10 to Excel** button, next to Scan, does the same; it stays greyed out until a scan has produced picks.
 
 ## How a suggestion is made
 

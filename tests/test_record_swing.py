@@ -99,3 +99,27 @@ def test_record_round_trip_and_summary(tmp_path, cfg):
     # Settled rows are left alone on the next update.
     again = rs.update_outcomes(back, cfg, frames={})
     assert again.loc[0, "outcome"] == "closed"
+
+
+def test_new_dates_append_and_earlier_picks_keep_their_levels(tmp_path, cfg):
+    """A later date adds rows; earlier rows keep every recorded field and only
+    gain outcome columns. Nothing earlier is dropped or re-levelled."""
+    p = tmp_path / "swing_picks.xlsx"
+    d1, d2 = D0, D0 + dt.timedelta(days=3)
+    df, _ = rs.add(rs.load(p), rs.pick_rows(view(day=d1), 10, d1))
+    rs.save(df, p)
+    first = rs.load(p)
+
+    later = view(day=d2)
+    later.table["entry"] = 150.0                     # different levels on day 2
+    df, n = rs.add(rs.load(p), rs.pick_rows(later, 10, d2))
+    f = bars([[99, 99, 98, 99]] + [[99, 101, 99, 100.5]] * 4)
+    df = rs.update_outcomes(df, cfg, frames={"S0": f})
+    rs.save(df, p)
+    after = rs.load(p)
+
+    assert n == 10 and len(after) == 20
+    assert list(after["price_date"].unique()) == [d1, d2]
+    old = after[after["price_date"] == d1].reset_index(drop=True)
+    pd.testing.assert_frame_equal(old[rs.PICK_COLUMNS], first[rs.PICK_COLUMNS])
+    assert old.loc[0, "outcome"] != "pending"       # S0 was played forward
