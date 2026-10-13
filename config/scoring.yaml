@@ -215,3 +215,60 @@ fno:
   near_expiry_sessions: 2          # OI is distorted by rollover this close to expiry
   risk_free_pct: 6.5               # Greeks and IV from prices; small effect at <3 months
   stale_minutes: 30                # chain older than this during market hours is flagged
+
+# ---------------------------------------------------------------------------
+# Swing trading (strategy/swing.py, run_swing.py, the Swing tab). Holds for
+# days to a few weeks, unlike the monthly momentum rotation above. Every
+# suggestion needs an uptrend, a liquid stock and an active setup; the score
+# only orders names that already qualify. Delivery (CNC) trades: overnight gap
+# risk is real, and the backtest fills gaps at the open, not at the stop.
+# ---------------------------------------------------------------------------
+swing:
+  universe: nifty200               # nifty200 | nifty500
+  top_n: 10                        # suggestions shown before "show all"
+  # Tradability
+  min_price: 50.0                  # rupees
+  min_turnover_cr: 20.0            # 20-day average traded value, crores
+  atr_pct: [1.0, 6.0]              # daily ATR as % of price: below is too
+                                   # sleepy to swing, above is a stop you
+                                   # cannot size sensibly
+  results_within_days: 5           # skip names reporting quarterly results
+                                   # this soon (live only; the backtest has no
+                                   # history of announcement dates)
+  # Market regime: NIFTY 500 vs its 200 DMA, plus breadth (% of the universe
+  # above its own 50 DMA). Shown with every suggestion; see `regime_gate`.
+  breadth_min_pct: 50.0
+  regime_gate: false               # true = no suggestions unless both pass
+  # Setups
+  pullback:
+    ma: 20                         # EMA the pullback should reach
+    touch_atr: 0.5                 # low within this many ATRs of the EMA ...
+    touch_bars: 3                  # ... in the last N sessions
+    rsi: [38.0, 58.0]              # RSI(14) reset, not broken
+  breakout:
+    lookback: 20                   # close above the prior N-session high
+    volume_mult: 1.5               # on at least this x the 20-day volume
+    max_base_pct: 15.0             # prior N-session range, % of price
+    near_high_pct: 10.0            # within this % of the 52-week high
+  # Score: weighted 0-100 components. Ranges map like the timing score above.
+  weights: {trend: 0.25, relative_strength: 0.25, setup: 0.30,
+            volume: 0.10, risk: 0.10}
+  trend_ranges:
+    sma50_vs_200_pct: [0.0, 15.0]
+    slope_200_pct: [0.0, 4.0]
+    adx: [15.0, 35.0]
+  volume_ud_ratio: [0.8, 1.6]
+  stop_pct_range: [10.0, 3.0]      # tighter stop scores higher (inverted)
+  # Trade plan
+  entry_buffer_pct: 0.1            # buy-stop this far above the signal high
+  entry_valid_sessions: 2          # cancel if not triggered by then
+  stop_lookback: 5                 # structure stop: lowest low of N sessions
+  stop_buffer_atr: 0.25            # ... minus this many ATRs
+  stop_atr: [1.0, 3.0]             # stop kept between these ATR multiples
+  t1_r: 1.5                        # book t1_book_pct here, stop to entry
+  t1_book_pct: 50.0
+  t2_r: 3.0                        # remainder exits here ...
+  max_hold_sessions: 15            # ... or at the close after this many
+  risk_per_trade_pct: 0.75         # of capital, if the stop is hit
+  max_position_pct: 15.0           # of capital, whatever the stop says
+  round_trip_cost_pct: 0.35        # STT, stamp, fees, DP, slippage
