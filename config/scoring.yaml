@@ -226,6 +226,9 @@ fno:
 swing:
   universe: nifty200               # nifty200 | nifty500
   top_n: 10                        # suggestions shown before "show all"
+  record_universes: [nifty200, nifty500]   # scans the daily job records
+                                   # (run_swing_daily.py); the 500 is a few
+                                   # times the rows, ~10 MB of CSV a year
   # Tradability
   min_price: 50.0                  # rupees
   min_turnover_cr: 20.0            # 20-day average traded value, crores

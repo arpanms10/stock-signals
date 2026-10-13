@@ -29,6 +29,9 @@ FNO_PLIST = Path.home() / "Library" / "LaunchAgents" / f"{FNO_LABEL}.plist"
 # Companion agent: holds the Mac awake 09:20-15:35 on trading days.
 AWAKE_LABEL = "com.arpanmuk.stock-signals.fno-awake"
 AWAKE_PLIST = Path.home() / "Library" / "LaunchAgents" / f"{AWAKE_LABEL}.plist"
+# Optional: the swing scan, recorded every weekday after the close.
+SWING_LABEL = "com.arpanmuk.stock-signals.swing-daily"
+SWING_PLIST = Path.home() / "Library" / "LaunchAgents" / f"{SWING_LABEL}.plist"
 FNO_TIMES = [(h, m) for h in range(9, 16) for m in (0, 30)
              if (9, 30) <= (h, m) <= (15, 30)]
 
@@ -100,6 +103,27 @@ def build_fno_awake() -> dict:
     }
 
 
+def build_swing_daily(hour: int = 19, minute: int = 30) -> dict:
+    """Weekdays after NSE's end-of-day files are out. A missed run (Mac
+    asleep) fires on wake, and is harmless whenever it lands: the job records
+    the latest price date once and skips it after that."""
+    return {
+        "Label": SWING_LABEL,
+        "ProgramArguments": [str(ROOT / ".venv" / "bin" / "python"),
+                             str(ROOT / "run_swing_daily.py")],
+        "WorkingDirectory": str(ROOT),
+        "EnvironmentVariables": {"PYTHONPATH": str(ROOT),
+                                 "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+        "StartCalendarInterval": [{"Weekday": d, "Hour": hour, "Minute": minute}
+                                  for d in range(1, 6)],
+        "RunAtLoad": False,
+        "StandardOutPath": str(ROOT / "reports" / "swing_daily.out.log"),
+        "StandardErrorPath": str(ROOT / "reports" / "swing_daily.err.log"),
+        "ProcessType": "Background",
+        "LowPriorityIO": True,
+    }
+
+
 def _install(plist: Path, payload: dict) -> None:
     (ROOT / "reports").mkdir(exist_ok=True)
     plist.parent.mkdir(parents=True, exist_ok=True)
@@ -114,14 +138,36 @@ def _install(plist: Path, payload: dict) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--day", default="saturday", choices=sorted(WEEKDAYS))
-    ap.add_argument("--hour", type=int, default=9)
-    ap.add_argument("--minute", type=int, default=30)
+    ap.add_argument("--hour", type=int, default=None,
+                    help="default 9 for the weekly job, 19 for --swing-daily")
+    ap.add_argument("--minute", type=int, default=None, help="default 30")
     ap.add_argument("--portfolio", type=float, default=None)
     ap.add_argument("--remove", action="store_true")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--fno-intraday", action="store_true",
                     help="install the half-hourly F&O snapshot agent instead")
+    ap.add_argument("--swing-daily", action="store_true",
+                    help="install the weekday-evening swing record agent instead "
+                         "(--hour/--minute default to 19:30)")
     args = ap.parse_args()
+
+    if args.swing_daily:
+        if args.remove:
+            subprocess.run(["launchctl", "unload", str(SWING_PLIST)], capture_output=True)
+            if SWING_PLIST.exists():
+                SWING_PLIST.unlink()
+            print(f"removed {SWING_LABEL}")
+            return
+        if args.status:
+            print(f"Swing daily: {'installed' if SWING_PLIST.exists() else 'not installed'}")
+            return
+        hour = 19 if args.hour is None else args.hour
+        minute = 30 if args.minute is None else args.minute
+        _install(SWING_PLIST, build_swing_daily(hour, minute))
+        print(f"Installed: swing record weekdays at {hour:02d}:{minute:02d}")
+        print(f"  plist {SWING_PLIST}")
+        print("Remove it with: python install_schedule.py --swing-daily --remove")
+        return
 
     if args.fno_intraday:
         if args.remove:
@@ -151,6 +197,7 @@ def main() -> None:
         print(f"loaded: {line[0] if line else 'no'}")
         print(f"F&O intraday agent: {'installed' if FNO_PLIST.exists() else 'not installed'}")
         print(f"Keep-awake agent: {'installed' if AWAKE_PLIST.exists() else 'not installed'}")
+        print(f"Swing daily agent: {'installed' if SWING_PLIST.exists() else 'not installed'}")
         state = ROOT / "data" / "last_weekly_run.txt"
         if state.exists():
             print(f"last run:\n  " + state.read_text().strip().replace("\n", "\n  "))
@@ -163,6 +210,8 @@ def main() -> None:
         print(f"removed {LABEL}")
         return
 
+    args.hour = 9 if args.hour is None else args.hour
+    args.minute = 30 if args.minute is None else args.minute
     (ROOT / "reports").mkdir(exist_ok=True)
     PLIST.parent.mkdir(parents=True, exist_ok=True)
     PLIST.write_bytes(plistlib.dumps(build(args.day, args.hour, args.minute,
