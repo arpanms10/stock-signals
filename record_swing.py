@@ -1,24 +1,23 @@
-"""Record the day's top swing picks, and score earlier ones as they play out.
+"""Record the day's swing scan, and rebuild history/swing_picks.xlsx from it.
 
-The swing backtest says what the plan WOULD have done; this file says what
-the Swing tab actually suggested, on the day, at the levels shown. Each run:
+Each run:
 
-  1. appends the scan's top picks (default 10) to the "Picks" sheet -- once
-     per price date and universe; a later run on the same data does nothing
-     unless --force replaces those rows;
-  2. plays every recorded pick that is not yet settled forward through the
-     prices since, with the plan as recorded (entry, stop, 1.5R / 3R, time
-     limit), and fills in its outcome: not triggered, open, or closed with
-     the exit reason and the result in R and % after costs;
-  3. rewrites the "Summary" sheet: settled trades and their average R.
+  1. writes the full scan to the permanent CSV record (swing_store.py:
+     history/swing/runs.csv, scans/YYYY-MM.csv, members.csv) -- once per
+     price date and universe; --force replaces that one scan;
+  2. rebuilds history/swing_picks.xlsx from that record: the top picks of
+     every recorded scan (default 10), each played forward through the
+     prices since with the plan its scan used -- not triggered, open, or
+     closed with the exit reason and the result in R and % after costs --
+     plus a Summary sheet.
 
-Writes history/swing_picks.xlsx, which is meant to live in git, so nothing
-about holdings goes in it.
+The workbook is a report, regenerated in full every time; the CSV files are
+the record. Nothing about holdings goes in either.
 
-    PYTHONPATH=. .venv/bin/python record_swing.py
-    PYTHONPATH=. .venv/bin/python record_swing.py --universe nifty500 --top 10
-    PYTHONPATH=. .venv/bin/python record_swing.py --force      # redo this date
-    PYTHONPATH=. .venv/bin/python record_swing.py --update     # outcomes only
+    PYTHONPATH=. .venv/bin/python record_swing.py                       # Nifty 200
+    PYTHONPATH=. .venv/bin/python record_swing.py --universe nifty500
+    PYTHONPATH=. .venv/bin/python record_swing.py --force               # redo this date
+    PYTHONPATH=. .venv/bin/python record_swing.py --update              # workbook only
 
 Decision support, not investment advice.
 """
@@ -26,9 +25,9 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 HISTORY = Path(__file__).parent / "history" / "swing_picks.xlsx"
@@ -39,7 +38,6 @@ PICK_COLUMNS = ["recorded_on", "price_date", "universe", "regime", "breadth_pct"
 OUTCOME_COLUMNS = ["outcome", "entry_date", "fill", "exit_date", "exit_reason",
                    "sessions", "r_net", "ret_pct", "checked_through"]
 COLUMNS = PICK_COLUMNS + OUTCOME_COLUMNS
-SETTLED = {"closed", "not triggered"}
 
 
 def _num(v, nd: int = 2):
@@ -48,60 +46,7 @@ def _num(v, nd: int = 2):
     return round(float(v), nd) if nd else int(round(float(v)))
 
 
-def pick_rows(view, top: int, recorded_on: dt.date, bench_close=None) -> list[dict]:
-    """The scan's suggested names, best first, as rows for the sheet."""
-    t = view.table
-    if t is None or t.empty:
-        return []
-    t = t[t["suggest"]].head(top)
-    reg = view.regime
-    base = {"recorded_on": recorded_on, "price_date": view.as_of,
-            "universe": view.universe,
-            "regime": reg.state if reg else None,
-            "breadth_pct": _num(reg.breadth_pct, 1) if reg else None,
-            "benchmark_close": _num(bench_close)}
-    rows = []
-    for i, r in enumerate(t.to_dict("records"), 1):
-        rows.append({**base, "rank": i, "symbol": r["symbol"], "setup": r["setup"],
-                     "score": _num(r["score"], 1), "close": _num(r["close"]),
-                     "entry": _num(r["entry"]), "stop": _num(r["stop"]),
-                     "stop_pct": _num(r["stop_pct"]), "t1": _num(r["t1"]),
-                     "t2": _num(r["t2"]), "sector": r.get("sector", ""),
-                     "outcome": "pending"})
-    return rows
-
-
 # ------------------------------------------------------------------ workbook
-
-def load(path: Path = HISTORY) -> pd.DataFrame:
-    if not path.exists():
-        return pd.DataFrame(columns=COLUMNS)
-    df = pd.read_excel(path, sheet_name="Picks")
-    for c in COLUMNS:
-        if c not in df:
-            df[c] = None
-    for c in ("recorded_on", "price_date", "entry_date", "exit_date", "checked_through"):
-        df[c] = pd.to_datetime(df[c]).dt.date
-    # Missing values come back as NaN; the rest of the code expects None.
-    return df[COLUMNS].astype(object).where(df[COLUMNS].notna(), None)
-
-
-def add(df: pd.DataFrame, rows: list[dict], force: bool = False) -> tuple[pd.DataFrame, int]:
-    """Append rows for one (price_date, universe). Returns (frame, rows added);
-    0 added if that date is already recorded and not forced."""
-    if not rows:
-        return df, 0
-    key = (rows[0]["price_date"], rows[0]["universe"])
-    same = (df["price_date"] == key[0]) & (df["universe"] == key[1])
-    if same.any():
-        if not force:
-            return df, 0
-        df = df[~same]
-    new = pd.DataFrame(rows, columns=COLUMNS).astype(object)
-    out = new if df.empty else pd.concat([df, new], ignore_index=True)
-    out = out.sort_values(["price_date", "universe", "rank"], kind="stable")
-    return out.reset_index(drop=True), len(rows)
-
 
 def summary(df: pd.DataFrame) -> pd.DataFrame:
     """Settled trades by setup and overall."""
@@ -170,39 +115,40 @@ def settle(row: dict, frame: pd.DataFrame, cfg: dict) -> dict:
             "exit_reason": t.exit_reason}
 
 
-def update_outcomes(df: pd.DataFrame, cfg: dict, frames: dict | None = None) -> pd.DataFrame:
-    """Fill in outcomes for every row not yet settled."""
-    todo = df.index[~df["outcome"].isin(SETTLED)]
-    if not len(todo):
-        return df
-    if frames is None:
-        frames = _frames(sorted(set(df.loc[todo, "symbol"])), cfg)
-    df = df.copy()
-    for i in todo:
-        f = frames.get(df.at[i, "symbol"])
-        if f is None or f.empty:
-            continue
-        for k, v in settle(df.loc[i].to_dict(), f, cfg).items():
-            df.at[i, k] = v
-    return df
+def picks(root: Path | None = None, frames: dict | None = None) -> pd.DataFrame:
+    """The top picks of every recorded scan, with outcomes recomputed."""
+    import swing_store as ss
+    root = root or ss.STORE
+    s, r = ss.scans(root), ss.runs(root)
+    if s.empty:
+        return pd.DataFrame(columns=COLUMNS)
+    r = r.assign(top_n=[json.loads(c)["top_n"] for c in r["config_json"]],
+                 recorded_on=pd.to_datetime(r["recorded_at"]).dt.date)
+    s = s.merge(r[["price_date", "universe", "top_n", "recorded_on", "regime",
+                   "breadth_pct", "benchmark_close"]], on=["price_date", "universe"])
+    top = s[s["suggest"] & (s["rank"] <= s["top_n"])]
+    top = top.sort_values(["price_date", "universe", "rank"]).reset_index(drop=True)
+    top = ss.outcomes(top[PICK_COLUMNS], frames, root)
+    # The CSV record keeps 6 decimals; the workbook is for reading.
+    # Python's round, as _num uses: pandas' .round breaks exact half-paisa
+    # ties (entry = high x 1.001) the other way.
+    for col, nd in (("score", 1), ("close", 2), ("entry", 2), ("stop", 2),
+                    ("stop_pct", 2), ("t1", 2), ("t2", 2)):
+        top[col] = [_num(v, nd) for v in top[col]]
+    return top[COLUMNS].astype(object).where(top[COLUMNS].notna(), None)
 
 
-def _frames(symbols: list[str], cfg: dict) -> dict:
-    """Adjusted daily bars, the same frames the scan used."""
-    import swing_report as sr
-    from data import store
-    return sr.load_frames(store.connect(), cfg, symbols)
-
-
-# ---------------------------------------------------------------------- run
-
-def record(view, cfg: dict, top: int = 10, path: Path = HISTORY,
-           force: bool = False, bench_close=None) -> tuple[int, pd.DataFrame]:
-    """Append the view's picks, settle what can be settled, save. Used by the
-    CLI and the Swing tab's button. Returns (rows added, the whole sheet)."""
-    df = load(path)
-    df, n = add(df, pick_rows(view, top, dt.date.today(), bench_close), force)
-    df = update_outcomes(df, cfg)
+def record(view, cfg: dict, top: int | None = None, path: Path = HISTORY,
+           force: bool = False, bench_close=None,
+           root: Path | None = None) -> tuple[int, pd.DataFrame]:
+    """Write the scan to the record, then rebuild the workbook from it. Used
+    by the CLI and the Swing tab's button. Returns (scan rows written, the
+    picks sheet). `top` is kept for compatibility; the record's own top_n
+    decides the picks, so it cannot drift from what the tab showed."""
+    import swing_store as ss
+    root = root or ss.STORE
+    n = ss.save_scan(view, cfg, root, force, bench_close)
+    df = picks(root)
     save(df, path)
     return n, df
 
@@ -217,11 +163,10 @@ def benchmark_close(cfg: dict, on: dt.date):
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--universe", choices=("nifty200", "nifty500"), default=None)
-    ap.add_argument("--top", type=int, default=None, help="picks to record (default: top_n)")
     ap.add_argument("--force", action="store_true",
-                    help="replace this date's record instead of keeping it")
+                    help="replace this date's recorded scan instead of keeping it")
     ap.add_argument("--update", action="store_true",
-                    help="only fill in outcomes for recorded picks")
+                    help="only rebuild the workbook from the record")
     ap.add_argument("--no-results", action="store_true",
                     help="skip the NSE results-calendar lookup")
     ap.add_argument("--path", type=Path, default=HISTORY)
@@ -230,7 +175,7 @@ def main() -> None:
     from scoring import timing
     cfg = timing.load_config()
     if args.update:
-        df = update_outcomes(load(args.path), cfg)
+        df = picks()
         save(df, args.path)
         print(summary(df).to_string(index=False))
         return
@@ -239,16 +184,17 @@ def main() -> None:
     view = sr.load(args.universe, cfg, check_results=not args.no_results)
     if view.as_of is None:
         raise SystemExit("No swing scan to record -- refresh prices first.")
-    top = args.top or cfg["swing"]["top_n"]
-    n, df = record(view, cfg, top, args.path, args.force,
-                   benchmark_close(cfg, view.as_of))
+    n, df = record(view, cfg, path=args.path, force=args.force,
+                   bench_close=benchmark_close(cfg, view.as_of))
     if n:
-        print(f"Recorded {n} picks for {view.as_of} ({view.universe}) -> {args.path}")
+        print(f"Recorded the {view.universe} scan of {view.as_of}: {n} eligible "
+              f"names, {int(view.table['suggest'].sum())} with a setup.")
     else:
-        print(f"{view.as_of} ({view.universe}) already recorded, or no setups -- "
-              f"kept as it was. --force replaces it.")
+        print(f"{view.as_of} ({view.universe}) already recorded -- kept as it was. "
+              f"--force replaces it.")
     if not view.results_checked:
         print("  (results calendar unavailable -- the results-week filter was skipped)")
+    print(f"Workbook rebuilt: {args.path}")
     print(summary(df).to_string(index=False))
 
 

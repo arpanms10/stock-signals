@@ -84,7 +84,36 @@ def _static(df: pd.DataFrame, fmt: dict[str, str]) -> None:
     st.table(out.set_index(key))
 
 
+def _forward() -> None:
+    """The live record: what was actually suggested, and how it has gone."""
+    import record_swing
+    st.markdown("**Forward record** (picks actually suggested, from "
+                "history/swing_picks.xlsx)")
+    if not record_swing.HISTORY.exists():
+        st.caption("Nothing recorded yet. Use **Save top 10 to Excel** after a "
+                   "scan, or install the daily job "
+                   "(`install_schedule.py --swing-daily`).")
+        return
+    try:
+        p = pd.read_excel(record_swing.HISTORY, sheet_name="Picks")
+        s = pd.read_excel(record_swing.HISTORY, sheet_name="Summary")
+    except (OSError, ValueError):
+        st.caption("history/swing_picks.xlsx could not be read.")
+        return
+    first, last = pd.to_datetime(p["price_date"]).min(), pd.to_datetime(p["price_date"]).max()
+    st.caption(f"{p['price_date'].nunique()} scan dates, {first:%d-%b-%Y} to "
+               f"{last:%d-%b-%Y}. Outcomes are replayed with each scan's own plan. "
+               "Only closed trades count as results; this is the evidence that "
+               "will confirm or overturn the backtest below.")
+    _static(s.rename(columns={"group": "", "trades": "Trades", "win_pct": "Win %",
+                              "avg_r": "Avg R", "avg_ret_pct": "Avg %"}),
+            {"Trades": "{:,.0f}", "Win %": "{:.1f}%", "Avg R": "{:+.3f}",
+             "Avg %": "{:+.2f}%"})
+    st.divider()
+
+
 def _backtest(cal: dict | None) -> None:
+    _forward()
     if not cal:
         st.info("No backtest on file yet. Run `run_swing.py --backtest`, or use "
                 "**Rerun swing backtest** in the sidebar.")
@@ -220,22 +249,24 @@ def render() -> None:
     save.write("")
     if save.button(f"Save top {n_save or s['top_n']} to Excel", width="stretch",
                    key="swing_save", disabled=not n_save,
-                   help="Appends the scanned picks to history/swing_picks.xlsx, "
-                        "once per price date, and fills in how earlier picks "
-                        "played out. Available after a scan with at least one "
-                        "suggestion."):
+                   help="Records this scan -- every eligible stock, not only the "
+                        "top -- in history/swing/ (once per price date), then "
+                        "rebuilds history/swing_picks.xlsx: the top picks of every "
+                        "recorded scan and how each has played out. Available "
+                        "after a scan with at least one suggestion."):
         import record_swing
-        n, df = record_swing.record(v, cfg, s["top_n"],
+        n, df = record_swing.record(v, cfg,
                                     bench_close=record_swing.benchmark_close(cfg, v.as_of))
         closed = int((df["outcome"] == "closed").sum())
+        where = (f"history/swing_picks.xlsx now holds {len(df)} picks across "
+                 f"{df['price_date'].nunique()} scan dates, {closed} closed.")
         if n:
-            st.success(f"Saved {n} {LABELS[v.universe]} picks for {v.as_of:%d-%b-%Y} "
-                       f"to history/swing_picks.xlsx. It now holds {len(df)} picks "
-                       f"across {df['price_date'].nunique()} dates, {closed} closed.")
+            st.success(f"Recorded the {LABELS[v.universe]} scan of {v.as_of:%d-%b-%Y} "
+                       f"({n} eligible stocks, {n_sug} with a setup). {where}")
         else:
-            st.info(f"{v.as_of:%d-%b-%Y} ({LABELS[v.universe]}) is already in "
-                    f"history/swing_picks.xlsx and was kept as first saved. "
-                    f"Outcomes of earlier picks were updated.")
+            st.info(f"The {LABELS[v.universe]} scan of {v.as_of:%d-%b-%Y} was already "
+                    f"recorded and is kept as first saved. Outcomes were refreshed: "
+                    f"{where}")
 
     cal = sr.calibration()
     tab_list, tab_method, tab_bt = st.tabs(["Suggestions", "Methodology", "Backtest"])
