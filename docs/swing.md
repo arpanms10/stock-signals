@@ -94,3 +94,45 @@ review rather than a ranking to trust. Same approach as the
 [F&O view](f_o/validation.md). A ranking that holds out-of-sample would have
 to come from a different idea, not from tuning these weights on the same
 data.
+
+## Alternative rankings, train / holdout (2026-10-13)
+
+```bash
+PYTHONPATH=. .venv/bin/python run_swing_experiment.py                        # train
+PYTHONPATH=. .venv/bin/python run_swing_experiment.py --holdout --ranking X  # once
+```
+
+The same setups and plan; only the order of the day's setups changes. Train
+2018-22, holdout 2023-26. The pass rule was fixed before the first run:
+
+- the top 10 must beat all setups by at least 0.05R,
+- the quintiles must rise (Spearman ≥ 0.7),
+- the top 10 must lead in at least 4 of 5 train years.
+
+At most one ranking would go to the holdout, and only once.
+
+| Ranking (train, 2018-22) | top 10 avg R | edge over all setups | quintiles, worst → preferred | rho | years ahead |
+|---|---|---|---|---|---|
+| Shipped score | +0.031 | −0.014 | +0.10, −0.01, +0.03, +0.04, +0.06 | 0.0 | 1/5 |
+| 9-1 momentum / vol | +0.037 | −0.007 | +0.01, +0.07, +0.06, +0.01, +0.08 | 0.3 | 2/5 |
+| Deepest 5-day dip | +0.035 | −0.010 | +0.04, +0.03, +0.03, +0.13, +0.00 | −0.3 | 1/5 |
+| Lowest volatility | +0.032 | −0.013 | +0.09, +0.07, −0.00, +0.04, +0.03 | −0.7 | 2/5 |
+| Relative strength alone | +0.033 | −0.012 | +0.10, +0.04, −0.03, +0.00, +0.11 | 0.1 | 1/5 |
+| **Random order** | **+0.041** | **−0.004** | | 0.6 | 2/5 |
+| Wider stop *(seen in 2023-26 earlier, so not eligible)* | +0.034 | −0.011 | +0.03, +0.02, +0.07, +0.03, +0.07 | 0.5 | 2/5 |
+
+All setups averaged +0.045R over the same period. The top 10 by any rule
+falls short of that partly because days with many setups (broad pullbacks)
+were good days, and a top-10 cut takes only part of them. That's why random
+order is the real bar, and **no ranking beat random order**.
+
+RSI(2) mean reversion was tested as a separate setup: buy the next open
+after RSI(2) falls below 10 in an uptrend, sell on the first close above the
+5-day average or after 5 sessions, with a 3 ATR stop. It won 59% of trades
+but averaged −0.018R after costs, and taking the lowest RSI(2) first did
+worse (−0.032R).
+
+**Outcome:** nothing passed, so the holdout was not run and stays clean for a
+future idea. Within these setups, which ones are taken matters less than
+whether any are taken: the setups' edge over plain uptrend names (about
++0.04R) is the only effect that has held up. The Swing tab is unchanged.
