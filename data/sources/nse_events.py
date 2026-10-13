@@ -65,9 +65,9 @@ def fetch(start: dt.date, end: dt.date) -> pd.DataFrame:
     return df.drop_duplicates(["symbol", "date"]).reset_index(drop=True)
 
 
-def upcoming(symbol: str, today: dt.date, until: dt.date,
-             max_age_hours: float = 12) -> list[dt.date]:
-    """Announced results dates for one stock between today and `until`.
+def calendar(today: dt.date, until: dt.date,
+             max_age_hours: float = 12) -> dict[str, list[dt.date]]:
+    """Announced results dates for every stock between today and `until`.
 
     Cached for half a day: the whole window is one or two requests shared by
     every symbol looked up that day."""
@@ -79,5 +79,13 @@ def upcoming(symbol: str, today: dt.date, until: dt.date,
         rows = [{"symbol": s, "date": d.isoformat()} for s, d in zip(df["symbol"], df["date"])]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(rows))
-    return sorted(dt.date.fromisoformat(r["date"]) for r in rows
-                  if r["symbol"] == symbol.upper())
+    out: dict[str, list[dt.date]] = {}
+    for r in rows:
+        out.setdefault(r["symbol"].upper(), []).append(dt.date.fromisoformat(r["date"]))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def upcoming(symbol: str, today: dt.date, until: dt.date,
+             max_age_hours: float = 12) -> list[dt.date]:
+    """Announced results dates for one stock between today and `until`."""
+    return calendar(today, until, max_age_hours).get(symbol.upper(), [])
