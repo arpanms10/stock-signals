@@ -8,6 +8,8 @@ Sections:
   5. F&O         -- PCR, OI support/resistance, expected range (ui/fno_tab.py)
   6. SWING       -- pullback / breakout setups, scored, with a trade plan
                     (ui/swing_tab.py)
+  7. ANALYZE     -- any one stock by ticker, name or ISIN: the Fundamental
+                    and/or Technical Analyst (ui/analyze_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -123,9 +125,9 @@ for f in snap.freshness:
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing = st.tabs(
+tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_analyze = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  "])
+     "  Swing  ", "  Analyze  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -640,3 +642,8 @@ with tab_fno:
 with tab_swing:
     from ui import swing_tab
     swing_tab.render()
+
+# ===================================================================== ANALYZE
+with tab_analyze:
+    from ui import analyze_tab
+    analyze_tab.render()
