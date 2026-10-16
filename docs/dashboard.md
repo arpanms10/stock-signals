@@ -26,6 +26,9 @@ for sells the realised gain, estimated tax, tax saved and tranche schedule.
 or held-only. Selecting a stock shows its entry levels: the price at which each
 rule would fire, with the stop and targets that would apply *there*.
 
+**Analyze** -- any one stock, by ticker, company name or ISIN, read by the
+Fundamental Analyst, the Technical Analyst or both. See [analyze](analyze.md).
+
 ## Badges
 
 | | meaning |
