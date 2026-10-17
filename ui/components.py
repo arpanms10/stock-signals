@@ -1,6 +1,8 @@
 """Shared rendering pieces for the dashboard."""
 from __future__ import annotations
 
+import datetime as dt
+
 import streamlit as st
 
 # Action -> (letter, background, text colour, tooltip)
@@ -153,6 +155,28 @@ HORIZON_TONE = {"early": "info", "due": "neutral", "late": "warn",
                 "slow": "warn"}
 
 
+def _short(iso: str) -> str:
+    try:
+        return dt.date.fromisoformat(iso).strftime("%d-%b")
+    except ValueError:
+        return iso
+
+
+def outcome_status(r: dict) -> tuple[str, str]:
+    """Status text and tone: how the entry ended, else where it stands
+    against the usual time to T1."""
+    if r.get("stopped_on"):
+        if r.get("t1_hit_on"):
+            return f"T1, then out at entry {_short(r['stopped_on'])}", "warn"
+        return f"stopped {_short(r['stopped_on'])}", "bad"
+    if r.get("t2_hit_on"):
+        return f"T2 hit {_short(r['t2_hit_on'])}", "good"
+    if r.get("t1_hit_on"):
+        return f"T1 hit {_short(r['t1_hit_on'])}", "good"
+    state = r.get("t1_state") or ""
+    return state, HORIZON_TONE.get(state, "neutral")
+
+
 def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> str:
     """The observation list as plain HTML.
 
@@ -171,7 +195,7 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
         f'font-size:12px;letter-spacing:.03em;text-transform:uppercase;'
         f'opacity:.7;white-space:nowrap;">{h}</th>'
         for h, a in (("Stock", "left"), ("Flagged", "left"), ("Then", "right"),
-                     ("Now", "right"), ("Move", "right"),
+                     ("Now", "right"), ("Move", "right"), ("Stop", "right"),
                      (f"T1:{t1_n}" if t1_n else "T1", "right"),
                      (f"T2:{t2_n}" if t2_n else "T2", "right"),
                      ("Status", "left"), ("Days", "right")))
@@ -182,8 +206,7 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
         move = r.get("move_pct")
         move_col = ("#12854a" if (move or 0) > 0 else
                     "#c0392b" if (move or 0) < 0 else "inherit")
-        state = r.get("t1_hit_on") and "hit" or r.get("t1_state") or ""
-        tone = "good" if state == "hit" else HORIZON_TONE.get(state, "neutral")
+        state, tone = outcome_status(r)
         cells = [
             f'<b>{r["symbol"]}</b>'
             + (" &nbsp;" + pill("swing", "info") if r.get("source") == "swing" else ""),
@@ -192,12 +215,12 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
             money(r.get("price")),
             f'<span style="color:{move_col}">'
             f'{pct(move, signed=True) if move is not None else "--"}</span>',
-            money(r.get("t1")), money(r.get("t2")),
+            money(r.get("stop")), money(r.get("t1")), money(r.get("t2")),
             pill(state, tone) if state else "",
             str(r.get("days") if r.get("days") is not None else "--"),
         ]
         aligns = ["left", "left", "right", "right", "right", "right", "right",
-                  "left", "right"]
+                  "right", "left", "right"]
         body.append("<tr>" + "".join(
             f'<td style="text-align:{a};padding:7px 10px;border-bottom:1px '
             f'solid var(--secondary-background-color,#3334);font-size:13px;'
