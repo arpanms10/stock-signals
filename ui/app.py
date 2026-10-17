@@ -317,6 +317,64 @@ with tab_hold:
                 st.dataframe(pd.DataFrame(snap.uncovered), hide_index=True,
                              width='stretch')
 
+
+@st.fragment
+def entry_levels(symbols: list[str], market: list[dict]) -> None:
+    """The Market tab's entry-levels panel.
+
+    A fragment, so picking another stock reruns only this panel: the rest
+    of the page stays live instead of fading behind the rerun."""
+    st.subheader("Entry levels")
+    st.caption("The price at which each rule would fire, with the stop and "
+               "targets that would apply there. **Not** a recommended price "
+               "— reaching a level is necessary, not sufficient.")
+    pick = st.selectbox("Stock", symbols)
+    row = next(r for r in market if r["symbol"] == pick)
+
+    head = st.columns([0.5, 2, 2, 2, 2])
+    head[0].markdown(c.badge("BUY" if row["in_top"] else "HOLD"),
+                     unsafe_allow_html=True)
+    head[1].markdown(f"**{row['symbol']}** &nbsp; rank {row['rank']}",
+                     unsafe_allow_html=True)
+    head[2].markdown(f"{c.money(row['price'])}")
+    head[3].markdown(
+        c.pill(f"quality {row['quality']:.0f}", c.quality_tone(row["quality"]))
+        if row["quality"] is not None else c.pill("no quality data", "warn"),
+        unsafe_allow_html=True)
+    head[4].markdown(c.pill("held", "good") if row["held"] else "",
+                     unsafe_allow_html=True)
+
+    st.markdown(f"<div style='color:#6b7280;font-size:13px;'>"
+                f"{c.trend_note(row)}</div>", unsafe_allow_html=True)
+
+    lv = row["levels"]
+    if lv["blocked"]:
+        st.warning(f"No entry possible: {lv['blocked']}")
+    for e in lv["entries"]:
+        with st.container(border=True):
+            away = c.pill(f"{e['pct_away']:+.1f}% away", "info")
+            title = e["rule"].replace("_", " ").title()
+            st.markdown(f"**{title}** &nbsp; {away}",
+                        unsafe_allow_html=True)
+            st.markdown(c.trade_plan(e["price"], e["stop"], e.get("t1"),
+                                     e.get("t2"), f"Needs: {e['note']}"),
+                        unsafe_allow_html=True)
+
+    import watching as wg
+    already = set(wg.symbols())
+    if row["symbol"] in already:
+        st.caption(f"✓ {row['symbol']} is on your watch list.")
+    elif st.button(f"Watch {row['symbol']}", key=f"watch_{row['symbol']}"):
+        ok, msg = wg.add(row["symbol"], source="rank")
+        (st.success if ok else st.info)(msg)
+        load.clear()
+
+    if row["flags"]:
+        with st.expander("Fundamental flags"):
+            for f_ in row["flags"]:
+                st.markdown(f"- {f_}")
+
+
 # ===================================================================== MARKET
 with tab_market:
     m = with_quality_note(pd.DataFrame(snap.market))
@@ -412,55 +470,7 @@ with tab_market:
             })
 
         st.divider()
-        st.subheader("Entry levels")
-        st.caption("The price at which each rule would fire, with the stop and "
-                   "targets that would apply there. **Not** a recommended price "
-                   "— reaching a level is necessary, not sufficient.")
-        pick = st.selectbox("Stock", view["symbol"].tolist())
-        row = next(r for r in snap.market if r["symbol"] == pick)
-
-        head = st.columns([0.5, 2, 2, 2, 2])
-        head[0].markdown(c.badge("BUY" if row["in_top"] else "HOLD"),
-                         unsafe_allow_html=True)
-        head[1].markdown(f"**{row['symbol']}** &nbsp; rank {row['rank']}",
-                         unsafe_allow_html=True)
-        head[2].markdown(f"{c.money(row['price'])}")
-        head[3].markdown(
-            c.pill(f"quality {row['quality']:.0f}", c.quality_tone(row["quality"]))
-            if row["quality"] is not None else c.pill("no quality data", "warn"),
-            unsafe_allow_html=True)
-        head[4].markdown(c.pill("held", "good") if row["held"] else "",
-                         unsafe_allow_html=True)
-
-        st.markdown(f"<div style='color:#6b7280;font-size:13px;'>"
-                    f"{c.trend_note(row)}</div>", unsafe_allow_html=True)
-
-        lv = row["levels"]
-        if lv["blocked"]:
-            st.warning(f"No entry possible: {lv['blocked']}")
-        for e in lv["entries"]:
-            with st.container(border=True):
-                away = c.pill(f"{e['pct_away']:+.1f}% away", "info")
-                title = e["rule"].replace("_", " ").title()
-                st.markdown(f"**{title}** &nbsp; {away}",
-                            unsafe_allow_html=True)
-                st.markdown(c.trade_plan(e["price"], e["stop"], e.get("t1"),
-                                         e.get("t2"), f"Needs: {e['note']}"),
-                            unsafe_allow_html=True)
-
-        import watching as wg
-        already = set(wg.symbols())
-        if row["symbol"] in already:
-            st.caption(f"✓ {row['symbol']} is on your watch list.")
-        elif st.button(f"Watch {row['symbol']}", key=f"watch_{row['symbol']}"):
-            ok, msg = wg.add(row["symbol"], source="rank")
-            (st.success if ok else st.info)(msg)
-            load.clear()
-
-        if row["flags"]:
-            with st.expander("Fundamental flags"):
-                for f_ in row["flags"]:
-                    st.markdown(f"- {f_}")
+        entry_levels(view["symbol"].tolist(), snap.market)
 
 
 # ================================================================= MOMENTUM
