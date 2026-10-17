@@ -301,3 +301,26 @@ results:
   gnpa_qoq_bps: [20.0, -10.0]      # banks only; NBFCs do not file it in XBRL
   # Price reaction to the announcement, in multiples of daily ATR.
   reaction_atr: 1.0                # |move| >= this many ATRs is a reaction
+
+# GARP / QARP stock picker (picker/, run_picker.py). All fundamentals from
+# NSE filings, point in time; see docs/picker.md. Unvalidated until
+# run_picker.py --backtest says otherwise.
+picker:
+  universe: nifty200
+  top_n: 15
+  min_sector_peers: 4              # fewer and P/E vs sector is left blank
+  garp:
+    min_growth: 15.0               # % a year: the LOWER of 1y and 2y core profit growth
+    max_peg: 1.5                   # core P/E / growth; Lynch's line was 1.0
+    min_interest_cover: 3.0
+    max_de: 1.0                    # debt / equity, where the balance sheet is filed
+    w_growth: 0.5                  # score = w x growth rank + (1-w) x PEG rank
+  qarp:
+    min_quality: 0.6               # percentile rank on quality, 0-1
+    max_pe_hist_pct: 0.8           # skip when P/E is above 80% of its own last 3 years
+    min_growth: 0.0                # still growing
+    w_quality: 0.6                 # score = w x quality rank + (1-w) x price rank
+  # Backtest: rebalance after each results season closes (45 days after the
+  # quarter, 60 for March), hold until the next.
+  rebalance: ["02-20", "06-05", "08-20", "11-20"]
+  round_trip_cost_pct: 0.35
