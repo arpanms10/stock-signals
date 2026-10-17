@@ -191,6 +191,25 @@ PYTHONPATH=. .venv/bin/python run_picker.py               # today's two shortlis
 PYTHONPATH=. .venv/bin/python run_picker.py --backtest
 ```
 
+## Analyze any stock
+
+The dashboard's **Analyze** tab looks at one stock on demand: any NSE listing,
+not only the ranked universe. Type a ticker, a company name or an ISIN, then
+pick an analyst:
+
+- **Fundamental Analyst**: business quality from NSE filings and Yahoo.
+  Growth, returns, balance sheet, cash conversion, promoter holding and
+  pledge, valuation, and a stance (Strong / Sound / Mixed / Weak) that any red
+  flag lowers one step.
+- **Technical Analyst**: the chart. Trend state, indicator readings,
+  delivery %, support and resistance from swing pivots, returns against the
+  NIFTY 500, and today's swing setup if there is one.
+- **Both**: the two verdicts side by side, then both reports.
+
+Both describe the stock; neither predicts its price. A name that matches
+several companies asks which one you meant. Details in
+[analyze](docs/analyze.md).
+
 ## Swing history
 
 Every scan is written down once, in full, so the live suggestions can be
@@ -280,6 +299,7 @@ cannot be rebuilt.
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
 | [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
 | [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
+| [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
 | [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |
