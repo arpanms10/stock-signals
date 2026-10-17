@@ -133,6 +133,7 @@ def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
     quarterly: set[str] = set()
     instant: set[str] = set()
     ytd: set[str] = set()
+    declared: set[str] = set()
     fy_start = dt.date(quarter_end.year - (quarter_end.month < 4), 4, 1)
     for el in root.iter():
         if not el.tag.endswith("}context"):
@@ -149,9 +150,10 @@ def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
                 inst = _date(sub.text)
             elif name == "explicitMember":
                 dims = True
+        cid = el.get("id")
+        declared.add(cid)
         if dims:
             continue
-        cid = el.get("id")
         if start and end == quarter_end:
             if 80 <= (end - start).days <= 100:
                 quarterly.add(cid)
@@ -159,6 +161,9 @@ def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
                 ytd.add(cid)
         elif inst == quarter_end:
             instant.add(cid)
+
+    if "OneD" not in declared:
+        quarterly |= _undeclared_quarter(root, quarter_end)
 
     out: dict[str, float] = {}
     for el in root.iter():
@@ -186,6 +191,30 @@ def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
     if out.get("paid_up") and out.get("face_value"):
         out["shares_cr"] = out["paid_up"] / out["face_value"]
     return out
+
+
+def _undeclared_quarter(root, quarter_end: dt.date) -> set[str]:
+    """The quarter's context in filings that never declare it.
+
+    NSE's pre-2023 filings tag every P&L fact contextRef="OneD" without
+    defining OneD anywhere -- read strictly, they hold no numbers at all,
+    which silently cut every series off at 2022. The period is still stated,
+    as facts: DateOfStartOfReportingPeriod / DateOfEndOfReportingPeriod
+    under that same context. Trust "OneD" only when those say it is one
+    quarter ending on `quarter_end`.
+    """
+    start = end = None
+    for el in root.iter():
+        if el.get("contextRef") != "OneD":
+            continue
+        tag = el.tag.split("}")[-1]
+        if tag == "DateOfStartOfReportingPeriod":
+            start = _date(el.text)
+        elif tag == "DateOfEndOfReportingPeriod":
+            end = _date(el.text)
+    if start and end == quarter_end and 80 <= (end - start).days <= 100:
+        return {"OneD"}
+    return set()
 
 
 def kind_of(nums: dict) -> str:

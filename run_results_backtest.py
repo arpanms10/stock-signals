@@ -4,7 +4,7 @@ The question: after a company files, and after the market has had its first
 reaction, does a "strong" verdict go on to beat a "weak" one? If it does, the
 verdict is worth acting on; if not, it is a reading aid and nothing more.
 
-  1. Fetch 16 quarters of filings for the Nifty 200 (cached by URL, so a rerun
+  1. Fetch 24 quarters of filings for the Nifty 200 (cached by URL, so a rerun
      only fetches what is new). About 3,000 filings the first time: an hour.
   2. Score every quarter as it would have been scored on the day: on its own
      filing and the seven before it, each as originally filed.
@@ -213,7 +213,7 @@ def report(df: pd.DataFrame, summary: dict) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--universe", default="nifty200", choices=["nifty200", "nifty500"])
-    ap.add_argument("--quarters", type=int, default=16)
+    ap.add_argument("--quarters", type=int, default=24)
     ap.add_argument("--fetch-only", action="store_true")
     ap.add_argument("--report-only", action="store_true")
     ap.add_argument("--limit", type=int, default=None, help="first N symbols (testing)")

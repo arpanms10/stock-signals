@@ -314,3 +314,18 @@ def test_march_cash_flow_covers_the_full_year():
            + "</xbrli:xbrl>")
     nums = rf.parse_quarter(xml, dt.date(2026, 3, 31))
     assert nums["ytd_months"] == 12 and nums["cfo_ytd"] == pytest.approx(1000.0)
+
+
+def test_old_filings_with_an_undeclared_quarter_context():
+    """Pre-2023 NSE filings use contextRef="OneD" without declaring OneD; the
+    period is stated only as facts. Read strictly they held nothing, which
+    cut every series off at 2022."""
+    xml = (f"<xbrli:xbrl {NS}>"
+           + ctx("D_Other", "2022-01-01", "2022-03-31", dim=True)
+           + fact("DateOfStartOfReportingPeriod", "OneD", "2022-01-01")
+           + fact("DateOfEndOfReportingPeriod", "OneD", "2022-03-31")
+           + fact("RevenueFromOperations", "OneD", "505910000000")
+           + "</xbrli:xbrl>")
+    assert rf.parse_quarter(xml, dt.date(2022, 3, 31))["revenue"] == pytest.approx(50591.0)
+    # A stated period that is not this quarter is not trusted.
+    assert rf.parse_quarter(xml, dt.date(2022, 6, 30)) == {}

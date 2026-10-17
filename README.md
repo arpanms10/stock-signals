@@ -57,7 +57,8 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `record_swing.py` | Record the day's swing scan in `history/swing/`, rebuild `history/swing_picks.xlsx` with outcomes |
 | `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
 | `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
-| `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 16 quarters; `--quarters 24` for the documented run) |
+| `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
+| `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -168,6 +169,28 @@ cares about -- but once that reaction is known, the verdict adds little
 rallied on their results beat those that sold off by 3.6% over the next 60
 sessions (t = 2.6).
 
+## GARP & QARP picker
+
+The **GARP / QARP** tab ranks the Nifty 200 two ways, on fundamentals taken
+only from NSE's filings and the price on the day. **GARP** (growth at a
+reasonable price) looks for core profit growing at least 15% a year, lastingly,
+at a PEG of 1.5 or less. **QARP** (quality at a reasonable price) looks for the
+top 40% on quality -- ROE, ROCE, cash conversion, margins and their stability,
+debt -- at a P/E that isn't near its own three-year high. The same code
+produces today's picks and every backtest rebalance.
+
+**Read the backtest first.** From 2022 to 2026, GARP beat the equal-weight
+universe by 2.3% a quarter (t = 2.0) once hindsight about index membership is
+partly stripped out, and that edge shrinks further the harder the check. QARP
+lagged by 2.6% a quarter, with milder drawdowns. Seventeen quarters is one
+market regime. Details in [GARP & QARP](docs/picker.md).
+
+```bash
+PYTHONPATH=. .venv/bin/python run_picker.py --refresh     # new filings for the Nifty 200
+PYTHONPATH=. .venv/bin/python run_picker.py               # today's two shortlists
+PYTHONPATH=. .venv/bin/python run_picker.py --backtest
+```
+
 ## Swing history
 
 Every scan is written down once, in full, so the live suggestions can be
@@ -255,6 +278,7 @@ cannot be rebuilt.
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes; all jobs in [Scheduled jobs](#scheduled-jobs) |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
+| [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
 | [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |

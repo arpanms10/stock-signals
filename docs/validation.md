@@ -68,6 +68,17 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
+## GARP & QARP picker (2026-10-17)
+
+Nifty 200, quarterly rebalance after each results season, top 15 equal
+weight, Jun 2022 to Aug 2026 (17 periods), fundamentals point in time from
+NSE filings. Against the equal-weight universe, keeping only the 150 largest
+by market cap on each date: **GARP +2.3% a quarter (t = 2.0)**, **QARP
+-2.6% a quarter (t = -2.2)**. GARP's edge is 3.2% on all of today's index
+and 1.1% (not significant) in the largest 100: part of it is hindsight about
+which stocks grew into the index. Neither ranks anything; both are shown as
+shortlists with this beside them. Full write-up in [GARP & QARP](picker.md).
+
 ## Quarterly results verdict (2026-10-17)
 
 3,226 Nifty 200 filings, Mar 2021 to Sep 2026, entry at the reaction-day

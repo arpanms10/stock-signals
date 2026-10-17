@@ -111,8 +111,9 @@ def backtest(cfg: dict) -> int:
     con = price_store.connect()
     index = price_store.load_index(con, timing.load_config()["signals"]["regime_index"])
     # Start once most of the universe has eight quarters visible (TTM growth).
+    # Start once eight quarters are visible: TTM growth needs two TTMs.
     first = sorted(q["to_date"].unique())
-    start = first[min(8, len(first) - 1)] + dt.timedelta(days=60)
+    start = first[min(7, len(first) - 1)] + dt.timedelta(days=60)
     end = price_store.load_prices(con, "RELIANCE")["date"].max()
     res = pe.backtest(q, dict(zip(u["symbol"], u["sector"])), cfg, con, start, end, index)
     periods = res["periods"]
@@ -123,13 +124,17 @@ def backtest(cfg: dict) -> int:
     periods.to_csv(PERIODS, index=False)
     res["picks"].to_csv(PICKS, index=False)
     summary = pe.summarise(periods)
-    summary.update({"tested_on": dt.date.today().isoformat(), "universe": cfg["universe"],
+    summary.update({"tested_on": dt.date.today().isoformat(),
+                    "top_by_mcap": cfg.get("backtest_top_by_mcap"),
+                    "universe_name": cfg["universe"],
                     "top_n": cfg["top_n"],
                     "note": "today's index members (survivorship); balance-sheet "
                             "quality only from 2025 filings"})
     CALIBRATION.write_text(json.dumps(summary, indent=1, default=str))
+    lim = cfg.get("backtest_top_by_mcap")
     print(f"\nBACKTEST {summary['from']} to {summary['to']}, {summary['periods']} periods, "
-          f"top {cfg['top_n']}, equal weight, {cfg['round_trip_cost_pct']}% round trip")
+          f"top {cfg['top_n']}, equal weight, {cfg['round_trip_cost_pct']}% round trip, "
+          + (f"largest {lim} by market cap on each date" if lim else "all of today's index"))
     for m in ("garp", "qarp", "universe", "index"):
         s = summary.get(m)
         if not s:
@@ -150,11 +155,16 @@ def main(argv=None) -> int:
     ap.add_argument("--backtest", action="store_true")
     ap.add_argument("--as-of", type=dt.date.fromisoformat, default=None)
     ap.add_argument("--quarters", type=int, default=24)
+    ap.add_argument("--top-by-mcap", type=int, default=None,
+                    help="backtest only the N largest by market cap on each date, "
+                         "0 for all (default: picker.backtest_top_by_mcap)")
     args = ap.parse_args(argv)
     cfg = pe.load_config()
     if args.refresh:
         pe.refresh(list(pe.universe(cfg["universe"])["symbol"]), args.quarters)
     if args.backtest:
+        if args.top_by_mcap is not None:
+            cfg = {**cfg, "backtest_top_by_mcap": args.top_by_mcap or None}
         return backtest(cfg)
     if args.as_of is None:
         from data import store as price_store

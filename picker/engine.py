@@ -129,10 +129,18 @@ def backtest(quarters: pd.DataFrame, sectors: dict[str, str], cfg: dict, con,
     held = {"garp": set(), "qarp": set()}
     periods, picks_log = [], []
     ix = index.set_index("date")["close"] if index is not None and not index.empty else None
+    top_mcap = cfg.get("backtest_top_by_mcap")
     for a, b in zip(dates, dates[1:]):
         scored = evaluate(quarters, a, raw, sectors, cfg)
         if scored.empty:
             continue
+        if top_mcap:
+            # Hindsight check: today's index holds stocks that grew INTO it,
+            # the very growers GARP picks. Keeping only what was already among
+            # the largest on the day removes "small then, member now" names.
+            keep = scored.nlargest(top_mcap, "mcap_cr")["symbol"]
+            scored = evaluate(quarters[quarters["symbol"].isin(keep)], a, raw,
+                              sectors, cfg)
         row = {"start": a, "end": b, "universe_n": len(scored)}
         allret = _period_return(adj, list(scored["symbol"]), a, b)
         row["universe"] = float(np.mean(list(allret.values()))) if allret else None

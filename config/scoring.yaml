@@ -325,3 +325,7 @@ picker:
   # quarter, 60 for March), hold until the next.
   rebalance: ["02-20", "06-05", "08-20", "11-20"]
   round_trip_cost_pct: 0.35
+  # The universe is TODAY's Nifty 200, which holds stocks that grew into it
+  # -- exactly GARP's picks. Backtest only the N largest by market cap on
+  # each date to strip that hindsight (null = all; see docs/picker.md).
+  backtest_top_by_mcap: 150
