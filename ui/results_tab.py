@@ -78,6 +78,38 @@ def render(run_script=None) -> None:
         _detail(view)
 
     _coming_up(status, upcoming, today)
+    _backtest()
+
+
+def _backtest() -> None:
+    """What run_results_backtest.py found, from config/results_calibration.json."""
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "config" / "results_calibration.json"
+    with st.expander("Has the verdict predicted anything? (backtest)"):
+        if not path.exists():
+            st.caption("No backtest yet. Run `run_results_backtest.py` (about an hour "
+                       "the first time: it reads ~3,000 filings).")
+            return
+        cal = json.loads(path.read_text())
+        q = cal["quarters"]
+        st.caption(f"Tested {cal['tested_on']}: {cal['events']} filings from "
+                   f"{cal['stocks']} Nifty 200 stocks, quarters {q[0]} to {q[-1]}. "
+                   "Entry at the close of the reaction day; returns less the NIFTY 500.")
+        (st.success if cal["verdict_predicts"] else st.warning)(
+            "The verdict has predicted 60-session excess returns."
+            if cal["verdict_predicts"] else
+            "No reliable edge: a strong verdict has not gone on to beat a weak one "
+            "once the reaction is known. Read it; don't trade on it alone.")
+        for h, r in cal["horizons"].items():
+            st.markdown(f"**{h} sessions on** -- strong minus weak, per quarter: "
+                        f"{r['verdict_spread_mean']}% (t = {r['verdict_spread_t']}, "
+                        f"better in {r['verdict_spread_positive_quarters']} of "
+                        f"{r['verdict_spread_quarters']} quarters)")
+            st.dataframe(pd.DataFrame(r["by_verdict"]).rename(columns={
+                "verdict": "Verdict", "n": "Filings", "mean": "Mean excess %",
+                "median": "Median %", "hit_pct": "Beat index %"}),
+                hide_index=True, width="stretch")
 
 
 def _num(r, k):

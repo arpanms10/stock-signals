@@ -250,3 +250,28 @@ def test_revised_filing_replaces_the_original(tmp_path):
     assert len(df) == 1 and df.iloc[0]["verdict"] == "strong"
     assert store.scored(store.cards(path), "X", end, "b")
     assert not store.scored(store.cards(path), "X", end, "a")
+
+
+# --- backtest helpers -------------------------------------------------------
+
+import run_results_backtest as bt  # noqa: E402
+
+
+def test_forward_returns_from_the_reaction_close():
+    p = bars([100.0] * 10 + [110.0] * 70)
+    idx = p.set_index("date")["close"] * 0 + 1000.0
+    d0 = p["date"].iloc[5]
+    f = bt.forward(p, idx, d0)
+    assert f["ret_20"] == 10.0 and f["excess_20"] == 10.0
+    assert "ret_60" in f
+    assert bt.forward(p, idx, p["date"].iloc[-5]) == {}     # horizon not reached
+
+
+def test_spread_is_taken_within_each_quarter():
+    """A quarter where everything rose must not count as the verdict working."""
+    rows = []
+    for q, base in ((dt.date(2025, 6, 30), 10.0), (dt.date(2025, 9, 30), -10.0)):
+        rows += [{"to_date": q, "verdict": "strong", "excess_60": base + 1}] * 3
+        rows += [{"to_date": q, "verdict": "weak", "excess_60": base}] * 3
+    s = bt.spread_by_quarter(pd.DataFrame(rows), "excess_60")
+    assert list(s.round(6)) == [1.0, 1.0]
