@@ -86,6 +86,8 @@ def _normalise_integrated(rec: dict) -> dict | None:
         # A revision replaces the original filing for the same quarter.
         "_stamp": _date_key((rec.get("revised_Date") or rec.get("broadcast_Date")
                              or "")[:11]),
+        # When the market first saw the numbers, in the old endpoint's key.
+        "broadCastDate": rec.get("broadcast_Date"),
         "_source": "integrated",
     }
 

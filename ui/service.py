@@ -342,6 +342,8 @@ SCRIPTS = {
     # Swing: replays every signal since 2018 and rewrites the summary the
     # Swing tab's Backtest section shows (config/swing_calibration.json).
     "Rerun swing backtest": ["run_swing.py", "--backtest"],
+    # Scores new filings for holdings, watch list and picks (Results tab).
+    "Check quarterly results": ["run_results.py"],
 }
 
 

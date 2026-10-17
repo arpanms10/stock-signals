@@ -14,6 +14,9 @@ config/holdings*.csv
 !config/holdings.example.csv
 data/holdings.json
 .env
+# Results scorecards (run_results.py). The figures are public, but the list of
+# symbols covered includes your holdings.
+data/results/
 
 # --- Large generated data ----------------------------------------------
 # market.db is ~450MB; GitHub rejects files over 100MB and this is entirely
@@ -44,6 +47,9 @@ config/fno_reach.json
 # config/swing_calibration.json <- run_swing.py --backtest; the Swing tab
 #   shows "no backtest yet" without it.
 config/swing_calibration.json
+# config/results_calibration.json <- run_results_backtest.py; the Results tab
+#   shows "no backtest yet" without it.
+config/results_calibration.json
 
 # --- Environment and noise ---------------------------------------------
 # Excel's lock file while a workbook in history/ is open.
