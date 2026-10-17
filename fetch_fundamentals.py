@@ -83,13 +83,18 @@ def from_nse(sym: str) -> tuple[dict, list[str]]:
     return out, src
 
 
-def from_yahoo(sym: str) -> tuple[dict, list[str]]:
-    """Ratios, plus absolute values only when Yahoo reports in INR."""
+def from_yahoo(sym: str, info_out: dict | None = None) -> tuple[dict, list[str]]:
+    """Ratios, plus absolute values only when Yahoo reports in INR.
+
+    `info_out`, when given, receives Yahoo's raw info dict -- the Fundamental
+    Analyst reads valuation fields from it without a second request."""
     import yfinance as yf
 
     out: dict = {}
     t = yf.Ticker(f"{sym}.NS")
     info = t.info or {}
+    if info_out is not None:
+        info_out.update(info)
     currency = (info.get("financialCurrency") or "INR").upper()
 
     if info.get("returnOnEquity") is not None:
@@ -147,11 +152,11 @@ def from_yahoo(sym: str) -> tuple[dict, list[str]]:
     return out, ([f"yahoo({currency})"] if out else [])
 
 
-def merge(sym: str) -> dict:
+def merge(sym: str, info_out: dict | None = None) -> dict:
     """NSE wins on its authoritative fields; Yahoo fills the rest."""
     nse_vals, nse_src = from_nse(sym)
     try:
-        y_vals, y_src = from_yahoo(sym)
+        y_vals, y_src = from_yahoo(sym, info_out)
     except Exception:
         y_vals, y_src = {}, []
 
@@ -170,6 +175,47 @@ def merge(sym: str) -> dict:
     row["_sources"] = "; ".join(used) or "none"
     row["_nse_fields"] = sorted(k for k in nse_vals if k in NSE_FIELDS)
     return row
+
+
+def fetch_rows(sym: str, quarter: str, quarters: int = 6, yahoo_only: bool = False,
+               info_out: dict | None = None) -> tuple[list[dict], dict]:
+    """Sheet rows for one symbol: the current row first, then prior quarters.
+
+    Returns ([], meta) when no source had anything. `meta` says how many
+    fields came back, whether it filed as a lender, and which fields NSE
+    supplied.
+    """
+    r = (dict(from_yahoo(sym, info_out)[0], symbol=sym, _sources="yahoo",
+              _nse_fields=[], _nse_abs=False)
+         if yahoo_only else merge(sym, info_out))
+    r.setdefault("_is_lender", False)
+
+    # Prior quarters carry only revenue and profit -- enough for growth,
+    # which is what they are for. Ratios live on the current row.
+    history = []
+    if not yahoo_only and quarters > 1:
+        try:
+            for h in nsef.results_history(sym, quarters)[1:]:
+                if h.get("revenue") is None:
+                    continue
+                history.append({
+                    "symbol": sym, "quarter": h["quarter"],
+                    "period": "quarterly", "revenue": h["revenue"],
+                    "pat": h["pat"], "notes": f"nse-history({h['to_date']})",
+                })
+        except Exception:
+            pass
+    data_fields = [k for k in r if not k.startswith("_") and k != "symbol"]
+    meta = {"fields": len(data_fields), "lender": r.pop("_is_lender", False),
+            "nse_fields": r.pop("_nse_fields")}
+    if not data_fields:
+        return [], meta
+    r["quarter"] = quarter
+    # NSE results are quarterly; Yahoo's absolute figures are annual.
+    # Record which basis this row's revenue/pat sit on.
+    r["period"] = "quarterly" if r.pop("_nse_abs", False) else "annual"
+    r["notes"] = r.pop("_sources")
+    return [r] + history, meta
 
 
 def main() -> None:
@@ -207,43 +253,14 @@ def main() -> None:
             failed.append(f"{sym} (REIT -- not an equity, cannot be scored)")
             continue
         try:
-            r = (dict(from_yahoo(sym)[0], symbol=sym, _sources="yahoo",
-                      _nse_fields=[], _nse_abs=False)
-                 if args.yahoo_only else merge(sym))
-            r.setdefault("_is_lender", False)
-
-            # Prior quarters carry only revenue and profit -- enough for growth,
-            # which is what they are for. Ratios live on the current row.
-            history = []
-            if not args.yahoo_only and args.quarters > 1:
-                try:
-                    for h in nsef.results_history(sym, args.quarters)[1:]:
-                        if h.get("revenue") is None:
-                            continue
-                        history.append({
-                            "symbol": sym, "quarter": h["quarter"],
-                            "period": "quarterly", "revenue": h["revenue"],
-                            "pat": h["pat"], "notes": f"nse-history({h['to_date']})",
-                        })
-                except Exception:
-                    pass
-            r["_history"] = history
-            data_fields = [k for k in r if not k.startswith("_") and k != "symbol"]
-            if not data_fields:
+            got, meta = fetch_rows(sym, quarter, args.quarters, args.yahoo_only)
+            if not got:
                 failed.append(f"{sym} (no data from any source)")
                 continue
-            r["quarter"] = quarter
-            # NSE results are quarterly; Yahoo's absolute figures are annual.
-            # Record which basis this row's revenue/pat sit on.
-            r["period"] = "quarterly" if r.pop("_nse_abs", False) else "annual"
-            r["notes"] = r.pop("_sources")
-            nsef_used = r.pop("_nse_fields")
-            lender = r.pop("_is_lender", False)
-            rows.append(r)
-            rows.extend(r.pop("_history", []))
-            print(f"  [{i}/{len(symbols)}] {sym}: {len(data_fields)} fields"
-                  f"{'  [LENDER]' if lender else ''}"
-                  f"{'  NSE: ' + ','.join(nsef_used) if nsef_used else ''}")
+            rows.extend(got)
+            print(f"  [{i}/{len(symbols)}] {sym}: {meta['fields']} fields"
+                  f"{'  [LENDER]' if meta['lender'] else ''}"
+                  f"{'  NSE: ' + ','.join(meta['nse_fields']) if meta['nse_fields'] else ''}")
         except Exception as exc:
             failed.append(f"{sym} ({type(exc).__name__}: {str(exc)[:50]})")
 

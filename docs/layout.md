@@ -68,10 +68,15 @@ fno_report.py              F&O load/text/Excel, shared by CLI and dashboard
 run_fno.py                 F&O analysis; run_fno_backtest.py validates it
 docs/f_o/                  F&O docs: overview, data traps, validation
 
+analysis/lookup.py         ticker / company name / ISIN -> NSE symbol
+analysis/fundamental.py    Fundamental Analyst: one stock, on demand
+analysis/technical.py      Technical Analyst: one stock, on demand
+
 ui/app.py                  dashboard: holdings and market sections
 ui/service.py              cached pipeline feeding the UI
 ui/components.py           badges and formatting
 ui/fno_tab.py              the F&O tab
+ui/analyze_tab.py          the Analyze tab
 run_ui.py                  launch the dashboard
 ```
 

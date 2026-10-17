@@ -11,6 +11,8 @@ Sections:
   7. RESULTS     -- this season's quarterly results for what you follow
                     (ui/results_tab.py)
   8. GARP / QARP -- fundamental shortlists from NSE filings (ui/picker_tab.py)
+  9. ANALYZE     -- any one stock by ticker, name or ISIN: the Fundamental
+                    and/or Technical Analyst (ui/analyze_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -151,9 +153,9 @@ for w in snap.warnings:
     st.warning(w)
 
 (tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results,
- tab_pick) = st.tabs(
+ tab_pick, tab_analyze) = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  ", "  Results  ", "  GARP / QARP  "])
+     "  Swing  ", "  Results  ", "  GARP / QARP  ", "  Analyze  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -705,3 +707,8 @@ with tab_pick:
     from ui import picker_tab
     picker_tab.render(snap.as_of, {h["symbol"] for h in snap.holdings},
                       run_script=lambda label, args: run_and_reload(label, args, st))
+
+# ===================================================================== ANALYZE
+with tab_analyze:
+    from ui import analyze_tab
+    analyze_tab.render()
