@@ -50,6 +50,9 @@ config/swing_calibration.json
 # config/results_calibration.json <- run_results_backtest.py; the Results tab
 #   shows "no backtest yet" without it.
 config/results_calibration.json
+# config/picker_calibration.json <- run_picker.py --backtest; the GARP / QARP
+#   tab warns "no backtest yet" without it.
+config/picker_calibration.json
 
 # --- Environment and noise ---------------------------------------------
 # Excel's lock file while a workbook in history/ is open.

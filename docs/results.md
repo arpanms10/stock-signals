@@ -47,7 +47,7 @@ has no dimension.
 A filing does **not** carry last year's quarter, so year-on-year needs the
 filing from four quarters back. Eight quarters are fetched per stock: enough
 for YoY on the newest and for the three before it, which the acceleration
-test needs. Parsed filings are cached in `data/cache/results/` by URL; a
+test needs. Raw filings are cached gzipped in `data/cache/filings/` by URL; a
 revision gets a new URL, so a filing is never fetched twice.
 
 **Basis:** one per series -- whichever of consolidated and standalone covers
@@ -141,7 +141,7 @@ PYTHONPATH=. .venv/bin/python run_results_backtest.py               # fetch + re
 PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only
 ```
 
-Every Nifty 200 filing for 24 quarters (`--quarters 24`) is scored as it would have been on
+Every Nifty 200 filing for 24 quarters is scored as it would have been on
 the day, on its own filing and the seven before it. Entry is at the
 **reaction-day close** -- after both the numbers and the market's first read
 are known -- and returns are measured over 20 and 60 sessions, less the

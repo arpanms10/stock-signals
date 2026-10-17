@@ -10,6 +10,7 @@ Sections:
                     (ui/swing_tab.py)
   7. RESULTS     -- this season's quarterly results for what you follow
                     (ui/results_tab.py)
+  8. GARP / QARP -- fundamental shortlists from NSE filings (ui/picker_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -149,9 +150,10 @@ for f in snap.freshness:
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results = st.tabs(
+(tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results,
+ tab_pick) = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  ", "  Results  "])
+     "  Swing  ", "  Results  ", "  GARP / QARP  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -698,3 +700,8 @@ with tab_swing:
 with tab_results:
     from ui import results_tab
     results_tab.render(run_script=lambda label, args: run_and_reload(label, args, st))
+
+with tab_pick:
+    from ui import picker_tab
+    picker_tab.render(snap.as_of, {h["symbol"] for h in snap.holdings},
+                      run_script=lambda label, args: run_and_reload(label, args, st))
