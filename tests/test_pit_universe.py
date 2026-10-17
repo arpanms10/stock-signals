@@ -98,3 +98,14 @@ def test_prices_use_the_loader_and_keep_the_last_price_when_delisted():
     # Delisted on 2 Jan: the holder is stuck at the last price.
     assert pe._period_return(adj, ["GONE"], D(2024, 1, 1), D(2024, 3, 1)) == \
         {"GONE": pytest.approx(-20.0)}
+
+
+def test_face_value_change_links_the_old_ticker_to_the_new(con):
+    con.executemany("INSERT INTO market VALUES (?,?,?,?,?)", [
+        ("2023-01-02", "FVOLD", 10.0, 1, 1), ("2023-06-30", "FVOLD", 10.0, 1, 1),
+        ("2023-07-03", "FVNEW", 10.0, 1, 1)])
+    bc.record_isins(con, [("FVOLD", "INE999Z01013"), ("FVNEW", "INE999Z01021")])
+    assert pu.aliases(con)["FVOLD"] == "FVNEW"
+    # Both trading at once: two securities, not a change of ticker.
+    con.execute("INSERT INTO market VALUES ('2023-07-03', 'FVOLD', 10, 1, 1)")
+    assert "FVOLD" not in pu.aliases(con)

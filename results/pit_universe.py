@@ -20,8 +20,9 @@ filings carry no shareholding pattern. A company with a large promoter stake
 ranks higher here than in the index.
 
 Renamed companies are one name under today's ticker (the ISIN link in
-data/bhavcopy.symbol_aliases), which is also the ticker NSE lists their
-filings under.
+data/bhavcopy.symbol_aliases, and a new ISIN from the same issuer after a
+face-value change -- see aliases()), which is also the ticker NSE lists
+their filings under.
 
   data/results/pit_universe.csv   date, symbol, rank, mcap_cr, turnover_rank,
                                   basis (mcap | mcap_early |
@@ -66,21 +67,52 @@ def dates(cfg: dict, start: dt.date, end: dt.date) -> list[tuple[dt.date, str]]:
     return sorted(out)
 
 
+def aliases(con) -> dict[str, str]:
+    """Old ticker -> today's: bhavcopy.symbol_aliases (same ISIN), plus a new
+    ISIN from the same issuer with no overlap in trading. A face-value change
+    issues a new ISIN that differs only in the serial digits (ANGELBRKG
+    INE732I01013 -> ANGELONE INE732I01021, AMIORG -> ACUTAAS), and NSE then
+    lists every filing, old ones included, under the new ticker."""
+    from data import bhavcopy as bc
+    out = bc.symbol_aliases(con)
+    spans = con.execute(
+        "SELECT i.isin, s.symbol, s.first, s.last FROM instruments i JOIN ("
+        "  SELECT symbol, MIN(date) first, MAX(date) last FROM market "
+        "  GROUP BY symbol) s ON s.symbol = i.symbol "
+        "WHERE i.isin LIKE 'INE%' ORDER BY s.first").fetchall()
+    by_issuer: dict[str, list[tuple]] = {}
+    for isin, sym, first, last in spans:
+        # INE + issuer (4) + security type (2, "01" = equity) + serial + check.
+        if isin[7:9] == "01":
+            by_issuer.setdefault(isin[:9], []).append((sym, first, last))
+    for links in by_issuer.values():
+        links = [x for i, x in enumerate(links) if x[0] not in {y[0] for y in links[:i]}]
+        # The new ticker takes over within a month; a long gap is a delisting
+        # and a later relisting (HEXAWARE 2020, HEXT 2025), not one series.
+        if len(links) < 2 or any(
+                b[1] <= a[2] or (dt.date.fromisoformat(b[1])
+                                 - dt.date.fromisoformat(a[2])).days > 31
+                for a, b in zip(links, links[1:])):
+            continue
+        final = out.get(links[-1][0], links[-1][0])
+        for sym, _, _ in links[:-1]:
+            out.setdefault(sym, final)
+    return out
+
+
 def pools(con, on: list[dt.date], size: int = POOL) -> dict[dt.date, list[str]]:
     """Turnover-ranked pool per date, today's tickers, most traded first."""
     from backtest import pit_engine as pit
-    from data import bhavcopy as bc
-    aliases = bc.symbol_aliases(con)
+    alias = aliases(con)
     return {d: pit.liquid_universe(con, d, size, lookback_days=LOOKBACK_DAYS,
-                                   min_days=MIN_DAYS, aliases=aliases)
+                                   min_days=MIN_DAYS, aliases=alias)
             for d in on}
 
 
 def _raw_closes(con, symbols: set[str]) -> dict[str, tuple[list, list]]:
     """Raw (unadjusted) closes per current ticker, renames joined."""
-    from data import bhavcopy as bc
-    aliases = bc.symbol_aliases(con)
-    olds = {o for o, n in aliases.items() if n in symbols}
+    alias = aliases(con)
+    olds = {o for o, n in alias.items() if n in symbols}
     want = sorted(symbols | olds)
     out: dict[str, dict] = {}
     for i in range(0, len(want), 400):
@@ -91,7 +123,7 @@ def _raw_closes(con, symbols: set[str]) -> dict[str, tuple[list, list]]:
             f"UNION ALL SELECT symbol, date, close FROM market_t2t "
             f"WHERE symbol IN ({marks})", chunk + chunk).fetchall()
         for sym, d, c in rows:
-            out.setdefault(aliases.get(sym, sym), {}).setdefault(d, c)
+            out.setdefault(alias.get(sym, sym), {}).setdefault(d, c)
     res = {}
     for sym, by_date in out.items():
         ds = sorted(by_date)
@@ -142,11 +174,10 @@ def mcap_on(shares: list[tuple] | None, closes: tuple[list, list] | None,
 
 def _action_dates(con) -> dict[str, list[dt.date]]:
     """Split / bonus ex-dates per current ticker."""
-    from data import bhavcopy as bc
-    aliases = bc.symbol_aliases(con)
+    alias = aliases(con)
     out: dict[str, list[dt.date]] = {}
     for sym, ex in con.execute("SELECT symbol, ex_date FROM market_actions"):
-        out.setdefault(aliases.get(sym, sym), []).append(dt.date.fromisoformat(ex))
+        out.setdefault(alias.get(sym, sym), []).append(dt.date.fromisoformat(ex))
     return out
 
 
@@ -210,7 +241,7 @@ class MarketPrices:
     def __init__(self, con=None):
         from data import bhavcopy as bc
         self.con = con if con is not None else bc.connect(MARKET_DB)
-        self.aliases = bc.symbol_aliases(self.con)
+        self.aliases = aliases(self.con)
         self._actions = None
 
     def load(self, symbol: str, adjusted: bool = True) -> pd.DataFrame:
