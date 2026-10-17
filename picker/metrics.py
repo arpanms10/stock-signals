@@ -17,7 +17,7 @@ Choices worth stating:
   large in this universe.
 
   The growth rate fed to PEG is the LOWER of one-year and two-year
-  (annualised) growth. Lynch's PEG wants expected growth; trailing growth
+  (annualised) growth, capped at 50% a year. Lynch's PEG wants expected growth; trailing growth
   off a depressed base is the classic way it lies, and taking the minimum
   asks the growth to have lasted.
 
@@ -172,7 +172,8 @@ def _balance(rows: list[dict], kind: str) -> list[dict]:
     return out
 
 
-def compute(rows: list[dict], as_of: dt.date, price_on) -> dict | None:
+def compute(rows: list[dict], as_of: dt.date, price_on,
+            growth_cap: float = 50.0) -> dict | None:
     """Metrics for one symbol on `as_of`.
 
     `rows` are that symbol's quarterly lines (any order, any dates);
@@ -199,7 +200,10 @@ def compute(rows: list[dict], as_of: dt.date, price_on) -> dict | None:
     out["core_growth_1y"] = _growth(core, core_1y)
     out["core_growth_2y"] = _cagr2(core, core_2y)
     gs = [g for g in (out["core_growth_1y"], out["core_growth_2y"]) if g is not None]
-    out["growth"] = min(gs) if gs else None
+    # Capped: off a near-zero base (BHEL, 2026: +3,077%) growth is a number
+    # with no meaning, and its PEG of 0.02 would top every list. Lynch never
+    # credited more than about 50% a year.
+    out["growth"] = min(min(gs), growth_cap) if gs else None
 
     top = "nii" if kind in ("bank", "nbfc") else "revenue"
     t_now = _ttm(lines, end, top)

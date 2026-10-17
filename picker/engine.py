@@ -19,7 +19,7 @@ from results import store
 from . import metrics as pm
 from . import score as ps
 
-UNIVERSE = store.DIR / "universe_quarters.csv"
+UNIVERSE = store.UNIVERSE
 
 
 def load_config() -> dict:
@@ -80,7 +80,8 @@ def evaluate(quarters: pd.DataFrame, as_of: dt.date, prices: Prices,
     """Metrics and both scores for every symbol on `as_of`."""
     out = []
     for sym, g in quarters.groupby("symbol"):
-        m = pm.compute(g.to_dict("records"), as_of, prices.on(sym))
+        m = pm.compute(g.to_dict("records"), as_of, prices.on(sym),
+                       cfg["garp"]["growth_cap"])
         if m is not None and m.get("price"):
             out.append(m)
     return ps.score(pd.DataFrame(out), cfg, sectors)

@@ -154,3 +154,9 @@ def test_summary_excess_is_against_the_universe():
     assert s["garp"]["excess_mean"] == 2.0
     assert s["garp"]["beat_universe_pct"] == 50.0
     assert s["universe"]["total"] == 10.2           # 1.06 x 1.04, rounded
+
+
+def test_growth_off_a_tiny_base_is_capped():
+    rows = quarters("X", [1.0] * 8 + [100.0] * 4)
+    m = pm.compute(rows, END + dt.timedelta(days=40), flat_price(100.0))
+    assert m["core_growth_1y"] > 1000 and m["growth"] == 50.0

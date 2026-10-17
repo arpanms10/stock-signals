@@ -344,6 +344,8 @@ SCRIPTS = {
     "Rerun swing backtest": ["run_swing.py", "--backtest"],
     # Scores new filings for holdings, watch list and picks (Results tab).
     "Check quarterly results": ["run_results.py"],
+    # New filings for the Nifty 200 behind the GARP / QARP tab.
+    "Refresh GARP / QARP filings": ["run_picker.py", "--refresh"],
 }
 
 

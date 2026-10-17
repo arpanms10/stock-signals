@@ -45,7 +45,7 @@ from results import filings as rf
 from results import reaction as rx
 
 ROOT = Path(__file__).resolve().parent
-QUARTERS = store.DIR / "backtest_quarters.csv"
+QUARTERS = store.UNIVERSE
 EVENTS = store.DIR / "backtest_events.csv"
 CALIBRATION = ROOT / "config" / "results_calibration.json"
 HORIZONS = (20, 60)

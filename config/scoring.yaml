@@ -312,6 +312,7 @@ picker:
   garp:
     min_growth: 15.0               # % a year: the LOWER of 1y and 2y core profit growth
     max_peg: 1.5                   # core P/E / growth; Lynch's line was 1.0
+    growth_cap: 50.0               # growth above this is off a tiny base; capped
     min_interest_cover: 3.0
     max_de: 1.0                    # debt / equity, where the balance sheet is filed
     w_growth: 0.5                  # score = w x growth rank + (1-w) x PEG rank

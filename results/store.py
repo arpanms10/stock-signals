@@ -3,9 +3,11 @@
   data/results/scorecards.csv   one row per (symbol, quarter end): the card,
                                 plus the price reaction once prices exist
   data/results/quarters.csv     one row per (symbol, quarter end): the parsed
-                                filing, for trend charts and the backtest
+                                filing, for trend charts
+  data/results/universe_quarters.csv   the same for the whole Nifty 200, for
+                                the backtests and the GARP / QARP picker
 
-Both live outside git, deliberately. The numbers are public, but which
+All live outside git, deliberately. The numbers are public, but which
 symbols are on file is not: holdings are on the coverage list, and the
 .gitignore keeps holdings out of the repo.
 
@@ -22,6 +24,9 @@ import pandas as pd
 DIR = Path(__file__).resolve().parents[1] / "data" / "results"
 CARDS = DIR / "scorecards.csv"
 QUARTERS = DIR / "quarters.csv"
+# The whole index universe's quarterly lines, for the backtests and the
+# GARP / QARP picker (run_results_backtest.py, run_picker.py).
+UNIVERSE = DIR / "universe_quarters.csv"
 KEY = ["symbol", "to_date"]
 
 
