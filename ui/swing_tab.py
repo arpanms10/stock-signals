@@ -6,6 +6,8 @@ pressed; results are then cached for the day.
 """
 from __future__ import annotations
 
+import datetime as dt
+
 import pandas as pd
 import streamlit as st
 
@@ -213,7 +215,9 @@ def _verdict(cal: dict | None) -> str | None:
             f"**Backtest** below.")
 
 
-def render() -> None:
+def render(on_watch=None) -> None:
+    """on_watch runs after a pick is added to the watch list, so the page can
+    drop its cached copy of that list."""
     cfg = _cfg()
     s = cfg["swing"]
     st.subheader("Swing: setups to hold for days to a few weeks")
@@ -291,11 +295,26 @@ def render() -> None:
             st.warning("Nothing eligible. Is the price history current? "
                        "Use **Refresh prices** in the sidebar.")
             return
-        _list(v, cfg, capital, show_all, cal)
+        _list(v, cfg, capital, show_all, cal, on_watch)
+
+
+def _results(view: pd.DataFrame, as_of) -> list[str]:
+    """Results badge per row. The scan already looked up announced dates
+    (results_on), so this reads only the local results store."""
+    try:
+        from results import engine as results_engine
+        upcoming = {}
+        if "results_on" in view:
+            upcoming = {s: d for s, d in zip(view["symbol"], view["results_on"])
+                        if isinstance(d, dt.date)}
+        b = results_engine.badges(list(view["symbol"]), dt.date.today(), upcoming)
+        return [b.get(s, "") for s in view["symbol"]]
+    except Exception:
+        return [""] * len(view)
 
 
 def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
-          cal: dict | None) -> None:
+          cal: dict | None, on_watch=None) -> None:
     s = cfg["swing"]
     t = sr.suggestion_rows(v.table, capital, cfg)
     sug = t[t["suggest"]]
@@ -344,15 +363,17 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
 
     # Status only varies in the full list; in the top list every row is
     # "suggested", so it would only push useful columns off the edge.
+    view = view.assign(results=_results(view, v.as_of))
     cols = (["rank", "symbol", "setup"] + (["status"] if show_all else [])
             + ["score", "close", "entry", "stop", "stop_pct", "t1", "t2", "qty",
-               "position", "sector"])
+               "position", "results", "sector"])
     st.dataframe(
         view[cols].replace({"setup": {"": "—"}}).rename(columns={
             "rank": "#", "symbol": "Stock", "setup": "Setup", "score": "Score",
             "close": "Close", "entry": "Buy above", "stop": "Stop",
             "stop_pct": "Risk %", "t1": "T1", "t2": "T2", "qty": "Qty",
-            "position": "Position", "status": "Status", "sector": "Sector"}),
+            "position": "Position", "status": "Status", "sector": "Sector",
+            "results": "Results"}),
         hide_index=True, width="stretch",
         height=min(38 + 35 * len(view), 720),
         column_config={
@@ -373,6 +394,9 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                 format="%d", help=f"Shares so the stop loses {s['risk_per_trade_pct']}% "
                                   f"of capital (max {s['max_position_pct']:.0f}% in one name)"),
             "Position": st.column_config.NumberColumn(format="₹%d"),
+            "Results": st.column_config.TextColumn(
+                help="This quarter's results verdict (vs the company's own "
+                     "trend), or its announced results date"),
         })
 
     st.divider()
@@ -409,3 +433,19 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                 f"{c.trend_note({'price': r['close'], 'sma50': r['sma50'], 'sma200': r['sma200'], 'rsi': r['rsi14']})}"
                 f" · ATR {r['atr_pct']:.1f}% · volume {r['vol_ratio']:.1f}× average"
                 f"</div>", unsafe_allow_html=True)
+
+    import watching as wg
+    if r["symbol"] in set(wg.symbols()):
+        st.caption(f"✓ {r['symbol']} is on your watch list.")
+    elif st.button(f"Watch {r['symbol']}", key=f"swing_watch_{r['symbol']}",
+                   help="Adds it to the Watching tab, measured from today's close "
+                        "with this plan's stop, T1 and T2."):
+        note = (f"swing {r['setup'] or 'no setup'} {v.as_of:%d-%b}: buy above "
+                f"{r['entry']:,.2f}, stop {r['stop']:,.2f}")
+        ok, msg = wg.add(r["symbol"], source="swing", notes=note,
+                         price=float(r["close"]),
+                         stop=float(r["stop"]),
+                         targets=(float(r["t1"]), float(r["t2"])), use_log=False)
+        (st.success if ok else st.info)(msg)
+        if ok and on_watch:
+            on_watch()

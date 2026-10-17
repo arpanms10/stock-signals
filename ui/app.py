@@ -8,7 +8,10 @@ Sections:
   5. F&O         -- PCR, OI support/resistance, expected range (ui/fno_tab.py)
   6. SWING       -- pullback / breakout setups, scored, with a trade plan
                     (ui/swing_tab.py)
-  7. ANALYZE     -- any one stock by ticker, name or ISIN: the Fundamental
+  7. RESULTS     -- this season's quarterly results for what you follow
+                    (ui/results_tab.py)
+  8. GARP / QARP -- fundamental shortlists from NSE filings (ui/picker_tab.py)
+  9. ANALYZE     -- any one stock by ticker, name or ISIN: the Fundamental
                     and/or Technical Analyst (ui/analyze_tab.py)
 
 Read-only throughout. Nothing here places an order.
@@ -41,6 +44,30 @@ QUALITY_NOTE = st.column_config.TextColumn(
     help="Why there is no quality score. Not fetched: no fundamentals on file "
          "yet -- use 'Refresh fundamentals'. Too little data: fetched, but too "
          "few figures came back to score.")
+
+
+RESULTS_COL = st.column_config.TextColumn(
+    "Results", help="This quarter's results verdict and filing date, or the "
+                    "announced results date. Judged against the company's own "
+                    "recent quarters -- see the Results tab.")
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def results_badges(symbols: tuple[str, ...]) -> dict[str, str]:
+    """Results column for any table; empty strings if nothing is on file."""
+    import datetime as dt
+    from results import engine as results_engine
+    try:
+        return results_engine.badges(list(symbols), dt.date.today())
+    except Exception:
+        return {}
+
+
+def with_results(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "symbol" not in df:
+        return df
+    b = results_badges(tuple(sorted(df["symbol"].astype(str))))
+    return df.assign(results=[b.get(s, "") for s in df["symbol"]])
 
 
 def with_quality_note(df: pd.DataFrame) -> pd.DataFrame:
@@ -125,9 +152,10 @@ for f in snap.freshness:
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_analyze = st.tabs(
+(tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results,
+ tab_pick, tab_analyze) = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  ", "  Analyze  "])
+     "  Swing  ", "  Results  ", "  GARP / QARP  ", "  Analyze  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -166,9 +194,9 @@ with tab_hold:
                             f"{c.money(val)} "
                             f"({100 * val / snap.book_value:.0f}% of book)")
                 st.dataframe(
-                    with_quality_note(grp)[["symbol", "value", "pct_of_book",
-                                            "pnl_pct", "quality", "quality_note",
-                                            "rank"]]
+                    with_results(with_quality_note(grp))[
+                        ["symbol", "value", "pct_of_book", "pnl_pct", "quality",
+                         "quality_note", "results", "rank"]]
                     .rename(columns={"pct_of_book": "% book", "pnl_pct": "P&L %",
                                      "quality": "Quality", "rank": "Rank"})
                     .sort_values("value", ascending=False),
@@ -180,6 +208,7 @@ with tab_hold:
                         "Quality": st.column_config.ProgressColumn(
                             min_value=0, max_value=100, format="%d"),
                         "quality_note": QUALITY_NOTE,
+                        "results": RESULTS_COL,
                     })
         with right:
             st.subheader("Sector exposure")
@@ -319,6 +348,64 @@ with tab_hold:
                 st.dataframe(pd.DataFrame(snap.uncovered), hide_index=True,
                              width='stretch')
 
+
+@st.fragment
+def entry_levels(symbols: list[str], market: list[dict]) -> None:
+    """The Market tab's entry-levels panel.
+
+    A fragment, so picking another stock reruns only this panel: the rest
+    of the page stays live instead of fading behind the rerun."""
+    st.subheader("Entry levels")
+    st.caption("The price at which each rule would fire, with the stop and "
+               "targets that would apply there. **Not** a recommended price "
+               "— reaching a level is necessary, not sufficient.")
+    pick = st.selectbox("Stock", symbols)
+    row = next(r for r in market if r["symbol"] == pick)
+
+    head = st.columns([0.5, 2, 2, 2, 2])
+    head[0].markdown(c.badge("BUY" if row["in_top"] else "HOLD"),
+                     unsafe_allow_html=True)
+    head[1].markdown(f"**{row['symbol']}** &nbsp; rank {row['rank']}",
+                     unsafe_allow_html=True)
+    head[2].markdown(f"{c.money(row['price'])}")
+    head[3].markdown(
+        c.pill(f"quality {row['quality']:.0f}", c.quality_tone(row["quality"]))
+        if row["quality"] is not None else c.pill("no quality data", "warn"),
+        unsafe_allow_html=True)
+    head[4].markdown(c.pill("held", "good") if row["held"] else "",
+                     unsafe_allow_html=True)
+
+    st.markdown(f"<div style='color:#6b7280;font-size:13px;'>"
+                f"{c.trend_note(row)}</div>", unsafe_allow_html=True)
+
+    lv = row["levels"]
+    if lv["blocked"]:
+        st.warning(f"No entry possible: {lv['blocked']}")
+    for e in lv["entries"]:
+        with st.container(border=True):
+            away = c.pill(f"{e['pct_away']:+.1f}% away", "info")
+            title = e["rule"].replace("_", " ").title()
+            st.markdown(f"**{title}** &nbsp; {away}",
+                        unsafe_allow_html=True)
+            st.markdown(c.trade_plan(e["price"], e["stop"], e.get("t1"),
+                                     e.get("t2"), f"Needs: {e['note']}"),
+                        unsafe_allow_html=True)
+
+    import watching as wg
+    already = set(wg.symbols())
+    if row["symbol"] in already:
+        st.caption(f"✓ {row['symbol']} is on your watch list.")
+    elif st.button(f"Watch {row['symbol']}", key=f"watch_{row['symbol']}"):
+        ok, msg = wg.add(row["symbol"], source="rank")
+        (st.success if ok else st.info)(msg)
+        load.clear()
+
+    if row["flags"]:
+        with st.expander("Fundamental flags"):
+            for f_ in row["flags"]:
+                st.markdown(f"- {f_}")
+
+
 # ===================================================================== MARKET
 with tab_market:
     m = with_quality_note(pd.DataFrame(snap.market))
@@ -404,6 +491,7 @@ with tab_market:
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
                 "quality_note": QUALITY_NOTE,
+                "results": RESULTS_COL,
                 "Held": st.column_config.CheckboxColumn(),
                 alt_label: st.column_config.NumberColumn(
                     format="%d",
@@ -414,61 +502,14 @@ with tab_market:
             })
 
         st.divider()
-        st.subheader("Entry levels")
-        st.caption("The price at which each rule would fire, with the stop and "
-                   "targets that would apply there. **Not** a recommended price "
-                   "— reaching a level is necessary, not sufficient.")
-        pick = st.selectbox("Stock", view["symbol"].tolist())
-        row = next(r for r in snap.market if r["symbol"] == pick)
-
-        head = st.columns([0.5, 2, 2, 2, 2])
-        head[0].markdown(c.badge("BUY" if row["in_top"] else "HOLD"),
-                         unsafe_allow_html=True)
-        head[1].markdown(f"**{row['symbol']}** &nbsp; rank {row['rank']}",
-                         unsafe_allow_html=True)
-        head[2].markdown(f"{c.money(row['price'])}")
-        head[3].markdown(
-            c.pill(f"quality {row['quality']:.0f}", c.quality_tone(row["quality"]))
-            if row["quality"] is not None else c.pill("no quality data", "warn"),
-            unsafe_allow_html=True)
-        head[4].markdown(c.pill("held", "good") if row["held"] else "",
-                         unsafe_allow_html=True)
-
-        st.markdown(f"<div style='color:#6b7280;font-size:13px;'>"
-                    f"{c.trend_note(row)}</div>", unsafe_allow_html=True)
-
-        lv = row["levels"]
-        if lv["blocked"]:
-            st.warning(f"No entry possible: {lv['blocked']}")
-        for e in lv["entries"]:
-            with st.container(border=True):
-                away = c.pill(f"{e['pct_away']:+.1f}% away", "info")
-                title = e["rule"].replace("_", " ").title()
-                st.markdown(f"**{title}** &nbsp; {away}",
-                            unsafe_allow_html=True)
-                st.markdown(c.trade_plan(e["price"], e["stop"], e.get("t1"),
-                                         e.get("t2"), f"Needs: {e['note']}"),
-                            unsafe_allow_html=True)
-
-        import watching as wg
-        already = set(wg.symbols())
-        if row["symbol"] in already:
-            st.caption(f"✓ {row['symbol']} is on your watch list.")
-        elif st.button(f"Watch {row['symbol']}", key=f"watch_{row['symbol']}"):
-            ok, msg = wg.add(row["symbol"], source="rank")
-            (st.success if ok else st.info)(msg)
-            load.clear()
-
-        if row["flags"]:
-            with st.expander("Fundamental flags"):
-                for f_ in row["flags"]:
-                    st.markdown(f"- {f_}")
+        entry_levels(view["symbol"].tolist(), snap.market)
 
 
 # ================================================================= MOMENTUM
 with tab_mom:
     lbs = getattr(snap, "lookbacks", None) or []
-    t = with_quality_note(pd.DataFrame(getattr(snap, "momentum_table", None) or []))
+    t = with_results(with_quality_note(
+        pd.DataFrame(getattr(snap, "momentum_table", None) or [])))
     if len(lbs) < 2 or t.empty:
         st.info("Needs a ranked universe and `compare_lookback_months` in "
                 "config/scoring.yaml. Press Recompute after a data refresh.")
@@ -505,7 +546,7 @@ with tab_mom:
         st.dataframe(
             view[["symbol", "status", "rank_main", "score_main", "rank_cmp",
                   "score_cmp", "price", "ret_main", "ret_cmp", "ret_1m", "vol",
-                  "quality", "quality_note", "sector", "held"]]
+                  "quality", "quality_note", "results", "sector", "held"]]
             .rename(columns={
                 "symbol": "Stock", "status": "On list",
                 "rank_main": f"{a}M rank", "score_main": f"{a}M score",
@@ -540,6 +581,7 @@ with tab_mom:
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
                 "quality_note": QUALITY_NOTE,
+                "results": RESULTS_COL,
                 "Held": st.column_config.CheckboxColumn(),
             })
         st.caption("Scores are only comparable within one column: a 9M and a "
@@ -573,8 +615,8 @@ with tab_watch:
 
     w = pd.DataFrame(snap.watching)
     if w.empty:
-        st.info("Nothing being watched yet. Add candidates from the Market tab, "
-                "or run `run_daily.py --watch-add SYMBOL`.")
+        st.info("Nothing being watched yet. Add candidates from the Market or "
+                "Swing tab, or run `run_daily.py --watch-add SYMBOL`.")
     else:
         settled = w[w["days"].fillna(0) >= 21]
         cols = st.columns(4)
@@ -604,6 +646,20 @@ with tab_watch:
             "*late*, *stalled*, or how fast it was reached. Calibration, not a "
             "rule: slow positions returned 7.4% over the next six months "
             "against 9.6% for fast ones, too small a gap to trade on.")
+
+        if "outcome" in w:
+            hit = lambda col: int((w[col].fillna("") != "").sum())
+            out = w[w["stopped_on"].fillna("") != ""]
+            at_entry = int((out["t1_hit_on"].fillna("") != "").sum())
+            st.caption(
+                f"**Outcomes so far:** {hit('t1_hit_on')} reached T1, "
+                f"{hit('t2_hit_on')} reached T2, {len(out)} stopped out"
+                + (f" ({at_entry} at the flagged price after T1)" if at_entry else "")
+                + f", {int((w['outcome'] == 'open').sum())} still open. Checked "
+                "against each day's high and low since the flag, after every price "
+                "refresh. The stop moves up to the flagged price once T1 is "
+                "reached; a day that touched both the stop and a target counts "
+                "as stopped.")
 
         young = w[w["days"].fillna(0) < 21]
         if len(young):
@@ -641,7 +697,16 @@ with tab_fno:
 # ======================================================================= SWING
 with tab_swing:
     from ui import swing_tab
-    swing_tab.render()
+    swing_tab.render(on_watch=load.clear)
+
+with tab_results:
+    from ui import results_tab
+    results_tab.render(run_script=lambda label, args: run_and_reload(label, args, st))
+
+with tab_pick:
+    from ui import picker_tab
+    picker_tab.render(snap.as_of, {h["symbol"] for h in snap.holdings},
+                      run_script=lambda label, args: run_and_reload(label, args, st))
 
 # ===================================================================== ANALYZE
 with tab_analyze:

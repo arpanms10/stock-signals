@@ -302,6 +302,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
         if f is not None and not f.empty:
             watch_prices[sym] = float(f["close"].iloc[-1])
     wg.fill_missing_baselines(watch_prices)
+    wg.update_from_store(con)
     watching = wg.report(watch_prices)
 
     checks = [("market", fr.assess(mkt)), ("prices", fr.assess_prices(con, [])),
@@ -341,6 +342,10 @@ SCRIPTS = {
     # Swing: replays every signal since 2018 and rewrites the summary the
     # Swing tab's Backtest section shows (config/swing_calibration.json).
     "Rerun swing backtest": ["run_swing.py", "--backtest"],
+    # Scores new filings for holdings, watch list and picks (Results tab).
+    "Check quarterly results": ["run_results.py"],
+    # New filings for the Nifty 200 behind the GARP / QARP tab.
+    "Refresh GARP / QARP filings": ["run_picker.py", "--refresh"],
 }
 
 

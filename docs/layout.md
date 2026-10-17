@@ -27,6 +27,20 @@ history/                   records kept in git (momentum picks, F&O ranges)
 
 data/sources/prices.py     OHLCV via jugaad-data
 data/sources/nse_fundamentals.py   results, shareholding and pledge from XBRL
+
+results/filings.py         one quarter per filing, period-aware; disk cache by URL
+results/scorecard.py       YoY / acceleration / margin / quality; lender card
+results/reaction.py        reaction day, move in ATRs, vs NIFTY 500
+results/coverage.py        holdings + watch list + swing and momentum picks
+results/engine.py          fetch -> score -> store; badges for other tables
+results/store.py           data/results/*.csv (outside git: coverage shows holdings)
+run_results.py             daily results run and report
+run_results_backtest.py    post-results drift test -> config/results_calibration.json
+
+picker/metrics.py          point-in-time TTM growth, P/E, PEG, quality inputs
+picker/score.py            percentile ranks, GARP / QARP gates and scores
+picker/engine.py           evaluate on a date, quarterly backtest
+run_picker.py              today's shortlists, --refresh, --backtest
 data/corporate_actions.py  split/bonus parsing and back-adjustment
 data/bhavcopy.py           full-market history -- the survivorship-free universe
 data/quality.py            suspect-bar detection and quarantine

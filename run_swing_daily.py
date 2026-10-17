@@ -9,6 +9,10 @@ weekday evening (install_schedule.py --swing-daily).
      NSE's daily market file -- seconds when only a day or two is missing.
   2. Record the scan for each universe in `swing.record_universes`, which
      also rebuilds history/swing_picks.xlsx.
+  3. Check the watch list (config/watching.csv) against the new prices:
+     stops hit and targets reached are dated there (watching.py).
+  4. Score any new quarterly results for the stocks you follow, and measure
+     the price reaction to the ones already scored (run_results.py).
 
 Idempotent: a holiday, or a second run the same evening, finds the price
 date already recorded and writes nothing. Weekends are skipped outright.
@@ -59,6 +63,12 @@ def main(argv=None) -> int:
             if not step(f"Record swing scan ({u})", ["record_swing.py", "--universe", u],
                         log, timeout=1800):
                 failures.append(f"record {u}")
+        if not step("Check watch list for stops and targets", ["watching.py"],
+                    log, timeout=600):
+            failures.append("watch list check")
+        if not step("Score new quarterly results", ["run_results.py"],
+                    log, timeout=1800):
+            failures.append("results")
     if failures:
         notify("Stock signals: swing record FAILED", ", ".join(failures))
         print(f"failed: {', '.join(failures)} -- see reports/swing_daily.log",

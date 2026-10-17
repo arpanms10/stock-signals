@@ -55,7 +55,10 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_swing.py` | Swing setups in the Nifty 200/500, scored, with a trade plan (`--all`, `--capital`, `--backtest`, `--recorded`) |
 | `run_swing_experiment.py` | Alternative swing rankings on a train / holdout split |
 | `record_swing.py` | Record the day's swing scan in `history/swing/`, rebuild `history/swing_picks.xlsx` with outcomes |
-| `run_swing_daily.py` | Refresh prices, then record the swing scans -- what the daily job runs |
+| `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
+| `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
+| `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
+| `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -132,6 +135,62 @@ PYTHONPATH=. .venv/bin/python run_swing.py --universe nifty500 --all --capital 1
 PYTHONPATH=. .venv/bin/python run_swing.py --backtest            # refresh the Backtest sub-tab
 ```
 
+## Quarterly results
+
+The dashboard's **Results** tab scores each quarterly filing for your
+holdings, the watch list and the latest swing and momentum picks, straight
+from NSE's XBRL. For an ordinary company it covers YoY revenue, EBITDA and
+profit, whether revenue growth is speeding up against its own recent pace,
+EBITDA margin against the same quarter last year, and how much of the profit
+came from other income or one-offs. Banks and NBFCs are scored on NII,
+credit cost and gross NPA movement instead. Each filing gets a verdict
+(strong / in line / weak), plus the price reaction in multiples of the stock's
+ATR. Other tables gain a **Results** column: this quarter's verdict, or the
+date the company reports.
+
+The verdict compares a company with **its own trend, not analyst estimates**,
+which no free source carries. It feeds no ranking.
+`run_results_backtest.py` tests whether it predicts anything once the
+reaction is known; the tab's backtest section shows the answer. Details in
+[quarterly results](docs/results.md).
+
+```bash
+PYTHONPATH=. .venv/bin/python run_results.py                  # score what's new, report
+PYTHONPATH=. .venv/bin/python run_results.py --symbols TCS INFY
+PYTHONPATH=. .venv/bin/python run_results_backtest.py         # does the verdict predict drift?
+```
+
+The swing daily job runs `run_results.py` after its price refresh.
+
+**What the backtest found** (3,226 filings, 2021-26): strong cards beat the
+index by 2% on the reaction day, so the scorecard measures what the market
+cares about -- but once that reaction is known, the verdict adds little
+(t = 1.6 at 60 sessions). The reaction itself keeps going: stocks that
+rallied on their results beat those that sold off by 3.6% over the next 60
+sessions (t = 2.6).
+
+## GARP & QARP picker
+
+The **GARP / QARP** tab ranks the Nifty 200 two ways, on fundamentals taken
+only from NSE's filings and the price on the day. **GARP** (growth at a
+reasonable price) looks for core profit growing at least 15% a year, lastingly,
+at a PEG of 1.5 or less. **QARP** (quality at a reasonable price) looks for the
+top 40% on quality -- ROE, ROCE, cash conversion, margins and their stability,
+debt -- at a P/E that isn't near its own three-year high. The same code
+produces today's picks and every backtest rebalance.
+
+**Read the backtest first.** From 2022 to 2026, GARP beat the equal-weight
+universe by 2.3% a quarter (t = 2.0) once hindsight about index membership is
+partly stripped out, and that edge shrinks further the harder the check. QARP
+lagged by 2.6% a quarter, with milder drawdowns. Seventeen quarters is one
+market regime. Details in [GARP & QARP](docs/picker.md).
+
+```bash
+PYTHONPATH=. .venv/bin/python run_picker.py --refresh     # new filings for the Nifty 200
+PYTHONPATH=. .venv/bin/python run_picker.py               # today's two shortlists
+PYTHONPATH=. .venv/bin/python run_picker.py --backtest
+```
+
 ## Analyze any stock
 
 The dashboard's **Analyze** tab looks at one stock on demand: any NSE listing,
@@ -192,7 +251,7 @@ touches git or your broker.
 | Job | When | Runs | Install | Check | Remove |
 |---|---|---|---|---|---|
 | Weekly report | Saturday 09:30 | `run_weekly.py`: refresh everything, advisor report, momentum and F&O records | `install_schedule.py --day saturday` | `install_schedule.py --status` | `install_schedule.py --remove` |
-| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx` | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
+| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
 | F&O intraday | Weekdays 09:30-15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent | `install_schedule.py --fno-intraday` | `install_schedule.py --fno-intraday --status` | `install_schedule.py --fno-intraday --remove` |
 
 All commands run as `PYTHONPATH=. .venv/bin/python install_schedule.py ...`.
@@ -238,6 +297,8 @@ cannot be rebuilt.
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes; all jobs in [Scheduled jobs](#scheduled-jobs) |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
+| [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
+| [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
 | [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
