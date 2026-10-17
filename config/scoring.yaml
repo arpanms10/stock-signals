@@ -275,3 +275,29 @@ swing:
   risk_per_trade_pct: 0.75         # of capital, if the stop is hit
   max_position_pct: 15.0           # of capital, whatever the stop says
   round_trip_cost_pct: 0.35        # STT, stamp, fees, DP, slippage
+
+# Quarterly results scorecard (results/, run_results.py). Judged against the
+# company's OWN trend: free sources carry no analyst consensus, so "beat" here
+# means better than its recent quarters, not better than the Street expected.
+# Unvalidated until run_results_backtest.py says otherwise -- the verdict is
+# shown, never used to rank.
+results:
+  quarters: 8                      # filings fetched per symbol (YoY + trend)
+  strong_at: 2                     # points >= this = strong
+  weak_at: -2                      # points <= this = weak
+  # Ordinary companies. Each line is [bad, good]: at or past good scores +1,
+  # at or past bad scores -1, between scores 0.
+  revenue_yoy_pct: [0.0, 15.0]
+  revenue_accel_pp: [-3.0, 3.0]    # YoY now minus mean YoY of the prior 3
+  margin_yoy_bps: [-150.0, 100.0]  # EBITDA margin vs the same quarter last year
+  core_pbt_yoy_pct: [0.0, 20.0]    # PBT less other income and exceptionals
+  # Earnings-quality flags; any one costs a point.
+  other_income_pct_of_pbt: 30.0
+  exceptional_pct_of_pbt: 10.0
+  # Banks and NBFCs.
+  nii_yoy_pct: [5.0, 15.0]
+  pat_yoy_pct: [0.0, 15.0]
+  credit_cost_yoy_pp: [5.0, -5.0]  # provisions / pre-provision profit
+  gnpa_qoq_bps: [20.0, -10.0]      # banks only; NBFCs do not file it in XBRL
+  # Price reaction to the announcement, in multiples of daily ATR.
+  reaction_atr: 1.0                # |move| >= this many ATRs is a reaction
