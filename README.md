@@ -55,7 +55,9 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_swing.py` | Swing setups in the Nifty 200/500, scored, with a trade plan (`--all`, `--capital`, `--backtest`, `--recorded`) |
 | `run_swing_experiment.py` | Alternative swing rankings on a train / holdout split |
 | `record_swing.py` | Record the day's swing scan in `history/swing/`, rebuild `history/swing_picks.xlsx` with outcomes |
-| `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets -- what the daily job runs |
+| `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
+| `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
+| `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 16 quarters; `--quarters 24` for the documented run) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -132,6 +134,40 @@ PYTHONPATH=. .venv/bin/python run_swing.py --universe nifty500 --all --capital 1
 PYTHONPATH=. .venv/bin/python run_swing.py --backtest            # refresh the Backtest sub-tab
 ```
 
+## Quarterly results
+
+The dashboard's **Results** tab scores each quarterly filing for your
+holdings, the watch list and the latest swing and momentum picks, straight
+from NSE's XBRL. For an ordinary company it covers YoY revenue, EBITDA and
+profit, whether revenue growth is speeding up against its own recent pace,
+EBITDA margin against the same quarter last year, and how much of the profit
+came from other income or one-offs. Banks and NBFCs are scored on NII,
+credit cost and gross NPA movement instead. Each filing gets a verdict
+(strong / in line / weak), plus the price reaction in multiples of the stock's
+ATR. Other tables gain a **Results** column: this quarter's verdict, or the
+date the company reports.
+
+The verdict compares a company with **its own trend, not analyst estimates**,
+which no free source carries. It feeds no ranking.
+`run_results_backtest.py` tests whether it predicts anything once the
+reaction is known; the tab's backtest section shows the answer. Details in
+[quarterly results](docs/results.md).
+
+```bash
+PYTHONPATH=. .venv/bin/python run_results.py                  # score what's new, report
+PYTHONPATH=. .venv/bin/python run_results.py --symbols TCS INFY
+PYTHONPATH=. .venv/bin/python run_results_backtest.py         # does the verdict predict drift?
+```
+
+The swing daily job runs `run_results.py` after its price refresh.
+
+**What the backtest found** (3,226 filings, 2021-26): strong cards beat the
+index by 2% on the reaction day, so the scorecard measures what the market
+cares about -- but once that reaction is known, the verdict adds little
+(t = 1.6 at 60 sessions). The reaction itself keeps going: stocks that
+rallied on their results beat those that sold off by 3.6% over the next 60
+sessions (t = 2.6).
+
 ## Swing history
 
 Every scan is written down once, in full, so the live suggestions can be
@@ -173,7 +209,7 @@ touches git or your broker.
 | Job | When | Runs | Install | Check | Remove |
 |---|---|---|---|---|---|
 | Weekly report | Saturday 09:30 | `run_weekly.py`: refresh everything, advisor report, momentum and F&O records | `install_schedule.py --day saturday` | `install_schedule.py --status` | `install_schedule.py --remove` |
-| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv` | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
+| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
 | F&O intraday | Weekdays 09:30-15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent | `install_schedule.py --fno-intraday` | `install_schedule.py --fno-intraday --status` | `install_schedule.py --fno-intraday --remove` |
 
 All commands run as `PYTHONPATH=. .venv/bin/python install_schedule.py ...`.
@@ -219,6 +255,7 @@ cannot be rebuilt.
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes; all jobs in [Scheduled jobs](#scheduled-jobs) |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
+| [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
 | [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |

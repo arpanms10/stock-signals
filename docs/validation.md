@@ -68,6 +68,16 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
+## Quarterly results verdict (2026-10-17)
+
+3,226 Nifty 200 filings, Mar 2021 to Sep 2026, entry at the reaction-day
+close. Strong cards beat the index by 2.0% on the reaction day and weak ones
+lag by 0.8%, so the scorecard tracks what the market prices. After that,
+strong minus weak is +1.7% over 60 sessions (t = 1.6): **not enough to rank
+on**. The **reaction** drifts: rallied minus sold off is +3.6% over 60
+sessions (t = 2.6). Full write-up in [quarterly results](results.md).
+
+
 ## Momentum on a continuous price history (2026-10-11)
 
 > **Supersedes every momentum figure below this section.** Those were run on

@@ -171,6 +171,9 @@ def summarise(df: pd.DataFrame) -> dict:
     t = h["verdict_spread_t"]
     out["verdict_predicts"] = bool(t is not None and t >= 2.0
                                    and (h["verdict_spread_mean"] or 0) > 0)
+    rt = h["reaction_spread_t"]
+    out["reaction_predicts"] = bool(rt is not None and rt >= 2.0
+                                    and (h["reaction_spread_mean"] or 0) > 0)
     return out
 
 
@@ -198,7 +201,12 @@ def report(df: pd.DataFrame, summary: dict) -> str:
     lines += ["", "VERDICT: " + (
         "the verdict has predicted 60-session excess returns (t >= 2 across quarters)."
         if summary["verdict_predicts"] else
-        "no reliable edge -- keep the verdict as a reading aid; it should not rank.")]
+        "no reliable edge -- keep the verdict as a reading aid; it should not rank."),
+        "REACTION: " + (
+        "stocks that rallied on the results kept beating those that sold off over "
+        "60 sessions (t >= 2 across quarters) -- the market's first read carries on."
+        if summary["reaction_predicts"] else
+        "no reliable drift after the reaction either.")]
     return "\n".join(lines)
 
 

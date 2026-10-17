@@ -99,13 +99,19 @@ def _backtest() -> None:
         (st.success if cal["verdict_predicts"] else st.warning)(
             "The verdict has predicted 60-session excess returns."
             if cal["verdict_predicts"] else
-            "No reliable edge: a strong verdict has not gone on to beat a weak one "
-            "once the reaction is known. Read it; don't trade on it alone.")
+            "No reliable edge from the verdict: a strong card has not gone on to "
+            "beat a weak one once the reaction is known. Read it; don't trade on it.")
+        if cal.get("reaction_predicts"):
+            st.info("The **reaction** has: stocks that rallied on their results kept "
+                    "beating those that sold off over the next 60 sessions. The "
+                    "market's first read carries on; the Reaction column is the one "
+                    "to watch.")
         for h, r in cal["horizons"].items():
             st.markdown(f"**{h} sessions on** -- strong minus weak, per quarter: "
                         f"{r['verdict_spread_mean']}% (t = {r['verdict_spread_t']}, "
                         f"better in {r['verdict_spread_positive_quarters']} of "
-                        f"{r['verdict_spread_quarters']} quarters)")
+                        f"{r['verdict_spread_quarters']} quarters); rallied minus sold "
+                        f"off: {r['reaction_spread_mean']}% (t = {r['reaction_spread_t']})")
             st.dataframe(pd.DataFrame(r["by_verdict"]).rename(columns={
                 "verdict": "Verdict", "n": "Filings", "mean": "Mean excess %",
                 "median": "Median %", "hit_pct": "Beat index %"}),
