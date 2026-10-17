@@ -18,14 +18,20 @@ independent. The headline test averages the strong-minus-weak spread within
 each quarter and tests across quarters, not across events.
 
 Known biases, stated rather than hidden: today's Nifty 200 (survivors), and
-the latest revision of each filing (rare, usually small).
+the latest revision of each filing (rare, usually small). `--universe pit`
+removes the first: each quarter's events come from the 200 largest companies
+at that quarter end, delisted and merged ones included (run_pit_universe.py
+builds the list). Past members the price store never tracked are priced from
+the full-market closes in data/market.db, which have no open, high or low:
+their reaction is sized on the close-to-close range instead of the ATR.
 
     PYTHONPATH=. .venv/bin/python run_results_backtest.py               # fetch + report
     PYTHONPATH=. .venv/bin/python run_results_backtest.py --fetch-only
     PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only
+    PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only --universe pit
 
 Writes data/results/backtest_events.csv and config/results_calibration.json,
-which the Results tab reads.
+which the Results tab reads; the point-in-time run writes *_pit beside them.
 """
 from __future__ import annotations
 
@@ -92,7 +98,11 @@ def forward(prices: pd.DataFrame, index: pd.Series, d0: dt.date) -> dict:
     return out
 
 
-def events(quarters: pd.DataFrame, cfg: dict, log=print) -> pd.DataFrame:
+def events(quarters: pd.DataFrame, cfg: dict, log=print,
+           members: pd.DataFrame | None = None) -> pd.DataFrame:
+    """One row per judged filing with prices. With `members` (the
+    point-in-time universe), a filing counts only when its company was a
+    member at that quarter end."""
     from data import store as price_store
     from scoring import timing
 
@@ -101,19 +111,27 @@ def events(quarters: pd.DataFrame, cfg: dict, log=print) -> pd.DataFrame:
     judged = cards["revenue_yoy"].notna() | cards.get("nii_yoy", pd.Series(dtype=float)).notna()
     cards = cards[judged & cards["broadcast"].notna()]
     con = price_store.connect()
+    load = lambda s: price_store.load_prices(con, s)    # noqa: E731
+    if members is not None:
+        from results import pit_universe as pu
+        keys = set(zip(members["symbol"], members["date"]))
+        cards = cards[[(s, d) in keys for s, d in zip(cards["symbol"], cards["to_date"])]]
+        load = pu.price_loader(con)
     idx_df = price_store.load_index(con, timing.load_config()["signals"]["regime_index"])
     index = idx_df.set_index("date")["close"]
     out = []
     for sym, g in cards.groupby("symbol"):
-        prices = price_store.load_prices(con, sym)
+        prices = load(sym)
         if prices.empty:
             continue
+        close_only = bool(prices.attrs.get("close_only"))
         for card in g.to_dict("records"):
             m = rx.measure(prices, pd.Timestamp(card["broadcast"]).to_pydatetime(),
                            idx_df, cfg.get("reaction_atr", 1.0))
             if not m:
                 continue
-            out.append({**card, **m, **forward(prices, index, m["reaction_date"])})
+            out.append({**card, **m, **forward(prices, index, m["reaction_date"]),
+                        "close_only": close_only})
     df = pd.DataFrame(out)
     log(f"{len(df)} events with prices, {df['symbol'].nunique()} stocks, "
         f"{df['to_date'].nunique()} quarters")
@@ -212,7 +230,9 @@ def report(df: pd.DataFrame, summary: dict) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--universe", default="nifty200", choices=["nifty200", "nifty500"])
+    ap.add_argument("--universe", default="nifty200", choices=["nifty200", "nifty500", "pit"],
+                    help="pit = the 200 largest at each quarter end (run_pit_universe.py "
+                         "builds it and fetches its filings; use with --report-only)")
     ap.add_argument("--quarters", type=int, default=24)
     ap.add_argument("--fetch-only", action="store_true")
     ap.add_argument("--report-only", action="store_true")
@@ -220,8 +240,9 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     cfg = engine.load_config()
-    if not args.report_only:
-        from data.sources import universe as uni
+    from data.sources import universe as uni
+    pit = args.universe == "pit"
+    if not args.report_only and not pit:
         syms = getattr(uni, args.universe)()["symbol"].astype(str).tolist()
         fetch(syms[: args.limit] if args.limit else syms, args.quarters)
         if args.fetch_only:
@@ -231,15 +252,37 @@ def main(argv=None) -> int:
         print("No backtest quarters on file; run without --report-only first.",
               file=sys.stderr)
         return 1
-    df = events(q, cfg)
+    members = None
+    if pit:
+        from results import pit_universe as pu
+        members = pu.load()
+        if members.empty:
+            print("No point-in-time universe. Run run_pit_universe.py first.",
+                  file=sys.stderr)
+            return 1
+    else:
+        # The file also holds past members fetched for the point-in-time run.
+        q = q[q["symbol"].isin(set(getattr(uni, args.universe)()["symbol"]))]
+    df = events(q, cfg, members=members)
     if df.empty:
         print("No events with prices.", file=sys.stderr)
         return 1
-    EVENTS.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(EVENTS, index=False)
+    events_path, cal_path = EVENTS, CALIBRATION
+    if pit:
+        events_path = EVENTS.with_name("backtest_events_pit.csv")
+        cal_path = CALIBRATION.with_name("results_calibration_pit.json")
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(events_path, index=False)
     summary = summarise(df)
-    CALIBRATION.write_text(json.dumps(summary, indent=1, default=str))
+    if pit:
+        summary["universe"] = "point-in-time top 200 by market cap"
+        summary["close_only_events"] = int(df["close_only"].sum())
+    CALIBRATION.parent.mkdir(parents=True, exist_ok=True)
+    cal_path.write_text(json.dumps(summary, indent=1, default=str))
     print(report(df, summary))
+    if pit:
+        print(f"\n{summary['close_only_events']} of {len(df)} events priced from "
+              f"full-market closes (no OHLC; reaction on the close-to-close range).")
     return 0
 
 
