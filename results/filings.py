@@ -11,15 +11,15 @@ What a filing does NOT carry is last year's quarter. NSE's XBRL has only the
 current period and year-to-date, so a year-on-year comparison needs the filing
 from four quarters back. `history()` fetches the last N quarters for that.
 
-Parsed filings are cached on disk keyed by their URL: a filing at a given URL
+Filings are cached on disk, raw, keyed by their URL: a filing at a given URL
 never changes (a revision is published under a new one), so a quarter is
 fetched once, ever.
 """
 from __future__ import annotations
 
 import datetime as dt
+import gzip
 import hashlib
-import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -27,7 +27,9 @@ import fundamentals as fu
 from data.sources import nse_client as nse
 from data.sources import nse_fundamentals as nsef
 
-CACHE = Path(__file__).resolve().parents[1] / "data" / "cache" / "results"
+# Raw filings, gzipped (~10x smaller). Raw rather than parsed, so a field
+# added later is read from the cache instead of refetching every filing.
+CACHE = Path(__file__).resolve().parents[1] / "data" / "cache" / "filings"
 CRORE = 1e7
 
 # Tag -> field. One table for all three schedules: a tag that a schedule does
@@ -62,8 +64,34 @@ TAGS = {
     "PercentageOfGrossNpa": "gnpa_pct",
     "PercentageOfNpa": "nnpa_pct",
 }
+TAGS.update({
+    "PaidUpValueOfEquityShareCapital": "paid_up",
+    "FaceValueOfEquityShareCapital": "face_value",
+})
+# Balance sheet, at the quarter end (September and March filings only).
+INSTANT_TAGS = {
+    "Equity": "equity",
+    "EquityAttributableToOwnersOfParent": "equity_owners",
+    "BorrowingsNoncurrent": "borrowings_noncurrent",
+    "BorrowingsCurrent": "borrowings_current",
+    "Borrowings": "borrowings",                 # banks and NBFCs
+    "DebtSecurities": "debt_securities",        # NBFCs
+    "Capital": "bank_capital",
+    "ReservesAndSurplus": "bank_reserves",
+    "Deposits": "deposits",
+    "Advances": "advances",
+    "Loans": "loans",                           # NBFCs
+    "Assets": "assets",
+    "CashAndCashEquivalents": "cash",
+}
+# Cash flow, 1 April to the quarter end (September and March filings).
+YTD_TAGS = {
+    "CashFlowsFromUsedInOperatingActivities": "cfo_ytd",
+    "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": "capex_ytd",
+    "PurchaseOfTangibleAssetsClassifiedAsInvestingActivities": "capex_ytd",
+}
 # Per-share and ratio fields; everything else is rupees, converted to crores.
-UNSCALED = {"eps", "eps_bank", "gnpa_pct", "nnpa_pct"}
+UNSCALED = {"eps", "eps_bank", "gnpa_pct", "nnpa_pct", "face_value"}
 
 
 def _date(s: str | None) -> dt.date | None:
@@ -88,17 +116,28 @@ def broadcast_time(s: str | None) -> dt.datetime | None:
 def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
     """The quarter's numbers from one filing, in crores (ratios as filed).
 
-    Only facts in a dimensionless context spanning one quarter and ending on
-    `quarter_end` are read. Taking the first fact per tag otherwise would mix
-    in year-to-date or full-year figures, which is the bug this module exists
-    to avoid.
+    Three kinds of context are read, each matched exactly:
+
+      quarter   a dimensionless duration of one quarter (80-100 days) ending
+                on `quarter_end` -- the P&L. Taking the first fact per tag
+                otherwise mixes in year-to-date or full-year figures, which
+                is the bug this module exists to avoid.
+      instant   a dimensionless instant on `quarter_end` -- the balance
+                sheet, filed with the September and March results only.
+      ytd       a dimensionless duration from 1 April to `quarter_end` --
+                the cash-flow statement, also half-yearly. Stored with the
+                months it covers, since September's is six months and
+                March's is twelve.
     """
     root = ET.fromstring(xml_text.encode())
     quarterly: set[str] = set()
+    instant: set[str] = set()
+    ytd: set[str] = set()
+    fy_start = dt.date(quarter_end.year - (quarter_end.month < 4), 4, 1)
     for el in root.iter():
         if not el.tag.endswith("}context"):
             continue
-        start = end = None
+        start = end = inst = None
         dims = False
         for sub in el.iter():
             name = sub.tag.split("}")[-1]
@@ -106,22 +145,46 @@ def parse_quarter(xml_text: str, quarter_end: dt.date) -> dict:
                 start = _date(sub.text)
             elif name == "endDate":
                 end = _date(sub.text)
+            elif name == "instant":
+                inst = _date(sub.text)
             elif name == "explicitMember":
                 dims = True
-        if start and end and not dims and end == quarter_end \
-                and 80 <= (end - start).days <= 100:
-            quarterly.add(el.get("id"))
+        if dims:
+            continue
+        cid = el.get("id")
+        if start and end == quarter_end:
+            if 80 <= (end - start).days <= 100:
+                quarterly.add(cid)
+            if start == fy_start:
+                ytd.add(cid)
+        elif inst == quarter_end:
+            instant.add(cid)
 
     out: dict[str, float] = {}
     for el in root.iter():
-        field = TAGS.get(el.tag.split("}")[-1])
-        if field is None or field in out or el.get("contextRef") not in quarterly:
+        tag, ctx = el.tag.split("}")[-1], el.get("contextRef")
+        if ctx in quarterly and tag in TAGS:
+            field = TAGS[tag]
+        elif ctx in instant and tag in INSTANT_TAGS:
+            field = INSTANT_TAGS[tag]
+        elif ctx in ytd and tag in YTD_TAGS:
+            field = YTD_TAGS[tag]
+        else:
+            continue
+        if field in out:
             continue
         try:
             v = float((el.text or "").strip())
         except ValueError:
             continue
         out[field] = v if field in UNSCALED else v / CRORE
+    if any(k in out for k in YTD_TAGS.values()):
+        out["ytd_months"] = (quarter_end.year - fy_start.year) * 12 \
+            + quarter_end.month - fy_start.month + 1
+    # Share count in crores: paid-up capital over face value. EPS x shares
+    # gives back profit, which is how the picker checks the two agree.
+    if out.get("paid_up") and out.get("face_value"):
+        out["shares_cr"] = out["paid_up"] / out["face_value"]
     return out
 
 
@@ -136,18 +199,24 @@ def kind_of(nums: dict) -> str:
 
 
 def _cache_path(url: str) -> Path:
-    return CACHE / f"{hashlib.sha1(url.encode()).hexdigest()[:20]}.json"
+    return CACHE / f"{hashlib.sha1(url.encode()).hexdigest()[:20]}.xml.gz"
+
+
+def raw_filing(url: str) -> str:
+    """The filing's XML, from the disk cache when it has been fetched before."""
+    path = _cache_path(url)
+    if path.exists():
+        return gzip.decompress(path.read_bytes()).decode()
+    text = nse.get(url, tries=2, timeout=60).text
+    ET.fromstring(text.encode())                  # never cache an error page
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(gzip.compress(text.encode()))
+    return text
 
 
 def fetch_quarter(url: str, quarter_end: dt.date) -> dict:
-    """Parse one filing, from the disk cache when it has been read before."""
-    path = _cache_path(url)
-    if path.exists():
-        return json.loads(path.read_text())
-    nums = parse_quarter(nse.get(url, tries=2, timeout=60).text, quarter_end)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(nums))
-    return nums
+    """Parse one filing (fetched once, ever; see raw_filing)."""
+    return parse_quarter(raw_filing(url), quarter_end)
 
 
 def _is_consolidated(rec: dict) -> bool:

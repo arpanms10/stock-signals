@@ -286,3 +286,31 @@ def test_spread_is_taken_within_each_quarter():
         rows += [{"to_date": q, "verdict": "weak", "excess_60": base}] * 3
     s = bt.spread_by_quarter(pd.DataFrame(rows), "excess_60")
     assert list(s.round(6)) == [1.0, 1.0]
+
+
+def test_balance_sheet_and_half_year_cash_flow():
+    xml = (f"<xbrli:xbrl {NS}>"
+           + ctx("OneD", "2026-07-01", "2026-09-30")
+           + ctx("FourD", "2026-04-01", "2026-09-30")
+           + '<xbrli:context id="OneI"><xbrli:entity/><xbrli:period><xbrli:instant>'
+             '2026-09-30</xbrli:instant></xbrli:period></xbrli:context>'
+           + '<xbrli:context id="PY_I"><xbrli:entity/><xbrli:period><xbrli:instant>'
+             '2026-03-31</xbrli:instant></xbrli:period></xbrli:context>'
+           + fact("Equity", "PY_I", "1000000000000")         # last March: ignored
+           + fact("Equity", "OneI", "1199940000000")
+           + fact("CashFlowsFromUsedInOperatingActivities", "FourD", "258010000000")
+           + fact("PaidUpValueOfEquityShareCapital", "OneD", "3620000000")
+           + fact("FaceValueOfEquityShareCapital", "OneD", "1")
+           + "</xbrli:xbrl>")
+    nums = rf.parse_quarter(xml, dt.date(2026, 9, 30))
+    assert nums["equity"] == pytest.approx(119994.0)
+    assert nums["cfo_ytd"] == pytest.approx(25801.0) and nums["ytd_months"] == 6
+    assert nums["shares_cr"] == pytest.approx(362.0)
+
+
+def test_march_cash_flow_covers_the_full_year():
+    xml = (f"<xbrli:xbrl {NS}>" + ctx("FourD", "2025-04-01", "2026-03-31")
+           + fact("CashFlowsFromUsedInOperatingActivities", "FourD", "10000000000")
+           + "</xbrli:xbrl>")
+    nums = rf.parse_quarter(xml, dt.date(2026, 3, 31))
+    assert nums["ytd_months"] == 12 and nums["cfo_ytd"] == pytest.approx(1000.0)
