@@ -44,6 +44,7 @@ TAGS = {
     "ProfitBeforeTax": "pbt",
     "TaxExpense": "tax",
     "ProfitLossForPeriod": "pat",
+    "ProfitLossForPeriodFromContinuingOperations": "pat_continuing",
     "ProfitOrLossAttributableToOwnersOfParent": "pat_owners",
     "BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations": "eps",
     "InterestEarned": "interest_earned",
@@ -184,10 +185,16 @@ def history(symbol: str, quarters: int = 8, filings: list[dict] | None = None,
                 log(f"{symbol}: could not read {end} filing ({exc})")
             return None
 
+    # The basis with the fuller series over the window, consolidated on a
+    # tie. Choosing by the latest quarter alone gave ABB -- consolidated only
+    # since late 2025 -- a series of five scattered quarters.
+    n_cons = sum(True in by_end[e] for e in ends)
+    n_sa = sum(False in by_end[e] for e in ends)
+    consolidated = n_cons >= n_sa
     latest = by_end[ends[0]]
-    consolidated = True in latest
-    first = read(latest[consolidated], ends[0])
-    if first is not None and kind_of(first) == "bank" and False in latest:
+    probe = latest.get(consolidated) or latest.get(not consolidated)
+    first = read(probe, ends[0]) if probe else None
+    if first is not None and kind_of(first) == "bank" and n_sa:
         consolidated = False
 
     out = []

@@ -50,6 +50,17 @@ def _points(value, band) -> int:
     return 1 if value <= good else -1 if value >= bad else 0
 
 
+def owners_pat(owners, total):
+    """Profit attributable to shareholders, falling back to total profit.
+
+    Some filers enter the attributable line as 0.00 when it equals the total
+    (APLAPOLLO, every quarter since 2022) -- read literally, a profitable
+    company earning nothing. A zero beside a non-zero total is "not filed"."""
+    if owners is None or (owners == 0 and total):
+        return total
+    return owners
+
+
 def company_lines(q: dict) -> dict:
     """Derived lines for an ordinary company (or an NBFC's P&L)."""
     pbt = q.get("pbt")
@@ -59,7 +70,7 @@ def company_lines(q: dict) -> dict:
     fin, dep = q.get("finance_costs"), q.get("depreciation")
     ebitda = None if core is None or fin is None or dep is None else core + fin + dep
     rev = q.get("revenue")
-    pat = q.get("pat_owners") if q.get("pat_owners") is not None else q.get("pat")
+    pat = owners_pat(q.get("pat_owners"), q.get("pat"))
     return {
         "revenue": rev, "ebitda": ebitda, "core_pbt": core, "pbt": pbt, "pat": pat,
         "eps": q.get("eps"), "other_income": q.get("other_income"),
@@ -73,8 +84,7 @@ def lender_lines(q: dict) -> dict:
     if q.get("kind") == "bank":
         ie, ix = q.get("interest_earned"), q.get("interest_expended")
         ppop, prov = q.get("ppop"), q.get("provisions")
-        pat = q.get("pat_bank_owners") if q.get("pat_bank_owners") is not None \
-            else q.get("pat_bank")
+        pat = owners_pat(q.get("pat_bank_owners"), q.get("pat_bank"))
         eps = q.get("eps_bank")
     else:
         # NBFC: interest earned less finance costs is NII; impairment is the
@@ -84,7 +94,7 @@ def lender_lines(q: dict) -> dict:
         pbt = q.get("pbt")
         ppop = None if pbt is None or prov is None \
             else pbt - (q.get("exceptional") or 0.0) + prov
-        pat = q.get("pat_owners") if q.get("pat_owners") is not None else q.get("pat")
+        pat = owners_pat(q.get("pat_owners"), q.get("pat"))
         eps = q.get("eps")
     nii = None if ie is None or ix is None else ie - ix
     cc = round(100 * prov / ppop, 2) if prov is not None and ppop and ppop > 0 else None

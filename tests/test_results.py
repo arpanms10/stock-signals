@@ -146,6 +146,13 @@ def test_bank_card_uses_nii_and_gnpa_movement():
     assert card["verdict"] == "strong"         # nii +1, pat +1
 
 
+def test_zero_attributable_profit_beside_a_profit_is_not_filed():
+    """APLAPOLLO files profit attributable to owners as 0.00 every quarter."""
+    assert sc.owners_pat(0.0, 263.1) == 263.1
+    assert sc.owners_pat(250.0, 263.1) == 250.0
+    assert sc.owners_pat(None, 263.1) == 263.1
+
+
 def test_zero_gnpa_is_treated_as_not_filed():
     """Consolidated bank filings carry GNPA as 0.00 -- not a perfect book."""
     assert sc.lender_lines({"kind": "bank", "gnpa_pct": 0.0})["gnpa"] is None
@@ -167,9 +174,13 @@ def test_history_keeps_one_basis_and_reads_banks_standalone(monkeypatch):
 
     monkeypatch.setattr(rf, "fetch_quarter", lambda url, end: {"revenue": 1.0})
     rows = rf.history("C", 8, filings=filings)
-    # Consolidated chosen from the latest quarter; June is a gap, not standalone.
+    # Standalone covers both quarters, consolidated only one: standalone,
+    # for the whole series -- never a consolidated quarter beside it.
     assert [(r["to_date"], r["basis"]) for r in rows] == \
-        [(dt.date(2026, 9, 30), "consolidated")]
+        [(dt.date(2026, 9, 30), "standalone"), (dt.date(2026, 6, 30), "standalone")]
+    filings.append(rec("30-Jun-2026", True))
+    rows = rf.history("C", 8, filings=filings)
+    assert {r["basis"] for r in rows} == {"consolidated"}     # tie: consolidated
 
 
 # --- reaction ---------------------------------------------------------------
