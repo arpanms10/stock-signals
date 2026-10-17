@@ -417,11 +417,12 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
         st.caption(f"✓ {r['symbol']} is on your watch list.")
     elif st.button(f"Watch {r['symbol']}", key=f"swing_watch_{r['symbol']}",
                    help="Adds it to the Watching tab, measured from today's close "
-                        "with this plan's T1 and T2."):
+                        "with this plan's stop, T1 and T2."):
         note = (f"swing {r['setup'] or 'no setup'} {v.as_of:%d-%b}: buy above "
                 f"{r['entry']:,.2f}, stop {r['stop']:,.2f}")
         ok, msg = wg.add(r["symbol"], source="swing", notes=note,
                          price=float(r["close"]),
+                         stop=float(r["stop"]),
                          targets=(float(r["t1"]), float(r["t2"])), use_log=False)
         (st.success if ok else st.info)(msg)
         if ok and on_watch:

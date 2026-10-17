@@ -323,13 +323,13 @@ def test_watching_swing_pick_keeps_its_own_baseline_and_targets(tmp_path, monkey
     import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: ("2026-01-02", 50.0))
     path = tmp_path / "w.csv"
-    ok, _ = wg.add("SW", source="swing", price=200.0, targets=(215.0, 230.0),
-                   use_log=False, path=path)
+    ok, _ = wg.add("SW", source="swing", price=200.0, stop=190.0,
+                   targets=(215.0, 230.0), use_log=False, path=path)
     row = wg.load(path)[0]
     assert ok and row.source == "swing"
     assert row.baseline_price == pytest.approx(200.0)
     assert row.baseline_date == dt.date.today().isoformat()
-    assert (row.t1, row.t2) == (215.0, 230.0)
+    assert (row.stop, row.t1, row.t2) == (190.0, 215.0, 230.0)
     rep = wg.report({"SW": 210.0}, path)[0]
     assert rep["t1_state"] == "" and rep["t2_state"] == "", \
         "momentum session counts do not apply to swing targets"
@@ -441,33 +441,115 @@ def test_sessions_between_skips_weekends():
     assert hz.sessions_between(dt.date(2026, 9, 4), dt.date(2026, 9, 7)) == 1
 
 
+def _watched(tmp_path, monkeypatch, **kw):
+    """One entry at a baseline of 100 on 1 Sep, stop 90, T1 115, T2 130."""
+    import watching as wg
+    monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
+    path = tmp_path / "w.csv"
+    wg.add("X", price=100.0, stop=90.0, targets=(115.0, 130.0), path=path, **kw)
+    rows = wg.load(path)
+    rows[0].baseline_date = "2026-09-01"
+    wg.save(rows, path)
+    return wg, path
+
+
 def test_target_hit_is_recorded_once_and_never_revised(tmp_path, monkeypatch):
     """The date a target was first met is a fact about the past."""
-    import watching as wg
-    monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
-    path = tmp_path / "w.csv"
-    wg.add("X", price=100.0, atr_hint=3.0, path=path)
-    row = wg.load(path)[0]
-    assert row.t1 > 100.0
-
-    first = dt.date(2026, 9, 10)
-    hits = wg.mark_target_hits({"X": row.t1 + 1}, first, path)
-    assert hits and "T1" in hits[0]
-    assert wg.load(path)[0].t1_hit_on == first.isoformat()
-
-    # A later, higher price must not move the recorded date.
-    wg.mark_target_hits({"X": row.t1 + 50}, dt.date(2026, 10, 1), path)
-    assert wg.load(path)[0].t1_hit_on == first.isoformat()
+    wg, path = _watched(tmp_path, monkeypatch)
+    bars = [("2026-09-02", 105, 98), ("2026-09-03", 116, 104)]
+    news = wg.check_outcomes({"X": bars}, path)
+    assert news and "T1" in news[0]
+    assert wg.load(path)[0].t1_hit_on == "2026-09-03"
+    # Running again, with more history, must not move the recorded date.
+    assert wg.check_outcomes({"X": bars + [("2026-09-04", 120, 112)]}, path) == []
+    assert wg.load(path)[0].t1_hit_on == "2026-09-03"
 
 
-def test_target_not_marked_below_the_level(tmp_path, monkeypatch):
-    import watching as wg
-    monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
-    path = tmp_path / "w.csv"
-    wg.add("X", price=100.0, atr_hint=3.0, path=path)
-    t1 = wg.load(path)[0].t1
-    assert wg.mark_target_hits({"X": t1 - 0.01}, dt.date(2026, 9, 10), path) == []
+def test_target_needs_the_high_to_reach_it(tmp_path, monkeypatch):
+    wg, path = _watched(tmp_path, monkeypatch)
+    assert wg.check_outcomes({"X": [("2026-09-02", 114.99, 100)]}, path) == []
     assert wg.load(path)[0].t1_hit_on == ""
+
+
+def test_baseline_session_itself_is_not_checked(tmp_path, monkeypatch):
+    """The baseline is that day's close; its own low came before the call."""
+    wg, path = _watched(tmp_path, monkeypatch)
+    assert wg.check_outcomes({"X": [("2026-09-01", 101, 80)]}, path) == []
+
+
+def test_stop_is_recorded_and_closes_the_entry(tmp_path, monkeypatch):
+    wg, path = _watched(tmp_path, monkeypatch)
+    bars = [("2026-09-02", 101, 95), ("2026-09-03", 96, 89.5),
+            ("2026-09-04", 140, 100)]                  # too late to count
+    news = wg.check_outcomes({"X": bars}, path)
+    row = wg.load(path)[0]
+    assert row.stopped_on == "2026-09-03" and "stop" in news[0]
+    assert row.t1_hit_on == "" and row.t2_hit_on == ""
+    assert wg.report({"X": 99.0}, path)[0]["outcome"] == "stopped"
+
+
+def test_a_bar_touching_stop_and_target_counts_as_stopped(tmp_path, monkeypatch):
+    """Daily bars do not say which came first; assuming the target would
+    flatter every result."""
+    wg, path = _watched(tmp_path, monkeypatch)
+    wg.check_outcomes({"X": [("2026-09-02", 120, 85)]}, path)
+    row = wg.load(path)[0]
+    assert row.stopped_on == "2026-09-02" and row.t1_hit_on == ""
+
+
+def test_stop_moves_to_the_baseline_after_t1(tmp_path, monkeypatch):
+    wg, path = _watched(tmp_path, monkeypatch)
+    bars = [("2026-09-02", 116, 101), ("2026-09-03", 110, 99.5)]
+    wg.check_outcomes({"X": bars}, path)
+    row = wg.load(path)[0]
+    assert row.t1_hit_on == "2026-09-02" and row.stopped_on == "2026-09-03"
+
+
+def test_t2_closes_the_entry(tmp_path, monkeypatch):
+    wg, path = _watched(tmp_path, monkeypatch)
+    bars = [("2026-09-02", 131, 101), ("2026-09-03", 100, 80)]
+    wg.check_outcomes({"X": bars}, path)
+    row = wg.load(path)[0]
+    assert (row.t1_hit_on, row.t2_hit_on, row.stopped_on) == \
+        ("2026-09-02", "2026-09-02", "")
+    assert wg.report({"X": 85.0}, path)[0]["outcome"] == "t2"
+
+
+def test_missing_days_are_caught_up(tmp_path, monkeypatch):
+    """A job that missed a week still finds the day the stop was hit."""
+    import pandas as pd
+    wg, path = _watched(tmp_path, monkeypatch)
+    df = pd.DataFrame({"date": [dt.date(2026, 9, d) for d in range(2, 12)],
+                       "high": [101] * 10, "low": [95] * 4 + [88] + [95] * 5})
+    wg.check_outcomes({"X": df}, path)
+    assert wg.load(path)[0].stopped_on == "2026-09-06"
+
+
+def test_missing_stop_is_derived_from_the_entrys_own_targets(tmp_path, monkeypatch):
+    """Entries from before the stop column: T1 sits t1_r x R above the
+    baseline, so the stop those targets were measured from is recoverable."""
+    import watching as wg
+    monkeypatch.setattr(wg, "_t1_r", lambda: 1.5)
+    path = tmp_path / "w.csv"
+    wg.save([wg.Watched("OLD", "2026-09-07", "2026-09-04", 100.0, 115.0, 130.0),
+             wg.Watched("BARE", "2026-09-07", "2026-09-04", 200.0)], path)
+    monkeypatch.setattr(wg, "_plan", lambda p, atr=None: (p * 0.9, p * 1.1, p * 1.2))
+    assert wg.fill_missing_plans(path) == 2
+    rows = {r.symbol: r for r in wg.load(path)}
+    assert rows["OLD"].stop == pytest.approx(90.0)
+    assert (rows["BARE"].stop, rows["BARE"].t1) == (pytest.approx(180.0),
+                                                     pytest.approx(220.0))
+    assert wg.fill_missing_plans(path) == 0, "filled once, never revised"
+
+
+def test_files_without_the_stop_columns_still_load(tmp_path):
+    import watching as wg
+    path = tmp_path / "w.csv"
+    path.write_text("symbol,added_on,baseline_date,baseline_price,t1,t2,"
+                    "t1_hit_on,t2_hit_on,source,conviction,notes\n"
+                    "A,2026-09-07,2026-09-04,10,11,12,,,rank,watch,\n")
+    row = wg.load(path)[0]
+    assert (row.stop, row.stopped_on, row.t1) == (0.0, "", 11.0)
 
 
 def _book(values, scores):

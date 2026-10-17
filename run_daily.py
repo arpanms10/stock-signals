@@ -217,7 +217,7 @@ def main() -> None:
             if not f.empty:
                 prices[sym] = float(f["close"].iloc[-1])
         filled = wg.fill_missing_baselines(prices)
-        newly_hit = wg.mark_target_hits(prices)
+        newly_hit = wg.update_from_store(con)
         rows = wg.report(prices)
         print("\n" + "=" * 68)
         print("WATCHING -- suggestions under close observation")

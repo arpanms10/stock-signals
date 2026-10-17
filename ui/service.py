@@ -302,6 +302,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
         if f is not None and not f.empty:
             watch_prices[sym] = float(f["close"].iloc[-1])
     wg.fill_missing_baselines(watch_prices)
+    wg.update_from_store(con)
     watching = wg.report(watch_prices)
 
     checks = [("market", fr.assess(mkt)), ("prices", fr.assess_prices(con, [])),

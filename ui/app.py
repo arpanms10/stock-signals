@@ -603,6 +603,20 @@ with tab_watch:
             "rule: slow positions returned 7.4% over the next six months "
             "against 9.6% for fast ones, too small a gap to trade on.")
 
+        if "outcome" in w:
+            hit = lambda col: int((w[col].fillna("") != "").sum())
+            out = w[w["stopped_on"].fillna("") != ""]
+            at_entry = int((out["t1_hit_on"].fillna("") != "").sum())
+            st.caption(
+                f"**Outcomes so far:** {hit('t1_hit_on')} reached T1, "
+                f"{hit('t2_hit_on')} reached T2, {len(out)} stopped out"
+                + (f" ({at_entry} at the flagged price after T1)" if at_entry else "")
+                + f", {int((w['outcome'] == 'open').sum())} still open. Checked "
+                "against each day's high and low since the flag, after every price "
+                "refresh. The stop moves up to the flagged price once T1 is "
+                "reached; a day that touched both the stop and a target counts "
+                "as stopped.")
+
         young = w[w["days"].fillna(0) < 21]
         if len(young):
             st.caption(f"{len(young)} of these are under 21 days old — too "
