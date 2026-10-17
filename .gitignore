@@ -14,6 +14,9 @@ config/holdings*.csv
 !config/holdings.example.csv
 data/holdings.json
 .env
+# Results scorecards (run_results.py). The figures are public, but the list of
+# symbols covered includes your holdings.
+data/results/
 
 # --- Large generated data ----------------------------------------------
 # market.db is ~450MB; GitHub rejects files over 100MB and this is entirely

@@ -170,3 +170,83 @@ def test_history_keeps_one_basis_and_reads_banks_standalone(monkeypatch):
     # Consolidated chosen from the latest quarter; June is a gap, not standalone.
     assert [(r["to_date"], r["basis"]) for r in rows] == \
         [(dt.date(2026, 9, 30), "consolidated")]
+
+
+# --- reaction ---------------------------------------------------------------
+
+from results import engine, reaction as rx, store  # noqa: E402
+
+import pandas as pd  # noqa: E402
+
+DAYS = [dt.date(2026, 10, d) for d in (12, 13, 14, 15, 16, 19, 20, 21, 22, 23)]
+
+
+def test_after_hours_filing_reacts_next_session():
+    assert rx.reaction_day(dt.datetime(2026, 10, 14, 21, 28), DAYS) == dt.date(2026, 10, 15)
+
+
+def test_intraday_filing_reacts_same_session():
+    assert rx.reaction_day(dt.datetime(2026, 10, 14, 15, 20), DAYS) == dt.date(2026, 10, 14)
+
+
+def test_weekend_filing_reacts_on_monday():
+    assert rx.reaction_day(dt.datetime(2026, 10, 17, 17, 46), DAYS) == dt.date(2026, 10, 19)
+
+
+def bars(closes, start=dt.date(2026, 8, 1)):
+    dates = list(pd.bdate_range(start, periods=len(closes)).date)
+    return pd.DataFrame({"date": dates, "open": closes, "high": [c * 1.01 for c in closes],
+                         "low": [c * 0.99 for c in closes], "close": closes})
+
+
+def test_measure_reports_move_atr_and_excess():
+    p = bars([100.0] * 30 + [104.0, 105.0, 105.0, 106.0, 108.0])
+    idx = p.assign(close=[1000.0] * 30 + [1010.0] * 5)
+    broadcast = dt.datetime.combine(p["date"].iloc[29], dt.time(20, 0))
+    m = rx.measure(p, broadcast, idx)
+    assert m["reaction_date"] == p["date"].iloc[30]
+    assert m["day_pct"] == 4.0
+    assert m["day_excess_pct"] == 3.0
+    assert m["d5_pct"] == 8.0
+    assert m["day_atr"] == pytest.approx(2.0, abs=0.1)     # ATR ~2% of price
+    assert m["reaction"] == "rallied"
+
+
+def test_measure_waits_for_prices():
+    p = bars([100.0] * 30)
+    late = dt.datetime.combine(p["date"].iloc[-1], dt.time(20, 0))
+    assert rx.measure(p, late) == {}
+
+
+def test_expected_quarter():
+    assert engine.expected_quarter(dt.date(2026, 10, 17)) == dt.date(2026, 9, 30)
+    assert engine.expected_quarter(dt.date(2027, 2, 1)) == dt.date(2026, 12, 31)
+    assert engine.expected_quarter(dt.date(2026, 4, 1)) == dt.date(2026, 3, 31)
+
+
+# --- storage round trip -----------------------------------------------------
+
+def test_cards_survive_a_csv_round_trip(tmp_path):
+    """NaN is truthy: read back from CSV, `exceptional or 0.0` kept NaN and
+    blanked every derived line. _clean restores None."""
+    rows = series([100, 100, 100, 100, 110, 110, 110, 130], pbt=40.0)
+    for r in rows:
+        r["exceptional"] = None
+    path = tmp_path / "q.csv"
+    store.save_quarters(rows, path)
+    cards = engine.cards_from_quarters(store.quarters(path), CFG)
+    newest = max(cards, key=lambda c: c["to_date"])
+    assert newest["revenue_yoy"] == 30.0 and newest["verdict"] == "strong"
+    # Older quarters get a card only when their year-ago quarter is on file.
+    assert len(cards) == 4
+
+
+def test_revised_filing_replaces_the_original(tmp_path):
+    path = tmp_path / "c.csv"
+    end = dt.date(2026, 9, 30)
+    store.save_cards([{"symbol": "X", "to_date": end, "xbrl": "a", "verdict": "weak"}], path)
+    df = store.save_cards([{"symbol": "X", "to_date": end, "xbrl": "b",
+                            "verdict": "strong"}], path)
+    assert len(df) == 1 and df.iloc[0]["verdict"] == "strong"
+    assert store.scored(store.cards(path), "X", end, "b")
+    assert not store.scored(store.cards(path), "X", end, "a")

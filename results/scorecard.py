@@ -197,8 +197,8 @@ def score(series: list[dict], cfg: dict) -> dict | None:
                 quality_hit = True
             ex = cur["exceptional"] or 0.0
             if abs(100 * ex / pbt) >= cfg["exceptional_pct_of_pbt"]:
-                flags.append(f"exceptional item of ₹{ex:,.0f} cr "
-                             f"({100 * ex / pbt:+.0f}% of PBT)")
+                flags.append(f"{_one_off(ex)} of ₹{abs(ex):,.0f} cr "
+                             f"({abs(100 * ex / pbt):.0f}% of PBT) in this quarter")
                 quality_hit = True
         points["quality"] = -1 if quality_hit else 0
         # A one-off in last year's quarter distorts reported PAT growth the
@@ -206,10 +206,11 @@ def score(series: list[dict], cfg: dict) -> dict | None:
         if py and py["pbt"] and py["pbt"] > 0:
             ex0 = py["exceptional"] or 0.0
             if abs(100 * ex0 / py["pbt"]) >= cfg["exceptional_pct_of_pbt"]:
-                flags.append(f"last year's quarter had a ₹{ex0:,.0f} cr exceptional "
-                             f"item -- read core PBT ({card['core_pbt_yoy']:+.0f}%), "
-                             f"not PAT" if card["core_pbt_yoy"] is not None else
-                             f"last year's quarter had a ₹{ex0:,.0f} cr exceptional item")
+                note = (f"last year's quarter had a ₹{abs(ex0):,.0f} cr "
+                        f"{_one_off(ex0)}")
+                if card["core_pbt_yoy"] is not None:
+                    note += f" -- read core PBT ({card['core_pbt_yoy']:+.0f}%), not PAT"
+                flags.append(note)
         if (card["pat_yoy"] or 0) > 10 and (card["revenue_yoy"] or 0) < 0:
             flags.append("profit up on falling revenue")
         if card["margin_yoy_bps"] is not None and card["margin_yoy_bps"] <= -200:
@@ -225,6 +226,10 @@ def score(series: list[dict], cfg: dict) -> dict | None:
     return card
 
 
+def _one_off(amount: float) -> str:
+    return "one-off gain" if amount > 0 else "one-off loss"
+
+
 def _sign_flags(cur, prev, flags: list[str]) -> None:
     if cur is None or prev is None:
         return
@@ -236,22 +241,28 @@ def _sign_flags(cur, prev, flags: list[str]) -> None:
         flags.append("loss-making both years")
 
 
-def headline(card: dict) -> str:
-    """One line: the numbers a reader would quote."""
+def _val(card, key: str) -> float | None:
+    """A card field, with a CSV round-trip's NaN read as missing."""
+    v = card.get(key)
+    return None if v is None or v != v else v
+
+
+def headline(card) -> str:
+    """One line: the numbers a reader would quote. Accepts a dict or a row."""
     def g(k: str) -> str:
-        v = card.get(k)
+        v = _val(card, k)
         return "n/a" if v is None else f"{v:+.0f}%"
     if card["kind"] in ("bank", "nbfc"):
         parts = [f"NII {g('nii_yoy')}", f"PAT {g('pat_yoy')}"]
-        if card.get("gnpa") is not None:
-            d = card.get("gnpa_qoq_bps")
+        if _val(card, "gnpa") is not None:
+            d = _val(card, "gnpa_qoq_bps")
             parts.append(f"GNPA {card['gnpa']:.2f}%"
-                         + (f" ({d:+.0f}bps)" if d is not None else ""))
+                         + (f" ({d:+.0f}bps QoQ)" if d is not None else ""))
     else:
         parts = [f"Rev {g('revenue_yoy')}", f"EBITDA {g('ebitda_yoy')}",
                  f"PAT {g('pat_yoy')}"]
-        if card.get("margin") is not None:
-            d = card.get("margin_yoy_bps")
-            parts.append(f"margin {card['margin']:.1f}%"
+        if _val(card, "margin") is not None:
+            d = _val(card, "margin_yoy_bps")
+            parts.append(f"EBITDA margin {card['margin']:.1f}%"
                          + (f" ({d:+.0f}bps)" if d is not None else ""))
-    return " · ".join(parts) + " YoY"
+    return "YoY: " + " · ".join(parts)
