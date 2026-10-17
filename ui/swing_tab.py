@@ -213,7 +213,9 @@ def _verdict(cal: dict | None) -> str | None:
             f"**Backtest** below.")
 
 
-def render() -> None:
+def render(on_watch=None) -> None:
+    """on_watch runs after a pick is added to the watch list, so the page can
+    drop its cached copy of that list."""
     cfg = _cfg()
     s = cfg["swing"]
     st.subheader("Swing: setups to hold for days to a few weeks")
@@ -291,11 +293,11 @@ def render() -> None:
             st.warning("Nothing eligible. Is the price history current? "
                        "Use **Refresh prices** in the sidebar.")
             return
-        _list(v, cfg, capital, show_all, cal)
+        _list(v, cfg, capital, show_all, cal, on_watch)
 
 
 def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
-          cal: dict | None) -> None:
+          cal: dict | None, on_watch=None) -> None:
     s = cfg["swing"]
     t = sr.suggestion_rows(v.table, capital, cfg)
     sug = t[t["suggest"]]
@@ -409,3 +411,18 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                 f"{c.trend_note({'price': r['close'], 'sma50': r['sma50'], 'sma200': r['sma200'], 'rsi': r['rsi14']})}"
                 f" · ATR {r['atr_pct']:.1f}% · volume {r['vol_ratio']:.1f}× average"
                 f"</div>", unsafe_allow_html=True)
+
+    import watching as wg
+    if r["symbol"] in set(wg.symbols()):
+        st.caption(f"✓ {r['symbol']} is on your watch list.")
+    elif st.button(f"Watch {r['symbol']}", key=f"swing_watch_{r['symbol']}",
+                   help="Adds it to the Watching tab, measured from today's close "
+                        "with this plan's T1 and T2."):
+        note = (f"swing {r['setup'] or 'no setup'} {v.as_of:%d-%b}: buy above "
+                f"{r['entry']:,.2f}, stop {r['stop']:,.2f}")
+        ok, msg = wg.add(r["symbol"], source="swing", notes=note,
+                         price=float(r["close"]),
+                         targets=(float(r["t1"]), float(r["t2"])), use_log=False)
+        (st.success if ok else st.info)(msg)
+        if ok and on_watch:
+            on_watch()

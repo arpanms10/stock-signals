@@ -317,6 +317,24 @@ def test_watching_report_measures_from_the_baseline(tmp_path, monkeypatch):
     assert [r["symbol"] for r in rep] == ["UP", "DOWN"], "best first"
 
 
+def test_watching_swing_pick_keeps_its_own_baseline_and_targets(tmp_path, monkeypatch):
+    """A swing pick is measured from the scan that made it, with the plan's
+    targets -- not from an older momentum call in the decision log."""
+    import watching as wg
+    monkeypatch.setattr(wg, "_baseline_from_log", lambda s: ("2026-01-02", 50.0))
+    path = tmp_path / "w.csv"
+    ok, _ = wg.add("SW", source="swing", price=200.0, targets=(215.0, 230.0),
+                   use_log=False, path=path)
+    row = wg.load(path)[0]
+    assert ok and row.source == "swing"
+    assert row.baseline_price == pytest.approx(200.0)
+    assert row.baseline_date == dt.date.today().isoformat()
+    assert (row.t1, row.t2) == (215.0, 230.0)
+    rep = wg.report({"SW": 210.0}, path)[0]
+    assert rep["t1_state"] == "" and rep["t2_state"] == "", \
+        "momentum session counts do not apply to swing targets"
+
+
 def test_missing_baseline_is_filled_once(tmp_path, monkeypatch):
     import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)

@@ -571,8 +571,8 @@ with tab_watch:
 
     w = pd.DataFrame(snap.watching)
     if w.empty:
-        st.info("Nothing being watched yet. Add candidates from the Market tab, "
-                "or run `run_daily.py --watch-add SYMBOL`.")
+        st.info("Nothing being watched yet. Add candidates from the Market or "
+                "Swing tab, or run `run_daily.py --watch-add SYMBOL`.")
     else:
         settled = w[w["days"].fillna(0) >= 21]
         cols = st.columns(4)
@@ -639,4 +639,4 @@ with tab_fno:
 # ======================================================================= SWING
 with tab_swing:
     from ui import swing_tab
-    swing_tab.render()
+    swing_tab.render(on_watch=load.clear)

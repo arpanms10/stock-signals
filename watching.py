@@ -36,7 +36,7 @@ HELP = """\
 #   t1, t2          target prices set when the name was flagged
 #   t1_hit_on       first session the price closed at or above T1 (blank until)
 #   t2_hit_on       same for T2
-#   source          why it is here: rank | advisor | manual
+#   source          why it is here: rank | advisor | swing | manual
 #   conviction      your own note: watch | interested | avoid
 #   notes           yours
 """
@@ -124,8 +124,14 @@ def _baseline_from_log(symbol: str) -> tuple[str, float] | None:
 def add(symbol: str, source: str = "manual", conviction: str = "watch",
         notes: str = "", price: float | None = None,
         atr_hint: float | None = None,
+        targets: tuple[float, float] | None = None,
+        use_log: bool = True,
         path: Path | str = WATCHING_PATH) -> tuple[bool, str]:
-    """Start watching a symbol, inheriting its baseline from the log if known."""
+    """Start watching a symbol, inheriting its baseline from the log if known.
+
+    The decision log records momentum calls. A swing pick is a different call,
+    made by today's scan, so its caller passes use_log=False with the scan's
+    price and its own T1/T2 rather than borrow a momentum baseline."""
     symbol = symbol.strip().upper()
     if not symbol:
         return False, "Empty symbol."
@@ -134,7 +140,7 @@ def add(symbol: str, source: str = "manual", conviction: str = "watch",
         return False, f"{symbol} is already on the watch list."
 
     today = dt.date.today().isoformat()
-    logged = _baseline_from_log(symbol)
+    logged = _baseline_from_log(symbol) if use_log else None
     if logged:
         b_date, b_price = logged
         note = (f"baseline from the decision log: first flagged {b_date} "
@@ -147,8 +153,8 @@ def add(symbol: str, source: str = "manual", conviction: str = "watch",
         note = ("no baseline price -- run run_daily.py to fill it, or set "
                 "baseline_price by hand")
 
-    t1 = t2 = 0.0
-    if b_price > 0:
+    t1, t2 = targets or (0.0, 0.0)
+    if b_price > 0 and not targets:
         try:
             from scoring import timing as _t
             from signals.engine import initial_stop, targets
@@ -230,7 +236,9 @@ def report(prices: dict[str, float], path: Path | str = WATCHING_PATH) -> list[d
             from scoring import timing as _t
             from strategy import horizon as hz
             cfg = _t.load_config()
-            if w.baseline_date:
+            # The session counts are measured on momentum targets; a swing
+            # trade's T1/T2 sit much closer and expire after a few weeks.
+            if w.baseline_date and w.source != "swing":
                 start = dt.date.fromisoformat(w.baseline_date)
                 elapsed = hz.sessions_between(start, today)
                 for tgt, hit_on, setter in (("t1", w.t1_hit_on, "1"),

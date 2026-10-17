@@ -185,7 +185,8 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
         state = r.get("t1_hit_on") and "hit" or r.get("t1_state") or ""
         tone = "good" if state == "hit" else HORIZON_TONE.get(state, "neutral")
         cells = [
-            f'<b>{r["symbol"]}</b>',
+            f'<b>{r["symbol"]}</b>'
+            + (" &nbsp;" + pill("swing", "info") if r.get("source") == "swing" else ""),
             r.get("baseline_date") or "--",
             money(r.get("baseline_price")),
             money(r.get("price")),
