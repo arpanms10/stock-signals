@@ -198,3 +198,28 @@ def update_reactions(cfg: dict | None = None, log=print) -> int:
     if updated:
         store.save_cards(updated)
     return len(updated)
+
+
+def badge(card, today: dt.date, next_date: dt.date | None = None) -> str:
+    """Short text for other tables: 'Q2 strong · 16 Oct', or 'reports 21 Oct'.
+
+    A card counts only when it is for the quarter now reporting; last
+    quarter's verdict next to a stock about to report would mislead."""
+    if card is not None and card["to_date"] >= expected_quarter(today):
+        when = card["broadcast"]
+        tail = f" · {when:%d %b}" if isinstance(when, (dt.datetime, pd.Timestamp)) \
+            and not pd.isna(when) else ""
+        return f"{card['quarter'][-2:]} {card['verdict']}{tail}"
+    if next_date is not None:
+        return f"reports {next_date:%d %b}"
+    return ""
+
+
+def badges(symbols, today: dt.date, upcoming_dates: dict | None = None) -> dict[str, str]:
+    """symbol -> badge, from what is on file. No network unless the caller
+    passes nothing for `upcoming_dates` -- then the (cached) NSE calendar."""
+    latest = store.latest()
+    by_sym = {r["symbol"]: r for r in latest.to_dict("records")} if not latest.empty else {}
+    if upcoming_dates is None:
+        upcoming_dates = upcoming(symbols, today, log=lambda *_: None)
+    return {s: badge(by_sym.get(s), today, upcoming_dates.get(s)) for s in symbols}

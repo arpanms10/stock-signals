@@ -8,6 +8,8 @@ Sections:
   5. F&O         -- PCR, OI support/resistance, expected range (ui/fno_tab.py)
   6. SWING       -- pullback / breakout setups, scored, with a trade plan
                     (ui/swing_tab.py)
+  7. RESULTS     -- this season's quarterly results for what you follow
+                    (ui/results_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -39,6 +41,30 @@ QUALITY_NOTE = st.column_config.TextColumn(
     help="Why there is no quality score. Not fetched: no fundamentals on file "
          "yet -- use 'Refresh fundamentals'. Too little data: fetched, but too "
          "few figures came back to score.")
+
+
+RESULTS_COL = st.column_config.TextColumn(
+    "Results", help="This quarter's results verdict and filing date, or the "
+                    "announced results date. Judged against the company's own "
+                    "recent quarters -- see the Results tab.")
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def results_badges(symbols: tuple[str, ...]) -> dict[str, str]:
+    """Results column for any table; empty strings if nothing is on file."""
+    import datetime as dt
+    from results import engine as results_engine
+    try:
+        return results_engine.badges(list(symbols), dt.date.today())
+    except Exception:
+        return {}
+
+
+def with_results(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "symbol" not in df:
+        return df
+    b = results_badges(tuple(sorted(df["symbol"].astype(str))))
+    return df.assign(results=[b.get(s, "") for s in df["symbol"]])
 
 
 def with_quality_note(df: pd.DataFrame) -> pd.DataFrame:
@@ -123,9 +149,9 @@ for f in snap.freshness:
 for w in snap.warnings:
     st.warning(w)
 
-tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing = st.tabs(
+tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  "])
+     "  Swing  ", "  Results  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -164,9 +190,9 @@ with tab_hold:
                             f"{c.money(val)} "
                             f"({100 * val / snap.book_value:.0f}% of book)")
                 st.dataframe(
-                    with_quality_note(grp)[["symbol", "value", "pct_of_book",
-                                            "pnl_pct", "quality", "quality_note",
-                                            "rank"]]
+                    with_results(with_quality_note(grp))[
+                        ["symbol", "value", "pct_of_book", "pnl_pct", "quality",
+                         "quality_note", "results", "rank"]]
                     .rename(columns={"pct_of_book": "% book", "pnl_pct": "P&L %",
                                      "quality": "Quality", "rank": "Rank"})
                     .sort_values("value", ascending=False),
@@ -178,6 +204,7 @@ with tab_hold:
                         "Quality": st.column_config.ProgressColumn(
                             min_value=0, max_value=100, format="%d"),
                         "quality_note": QUALITY_NOTE,
+                        "results": RESULTS_COL,
                     })
         with right:
             st.subheader("Sector exposure")
@@ -460,6 +487,7 @@ with tab_market:
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
                 "quality_note": QUALITY_NOTE,
+                "results": RESULTS_COL,
                 "Held": st.column_config.CheckboxColumn(),
                 alt_label: st.column_config.NumberColumn(
                     format="%d",
@@ -476,7 +504,8 @@ with tab_market:
 # ================================================================= MOMENTUM
 with tab_mom:
     lbs = getattr(snap, "lookbacks", None) or []
-    t = with_quality_note(pd.DataFrame(getattr(snap, "momentum_table", None) or []))
+    t = with_results(with_quality_note(
+        pd.DataFrame(getattr(snap, "momentum_table", None) or [])))
     if len(lbs) < 2 or t.empty:
         st.info("Needs a ranked universe and `compare_lookback_months` in "
                 "config/scoring.yaml. Press Recompute after a data refresh.")
@@ -513,7 +542,7 @@ with tab_mom:
         st.dataframe(
             view[["symbol", "status", "rank_main", "score_main", "rank_cmp",
                   "score_cmp", "price", "ret_main", "ret_cmp", "ret_1m", "vol",
-                  "quality", "quality_note", "sector", "held"]]
+                  "quality", "quality_note", "results", "sector", "held"]]
             .rename(columns={
                 "symbol": "Stock", "status": "On list",
                 "rank_main": f"{a}M rank", "score_main": f"{a}M score",
@@ -548,6 +577,7 @@ with tab_mom:
                 "Quality": st.column_config.ProgressColumn(
                     min_value=0, max_value=100, format="%d"),
                 "quality_note": QUALITY_NOTE,
+                "results": RESULTS_COL,
                 "Held": st.column_config.CheckboxColumn(),
             })
         st.caption("Scores are only comparable within one column: a 9M and a "
@@ -664,3 +694,7 @@ with tab_fno:
 with tab_swing:
     from ui import swing_tab
     swing_tab.render(on_watch=load.clear)
+
+with tab_results:
+    from ui import results_tab
+    results_tab.render(run_script=lambda label, args: run_and_reload(label, args, st))

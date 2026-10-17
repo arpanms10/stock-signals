@@ -6,6 +6,8 @@ pressed; results are then cached for the day.
 """
 from __future__ import annotations
 
+import datetime as dt
+
 import pandas as pd
 import streamlit as st
 
@@ -296,6 +298,21 @@ def render(on_watch=None) -> None:
         _list(v, cfg, capital, show_all, cal, on_watch)
 
 
+def _results(view: pd.DataFrame, as_of) -> list[str]:
+    """Results badge per row. The scan already looked up announced dates
+    (results_on), so this reads only the local results store."""
+    try:
+        from results import engine as results_engine
+        upcoming = {}
+        if "results_on" in view:
+            upcoming = {s: d for s, d in zip(view["symbol"], view["results_on"])
+                        if isinstance(d, dt.date)}
+        b = results_engine.badges(list(view["symbol"]), dt.date.today(), upcoming)
+        return [b.get(s, "") for s in view["symbol"]]
+    except Exception:
+        return [""] * len(view)
+
+
 def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
           cal: dict | None, on_watch=None) -> None:
     s = cfg["swing"]
@@ -346,15 +363,17 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
 
     # Status only varies in the full list; in the top list every row is
     # "suggested", so it would only push useful columns off the edge.
+    view = view.assign(results=_results(view, v.as_of))
     cols = (["rank", "symbol", "setup"] + (["status"] if show_all else [])
             + ["score", "close", "entry", "stop", "stop_pct", "t1", "t2", "qty",
-               "position", "sector"])
+               "position", "results", "sector"])
     st.dataframe(
         view[cols].replace({"setup": {"": "—"}}).rename(columns={
             "rank": "#", "symbol": "Stock", "setup": "Setup", "score": "Score",
             "close": "Close", "entry": "Buy above", "stop": "Stop",
             "stop_pct": "Risk %", "t1": "T1", "t2": "T2", "qty": "Qty",
-            "position": "Position", "status": "Status", "sector": "Sector"}),
+            "position": "Position", "status": "Status", "sector": "Sector",
+            "results": "Results"}),
         hide_index=True, width="stretch",
         height=min(38 + 35 * len(view), 720),
         column_config={
@@ -375,6 +394,9 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                 format="%d", help=f"Shares so the stop loses {s['risk_per_trade_pct']}% "
                                   f"of capital (max {s['max_position_pct']:.0f}% in one name)"),
             "Position": st.column_config.NumberColumn(format="₹%d"),
+            "Results": st.column_config.TextColumn(
+                help="This quarter's results verdict (vs the company's own "
+                     "trend), or its announced results date"),
         })
 
     st.divider()
