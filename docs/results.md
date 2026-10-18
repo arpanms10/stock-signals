@@ -218,6 +218,81 @@ What it says:
    it is weaker (t = 1.7). Read the drift as real but modest, not as a
    large-cap anomaly.
 
-Not yet acted on anywhere. Survivorship is settled; what remains is whether
-a rule built on it survives costs -- a 60-session hold after each reaction
-is a lot of turnover in results season.
+Not yet acted on anywhere. Survivorship is settled; whether a rule built on
+it survives costs is the next section.
+
+## Does the drift survive costs as a rule?
+
+```bash
+PYTHONPATH=. .venv/bin/python run_drift_backtest.py               # 500 random draws, ~5 min
+PYTHONPATH=. .venv/bin/python run_drift_backtest.py --ohlc-only   # drop close-only filings
+```
+
+**Tested 2026-10-18 on the survivorship-free events above. It does not
+pass.** Nothing ranks on the reaction.
+
+The rule, fixed before running: after every filing whose reaction was
+*rallied* (≥1 ATR), buy at the reaction-day close and sell at the close 20,
+40 or 60 sessions later. The book has 20 equal slots (5% of NAV per name,
+the position cap); a rally that finds every slot taken, or the name already
+held, is skipped, and same-day rallies fill slots in broadcast order. Idle
+capital sits in the NIFTY 500 (an index fund, no cost charged), so the book
+is always fully in equities. 0.35% per round trip, half on each side. A
+holding that stops trading keeps its last price and is sold at it. Book
+from 14 Oct 2021 (the first full results season on file) to 16 Oct 2026.
+
+The gate, also fixed before running: the 20-slot book's excess over the
+equal-weight point-in-time universe, per calendar quarter, after costs,
+t ≥ 2 at 20 or 60 sessions.
+
+| 20 slots | CAGR | Worst drawdown | Turnover | Excess a quarter vs EW universe | Rallies skipped |
+|---|---|---|---|---|---|
+| Hold 20 sessions | 10.6% | -21.5% | 4.7x a year | -0.02% (t = -0.0, 12 of 21) | 231 of 703 |
+| Hold 40 | 12.8% | -23.9% | 4.0x | +0.51% (t = 0.9) | 298 |
+| **Hold 60** | 13.2% | -25.5% | 3.9x | **+0.69% (t = 0.9, 11 of 21)** | 310 |
+| Equal-weight universe | 10.2% | -23.7% | | | |
+| NIFTY 500 | 7.1% | -18.8% | | | |
+
+Controls on the same entry dates, holds and slots (500 draws each; the
+book's quarterly excess over the control's mean):
+
+| 20 slots | Random universe member | Random same-day filer | Idle capital in the EW universe instead |
+|---|---|---|---|
+| Hold 20 | +0.96% (t = 3.2), CAGR 6.3% | +0.43% (t = 1.2), CAGR 8.6% | +0.51% vs EW (t = 1.7) |
+| Hold 40 | +1.33% (t = 3.0), 6.9% | +0.95% (t = 2.4), 8.4% | +0.82% (t = 1.8) |
+| Hold 60 | +1.16% (t = 1.4), 8.2% | +1.12% (t = 1.7), 8.3% | +0.67% (t = 0.8) |
+
+Per filing rather than per book: each rallied stock's return over the hold,
+less the round trip, less the equal-weight universe over the same window,
+averaged within each filing quarter (21 quarters):
+
+| | 20 sessions | 40 sessions | 60 sessions |
+|---|---|---|---|
+| Rallied, net, vs EW universe | +0.29% (t = 1.3) | +1.20% (t = 2.6) | +1.82% (t = 2.5) |
+| ... without the 105 close-only filings | +0.19% (t = 0.6) | +0.90% (t = 1.3) | +1.46% (t = 1.6) |
+| Rallied minus sold off, both legs paying (reference; no shorting) | +0.40% (t = 0.9) | +2.20% (t = 2.8) | +2.71% (t = 2.2) |
+
+What it says:
+
+1. **The 20-session drift is gone after costs.** Its t = 3.3 was a spread
+   with a short leg; long only, after 0.35%, rallied stocks match the
+   universe.
+2. **At 40-60 sessions a per-filing edge of 1-2% a quarter remains, but it
+   is fragile.** It halves and loses significance without the 105 filings
+   priced from closes only (companies the price store never tracked, whose
+   reaction is sized on the close-to-close range).
+3. **A capped book does not capture it.** Results season bunches rallies
+   into a few weeks: 20 slots fill in the first days and skip a third of
+   them at 20 sessions, 44% at 60, in broadcast order, which is arbitrary. The book lands at 0.7% a
+   quarter, t = 0.9, with a deeper drawdown than the universe and 4x a year
+   of turnover (about 1.4% a year in costs).
+4. **Against random picks with the same turnover it does better**, which
+   says the rally carries some information -- but most of that gap is the
+   control paying costs on random stocks (6-8% a year, below the universe).
+   Against that day's other filers it is t = 1.2-2.4.
+5. **Not pre-registered, and so not a pass:** with 40 slots (no cap in
+   practice, ~30 names) and a 60-session hold the book does +1.1% a
+   quarter, t = 2.4 (2.4 without the close-only filings too), CAGR 15.5%,
+   drawdown -20.5%. It is the best of nine book settings, found after
+   looking. If anything is to be tracked forward, it is this one, on paper,
+   from the next results season.

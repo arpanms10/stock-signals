@@ -100,6 +100,19 @@ sessions (t = 2.6). Full write-up in [quarterly results](results.md).
 (t = 2.6), +1.5% over 20 (t = 3.3); +3.0% (t = 2.2) when the 105 filings
 priced from closes only are left out.
 
+**As a long-only rule after costs (2026-10-18): fails.** Buy each rallied
+filing at the reaction-day close, 20 equal slots, idle capital in the NIFTY
+500, 0.35% a round trip, Oct 2021 to Oct 2026. Against the equal-weight
+point-in-time universe: hold 20 sessions -0.02% a quarter (t = 0.0), hold 60
++0.69% (t = 0.9); CAGR 10.6% and 13.2% against the universe's 10.2%; worst
+drawdown -21.5% and -25.5% against -23.7%; turnover about 4x a year. Per
+filing, rallied stocks beat the universe by 1.8% over 60 sessions after
+costs (t = 2.5), but only 1.5% (t = 1.6) without the close-only filings,
+and a capped book skips a third to 44% of rallies because results season
+bunches them. A 40-slot book at 60 sessions reaches t = 2.4, but that setting was
+found after looking. Nothing ranks on the reaction. Full write-up in
+[quarterly results](results.md#does-the-drift-survive-costs-as-a-rule).
+
 
 ## Momentum on a continuous price history (2026-10-11)
 
