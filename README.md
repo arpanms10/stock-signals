@@ -39,7 +39,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 
 | | |
 |---|---|
-| `run_ui.py` | Dashboard: holdings and market, localhost only |
+| `run_ui.py` | Dashboard, localhost only: Today, Portfolio, Ideas, Market and Research menus ([dashboard](docs/dashboard.md)) |
 | `run_advisor.py` | Verdicts on your book, as text |
 | `run_momentum.py` | Rank the universe |
 | `run_pit_momentum.py` | Survivorship-free backtest |
@@ -109,7 +109,7 @@ what you held is deliberately not in it.
 
 ## Swing trading
 
-The dashboard's **Swing** tab looks for short-term trades -- days to a few
+The dashboard's **Swing** page looks for short-term trades -- days to a few
 weeks -- in the Nifty 200 or 500: liquid stocks in an uptrend showing a
 **pullback** to the 20 EMA or a **breakout** from a tight base. Each gets a
 0-100 score and a fixed plan: buy above the signal day's high, stop under
@@ -139,7 +139,7 @@ PYTHONPATH=. .venv/bin/python run_swing.py --backtest            # refresh the B
 
 ## Quarterly results
 
-The dashboard's **Results** tab scores each quarterly filing for your
+The dashboard's **Quarterly results** page scores each quarterly filing for your
 holdings, the watch list and the latest swing and momentum picks, straight
 from NSE's XBRL. For an ordinary company it covers YoY revenue, EBITDA and
 profit, whether revenue growth is speeding up against its own recent pace,
@@ -173,7 +173,7 @@ sessions (t = 2.6).
 
 ## GARP & QARP picker
 
-The **GARP / QARP** tab ranks the Nifty 200 two ways, on fundamentals taken
+The **GARP / QARP** page ranks the Nifty 200 two ways, on fundamentals taken
 only from NSE's filings and the price on the day. **GARP** (growth at a
 reasonable price) looks for core profit growing at least 15% a year, lastingly,
 at a PEG of 1.5 or less. **QARP** (quality at a reasonable price) looks for the
@@ -195,7 +195,7 @@ PYTHONPATH=. .venv/bin/python run_picker.py --backtest
 
 ## Mutual funds
 
-The **Mutual Funds** tab (and `run_mf.py`) judges any mutual fund against its
+The **Mutual funds** page (and `run_mf.py`) judges any mutual fund against its
 SEBI category and gives **EXIT / TRIM / ADD / WATCH / HOLD**, with reasons.
 It uses month-end NAVs of Direct Growth plans from AMFI's free files, and
 funds that later closed or merged are included.
@@ -244,7 +244,7 @@ still count towards your caps. Caps and thresholds are in
 
 ## Analyze any stock
 
-The dashboard's **Analyze** tab looks at one stock on demand: any NSE listing,
+The dashboard's **Analyze a stock** page looks at one stock on demand: any NSE listing,
 not only the ranked universe. Type a ticker, a company name or an ISIN, then
 pick an analyst:
 

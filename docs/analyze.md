@@ -7,7 +7,7 @@ verdict, and what they can't tell you.
 
 ---
 
-The dashboard's **Analyze** tab looks at one stock at a time. That can be any
+The dashboard's **Analyze a stock** page (Research menu) looks at one stock at a time. That can be any
 NSE-listed company, not only those in the NIFTY 500, your holdings or the
 watchlist.
 

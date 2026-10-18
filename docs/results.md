@@ -16,9 +16,9 @@ PYTHONPATH=. .venv/bin/python run_results.py --no-fetch       # report from what
 PYTHONPATH=. .venv/bin/python run_results_backtest.py         # does the verdict predict drift?
 ```
 
-The dashboard's **Results** tab shows the same, with a filter by why each
+The dashboard's **Quarterly results** page shows the same, with a filter by why each
 stock is followed, one stock's last eight quarters, and who reports next.
-**Check for new results** (in the tab and the sidebar) runs `run_results.py`.
+**Check for new results** (on the page and on Data and jobs) runs `run_results.py`.
 The Holdings, Momentum and Swing tables get a **Results** column:
 `Q2 strong · 16 Oct` once this quarter is filed, `reports 21 Oct` before.
 
