@@ -4,7 +4,7 @@ Two steps, kept apart so the backtest can test the first on its own:
 
   state()   judged on the fund alone, against its category:
             YOUNG, WEAK, SLIPPING, STRONG or OK
-  decide()  the state plus your book (config/mf_holdings.csv): how much of
+  decide()  the state plus your book (config/mf_holdings.csv or .xlsx): how much of
             the MF portfolio it is, whether the category or a near-twin is
             already overweight, and whether a sale now costs exit load / STCG
 

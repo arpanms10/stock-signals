@@ -19,7 +19,8 @@ Also on the dashboard's **Mutual Funds** tab.
 
 ## Your book, without amounts
 
-`config/mf_holdings.csv` (git-ignored; copy `config/mf_holdings.example.csv`):
+`config/mf_holdings.csv` **or** `config/mf_holdings.xlsx`, but not both. Both
+are git-ignored; copy `config/mf_holdings.example.csv` to start:
 
 ```
 fund,pct,held_over_1y,notes
@@ -33,6 +34,9 @@ Kotak Emerging Equity,20,no,
 - `held_over_1y` is optional. It only changes the warning on a sell. Under a
   year, most equity funds charge an exit load of about 1% and gains are
   short-term. Blank means "check before selling".
+- In Excel, the first sheet is read. Headers can be loose ("Fund Name",
+  "Scheme", "Weight", "Allocation %"), and a column formatted as a percentage
+  (30% stored as 0.3) is read as 30.
 - `fund` is a name as you'd say it, or the AMFI code. Old names work
   ("Axis Bluechip", "Kotak Emerging Equity"); an ambiguous one ("hdfc") lists
   candidates instead of guessing.

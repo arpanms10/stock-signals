@@ -1,6 +1,6 @@
 """Mutual Funds tab: your MF book's verdicts, and any fund by name.
 
-Reads config/mf_holdings.csv (percent of the MF book, no amounts) and the
+Reads config/mf_holdings.csv or .xlsx (percent of the MF book, no amounts) and the
 NAV history in data/mf/mf.db (run_mf.py --refresh). Funds typed in the box
 are judged alongside, as not held. Same engine as run_mf.py.
 """
@@ -35,7 +35,7 @@ def _cat(k: str | None) -> str:
 
 def render() -> None:
     st.caption("Each fund against its SEBI category on month-end Direct Growth NAVs. "
-               "Your book comes from config/mf_holdings.csv (% of the MF portfolio). "
+               "Your book comes from config/mf_holdings.csv or .xlsx (% of the MF portfolio). "
                "Decision support, not advice.")
     q = st.text_input("Evaluate funds (comma-separated names or AMFI codes)",
                       placeholder="parag parikh flexi cap, hdfc flexi cap")

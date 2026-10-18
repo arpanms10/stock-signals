@@ -228,3 +228,43 @@ def test_unranked_held_funds_hold_but_still_obey_category_caps():
     d = {x.code: x for x in verdict.decide(s, {}, RULES, _book([(7, 30, "yes"), (8, 70, "yes")]))}
     assert d[7].action == "TRIM" and d[7].target == pytest.approx(10)
     assert d[8].action == "HOLD" and "yardstick" in d[8].reasons[0]
+
+
+# --- holdings file: CSV or Excel --------------------------------------------
+
+from mf import holdings as hold   # noqa: E402
+
+
+def test_xlsx_book_with_loose_headers_and_percent_cells(tmp_path):
+    p = tmp_path / "mf_holdings.xlsx"
+    pd.DataFrame({"Fund Name": ["Parag Parikh Flexi Cap", "HDFC Mid-Cap Opportunities", 120503],
+                  "Allocation %": [0.5, 0.3, 0.2],          # cells formatted as %
+                  "Held over 1 year": ["yes", "no", None]}).to_excel(p, index=False)
+    book = hold.load(SCHEMES, "2026-10", p)
+    t = book.table.set_index("code")
+    assert list(t.index) == [122639, 118989, 120503]
+    assert t["weight"].tolist() == pytest.approx([50, 30, 20])
+    assert t.at[118989, "held_over_1y"] == "no"
+    assert book.unresolved == [] and book.warnings == []
+
+
+def test_csv_book_still_works_and_flags_unknown_funds(tmp_path):
+    p = tmp_path / "mf_holdings.csv"
+    p.write_text("# comment\nfund,pct,held_over_1y\nPPFAS flexi,60,yes\nhdfc,40,\n")
+    book = hold.load(SCHEMES, "2026-10", p)
+    assert book.table["code"].tolist() == [122639]
+    assert book.unresolved[0][0] == "hdfc"
+
+
+def test_both_files_present_is_an_error(tmp_path):
+    (tmp_path / "mf_holdings.csv").write_text("fund,pct\nx,100\n")
+    pd.DataFrame({"fund": ["x"], "pct": [100]}).to_excel(tmp_path / "mf_holdings.xlsx", index=False)
+    with pytest.raises(SystemExit):
+        hold.find_file(tmp_path)
+
+
+def test_missing_percentage_column_names_what_was_found(tmp_path):
+    p = tmp_path / "mf_holdings.xlsx"
+    pd.DataFrame({"Scheme": ["PPFAS flexi"], "Amount": [100000]}).to_excel(p, index=False)
+    with pytest.raises(SystemExit, match="amount"):
+        hold.load(SCHEMES, "2026-10", p)

@@ -1,5 +1,6 @@
 # Your mutual fund book, as a share of the whole MF portfolio -- no amounts.
-# Copy to config/mf_holdings.csv (git-ignored) and edit.
+# Copy to config/mf_holdings.csv (git-ignored) and edit -- or keep the same
+# columns in config/mf_holdings.xlsx (first sheet). Not both.
 #   fund          name as you'd say it, or the AMFI scheme code
 #   pct           % of the total MF portfolio; the column should sum to 100
 #   held_over_1y  optional yes / no / blank: only changes the exit-load / STCG

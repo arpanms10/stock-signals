@@ -1,7 +1,7 @@
 """Mutual funds: judge a fund against its category and say EXIT / TRIM / ADD / WATCH / HOLD.
 
     PYTHONPATH=. .venv/bin/python run_mf.py --refresh                 # NAV history (first run ~25 min)
-    PYTHONPATH=. .venv/bin/python run_mf.py                           # your book (config/mf_holdings.csv)
+    PYTHONPATH=. .venv/bin/python run_mf.py                           # your book (config/mf_holdings.csv or .xlsx)
     PYTHONPATH=. .venv/bin/python run_mf.py "parag parikh flexi" "hdfc flexi cap"
     PYTHONPATH=. .venv/bin/python run_mf.py "quant small cap" "nippon small cap" --compare
     PYTHONPATH=. .venv/bin/python run_mf.py --excel                   # workbook in reports/mf/
@@ -70,7 +70,7 @@ def main() -> None:
     ap.add_argument("funds", nargs="*", help="fund names or AMFI codes to evaluate")
     ap.add_argument("--refresh", action="store_true", help="download missing NAV months first")
     ap.add_argument("--compare", action="store_true", help="side-by-side metrics table")
-    ap.add_argument("--no-holdings", action="store_true", help="ignore config/mf_holdings.csv")
+    ap.add_argument("--no-holdings", action="store_true", help="ignore config/mf_holdings.csv / .xlsx")
     ap.add_argument("--excel", nargs="?", const=REPORT, type=Path, help="write a workbook")
     ap.add_argument("--backtest", action="store_true",
                     help="test the fund states on history (survivorship-free)")
@@ -98,7 +98,7 @@ def main() -> None:
         for w in ev.book.warnings:
             print(f"Holdings: {w}")
     elif not args.funds:
-        raise SystemExit("No config/mf_holdings.csv (see config/mf_holdings.example.csv); "
+        raise SystemExit("No config/mf_holdings.csv or .xlsx (see config/mf_holdings.example.csv); "
                          "or name funds to evaluate.")
     print_decisions(ev)
     if args.compare:

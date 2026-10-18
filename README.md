@@ -59,7 +59,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
 | `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
 | `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
-| `run_mf.py` | Mutual funds vs their category: EXIT / TRIM / ADD / WATCH for your MF book (`config/mf_holdings.csv`, % only) or any named fund (`--refresh`, `--compare`, `--excel`, `--backtest`) |
+| `run_mf.py` | Mutual funds vs their category: EXIT / TRIM / ADD / WATCH for your MF book (`config/mf_holdings.csv` or `.xlsx`, % only) or any named fund (`--refresh`, `--compare`, `--excel`, `--backtest`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -191,6 +191,55 @@ PYTHONPATH=. .venv/bin/python run_picker.py --refresh     # new filings for the 
 PYTHONPATH=. .venv/bin/python run_picker.py               # today's two shortlists
 PYTHONPATH=. .venv/bin/python run_picker.py --backtest
 ```
+
+## Mutual funds
+
+The **Mutual Funds** tab (and `run_mf.py`) judges any mutual fund against its
+SEBI category and gives **EXIT / TRIM / ADD / WATCH / HOLD**, with reasons.
+It uses month-end NAVs of Direct Growth plans from AMFI's free files, and
+funds that later closed or merged are included.
+
+**Your book, no amounts.** Put `config/mf_holdings.csv` **or**
+`config/mf_holdings.xlsx` in config/; both are git-ignored, so keep only one.
+List each fund and its share of your whole MF portfolio, summing to 100:
+
+| fund | pct | held_over_1y |
+|---|---|---|
+| Parag Parikh Flexi Cap | 30 | yes |
+| Kotak Emerging Equity | 20 | no |
+
+- Fund names can be as you'd say them, including old names ("Axis
+  Bluechip"), or AMFI codes. A vague name ("hdfc") lists candidates instead of
+  guessing.
+- In Excel, the first sheet is read and headers can be loose: "Fund Name",
+  "Scheme", "Weight", "Allocation %". A column formatted as % works.
+- `held_over_1y` is optional. It only changes the exit-load / short-term
+  gains warning on a sell.
+
+```bash
+PYTHONPATH=. .venv/bin/python run_mf.py --refresh                 # NAV history: ~25 min once, then quick
+PYTHONPATH=. .venv/bin/python run_mf.py                           # verdicts for your book
+PYTHONPATH=. .venv/bin/python run_mf.py "ppfas flexi" "hdfc flexi cap" --compare
+PYTHONPATH=. .venv/bin/python run_mf.py --excel                   # reports/mf/MF_Evaluation.xlsx
+```
+
+**What to expect.** It's good at organising your book and weak at predicting
+which fund will do best. A survivorship-free backtest (531 funds since 2018)
+found past category rank barely predicts the next year. Funds marked WEAK beat
+their category median 44% of the time from 2022, and 50% in 2018-21. Funds
+marked STRONG did no better than chance.
+
+| Verdict | Worth |
+|---|---|
+| TRIM for size, category cap or near-twin funds | Act on it: it's arithmetic on your own book, not a forecast |
+| EXIT | A prompt to compare with the alternatives it lists. The category's index fund is the low-regret switch. Mind exit load and tax first |
+| WATCH | Look again in 3-6 months; good funds have bad years |
+| ADD | No better than average at predicting the next year; sizing matters more than the pick |
+| HOLD | Usually the right answer: switching costs tax and exit load |
+
+Run it once a quarter. Debt, index and thematic funds aren't ranked, but they
+still count towards your caps. Caps and thresholds are in
+`config/mf_rules.yaml`. Details in [mutual fund evaluation](docs/mf_evaluation.md).
 
 ## Analyze any stock
 
