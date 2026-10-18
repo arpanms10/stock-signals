@@ -58,6 +58,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
 | `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
 | `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
+| `run_drift_backtest.py` | Whether buying stocks that rallied on their results beats the universe after costs (point-in-time universe) |
 | `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
