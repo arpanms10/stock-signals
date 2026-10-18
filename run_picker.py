@@ -13,6 +13,9 @@ trusting either list.
     PYTHONPATH=. .venv/bin/python run_picker.py                 # today's picks
     PYTHONPATH=. .venv/bin/python run_picker.py --as-of 2025-06-05
     PYTHONPATH=. .venv/bin/python run_picker.py --backtest      # -> config/picker_calibration.json
+    PYTHONPATH=. .venv/bin/python run_picker.py --backtest --universe pit
+        # the 200 largest on each date, not today's index (run_pit_universe.py
+        # first) -> config/picker_calibration_pit.json
 """
 from __future__ import annotations
 
@@ -32,6 +35,11 @@ ROOT = Path(__file__).resolve().parent
 CALIBRATION = ROOT / "config" / "picker_calibration.json"
 PERIODS = store.DIR / "picker_backtest_periods.csv"
 PICKS = store.DIR / "picker_backtest_picks.csv"
+
+
+def _out(path: Path, universe: str) -> Path:
+    """The point-in-time run writes beside the default, never over it."""
+    return path if universe == "index" else path.with_name(f"{path.stem}_pit{path.suffix}")
 
 
 def _f(v, fmt="{:.1f}", none="-"):
@@ -99,7 +107,7 @@ def live(as_of: dt.date, cfg: dict) -> int:
     return 0
 
 
-def backtest(cfg: dict) -> int:
+def backtest(cfg: dict, universe: str = "index") -> int:
     from data import store as price_store
     from scoring import timing
     q = store.quarters(pe.UNIVERSE)
@@ -107,34 +115,57 @@ def backtest(cfg: dict) -> int:
         print("No universe filings on file. Run with --refresh first.", file=sys.stderr)
         return 1
     u = pe.universe(cfg["universe"])
-    q = q[q["symbol"].isin(set(u["symbol"]))]
     con = price_store.connect()
-    index = price_store.load_index(con, timing.load_config()["signals"]["regime_index"])
-    # Start once most of the universe has eight quarters visible (TTM growth).
-    # Start once eight quarters are visible: TTM growth needs two TTMs.
-    first = sorted(q["to_date"].unique())
+    # Start once eight quarters are visible: TTM growth needs two TTMs. Read
+    # off today's index either way, so both universes test the same periods
+    # (a delisted company's filings can reach back years before the rest).
+    first = sorted(q.loc[q["symbol"].isin(set(u["symbol"])), "to_date"].unique())
     start = first[min(7, len(first) - 1)] + dt.timedelta(days=60)
+    members = loader = None
+    if universe == "pit":
+        from results import pit_universe as pu
+        pit = pu.load()
+        if pit.empty:
+            print("No point-in-time universe. Run run_pit_universe.py first.",
+                  file=sys.stderr)
+            return 1
+        q = q[q["symbol"].isin(pu.ever(pit))]
+        # Sector is for P/E against peers; past members outside today's
+        # Nifty 500 have none on file and are left out of that comparison.
+        u = pd.concat([u, pe.universe("nifty500")]).drop_duplicates("symbol")
+        members = lambda d: pu.on(pit, d)          # noqa: E731
+        loader = pu.price_loader(con)
+    else:
+        q = q[q["symbol"].isin(set(u["symbol"]))]
+    index = price_store.load_index(con, timing.load_config()["signals"]["regime_index"])
     end = price_store.load_prices(con, "RELIANCE")["date"].max()
-    res = pe.backtest(q, dict(zip(u["symbol"], u["sector"])), cfg, con, start, end, index)
+    res = pe.backtest(q, dict(zip(u["symbol"], u["sector"])), cfg, con, start, end, index,
+                      members=members, loader=loader)
     periods = res["periods"]
     if periods.empty:
         print("No periods to test.", file=sys.stderr)
         return 1
     store.DIR.mkdir(parents=True, exist_ok=True)
-    periods.to_csv(PERIODS, index=False)
-    res["picks"].to_csv(PICKS, index=False)
+    periods.to_csv(_out(PERIODS, universe), index=False)
+    res["picks"].to_csv(_out(PICKS, universe), index=False)
     summary = pe.summarise(periods)
     summary.update({"tested_on": dt.date.today().isoformat(),
                     "top_by_mcap": cfg.get("backtest_top_by_mcap"),
-                    "universe_name": cfg["universe"],
+                    "universe_name": cfg["universe"] if universe == "index"
+                    else "point-in-time top 200 by market cap",
                     "top_n": cfg["top_n"],
-                    "note": "today's index members (survivorship); balance-sheet "
-                            "quality only from 2025 filings"})
-    CALIBRATION.write_text(json.dumps(summary, indent=1, default=str))
+                    "note": ("today's index members (survivorship)" if universe == "index"
+                             else "200 largest on each date from the full market, "
+                                  "delisted included")
+                    + "; balance-sheet quality only from 2025 filings"})
+    _out(CALIBRATION, universe).write_text(json.dumps(summary, indent=1, default=str))
     lim = cfg.get("backtest_top_by_mcap")
+    whole = "all of today's index" if universe == "index" else \
+        "the 200 largest on each date (point in time)"
     print(f"\nBACKTEST {summary['from']} to {summary['to']}, {summary['periods']} periods, "
           f"top {cfg['top_n']}, equal weight, {cfg['round_trip_cost_pct']}% round trip, "
-          + (f"largest {lim} by market cap on each date" if lim else "all of today's index"))
+          + (f"largest {lim} by market cap on each date" if lim else whole)
+          + ("" if universe == "index" else " -- point-in-time universe"))
     for m in ("garp", "qarp", "universe", "index"):
         s = summary.get(m)
         if not s:
@@ -157,7 +188,11 @@ def main(argv=None) -> int:
     ap.add_argument("--quarters", type=int, default=24)
     ap.add_argument("--top-by-mcap", type=int, default=None,
                     help="backtest only the N largest by market cap on each date, "
-                         "0 for all (default: picker.backtest_top_by_mcap)")
+                         "0 for all (default: picker.backtest_top_by_mcap; "
+                         "with --universe pit, all 200)")
+    ap.add_argument("--universe", choices=["index", "pit"], default="index",
+                    help="backtest on today's index (default) or on the 200 largest "
+                         "on each date (run_pit_universe.py)")
     args = ap.parse_args(argv)
     cfg = pe.load_config()
     if args.refresh:
@@ -165,7 +200,10 @@ def main(argv=None) -> int:
     if args.backtest:
         if args.top_by_mcap is not None:
             cfg = {**cfg, "backtest_top_by_mcap": args.top_by_mcap or None}
-        return backtest(cfg)
+        elif args.universe == "pit":
+            # Already the largest 200 on each date; a further cut is a variant.
+            cfg = {**cfg, "backtest_top_by_mcap": None}
+        return backtest(cfg, args.universe)
     if args.as_of is None:
         from data import store as price_store
         args.as_of = price_store.load_prices(price_store.connect(), "RELIANCE")["date"].max()

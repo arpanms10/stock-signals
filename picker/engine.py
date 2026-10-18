@@ -51,14 +51,20 @@ def refresh(symbols: list[str], quarters: int = 24, log=print) -> pd.DataFrame:
 class Prices:
     """Raw closes per symbol, for 'the close on or before this date'."""
 
-    def __init__(self, con, adjusted: bool = False):
+    def __init__(self, con, adjusted: bool = False, loader=None):
+        """`loader(symbol, adjusted)` replaces the price store, for symbols it
+        does not track (see results.pit_universe.price_loader)."""
         self.con, self.adjusted, self._cache = con, adjusted, {}
+        self.loader = loader
 
     def frame(self, symbol: str) -> pd.DataFrame:
         if symbol not in self._cache:
-            from data import store as price_store
-            self._cache[symbol] = price_store.load_prices(self.con, symbol,
-                                                          adjusted=self.adjusted)
+            if self.loader is not None:
+                self._cache[symbol] = self.loader(symbol, self.adjusted)
+            else:
+                from data import store as price_store
+                self._cache[symbol] = price_store.load_prices(self.con, symbol,
+                                                              adjusted=self.adjusted)
         return self._cache[symbol]
 
     def on(self, symbol: str):
@@ -118,12 +124,16 @@ def _period_return(adj: Prices, symbols: list[str], a: dt.date, b: dt.date) -> d
 
 def backtest(quarters: pd.DataFrame, sectors: dict[str, str], cfg: dict, con,
              start: dt.date, end: dt.date, index: pd.DataFrame | None = None,
-             log=print) -> dict:
+             log=print, members=None, loader=None) -> dict:
     """Rebalance on each date, equal weight, hold to the next date.
 
     Benchmarks on the same dates: the equal-weighted universe (every stock
-    with a price -- the fair comparison, same survivors) and the index."""
-    raw, adj = Prices(con), Prices(con, adjusted=True)
+    with a price -- the fair comparison, same survivors) and the index.
+
+    `members(date) -> set` limits each date to the universe as it stood then
+    (results.pit_universe); without it every symbol in `quarters` is
+    eligible on every date. `loader` is passed to Prices."""
+    raw, adj = Prices(con, loader=loader), Prices(con, adjusted=True, loader=loader)
     dates = rebalance_dates(cfg, start, end)
     n, cost = cfg["top_n"], cfg["round_trip_cost_pct"]
     held = {"garp": set(), "qarp": set()}
@@ -131,7 +141,9 @@ def backtest(quarters: pd.DataFrame, sectors: dict[str, str], cfg: dict, con,
     ix = index.set_index("date")["close"] if index is not None and not index.empty else None
     top_mcap = cfg.get("backtest_top_by_mcap")
     for a, b in zip(dates, dates[1:]):
-        scored = evaluate(quarters, a, raw, sectors, cfg)
+        qa = quarters if members is None else \
+            quarters[quarters["symbol"].isin(members(a))]
+        scored = evaluate(qa, a, raw, sectors, cfg)
         if scored.empty:
             continue
         if top_mcap:
@@ -139,7 +151,7 @@ def backtest(quarters: pd.DataFrame, sectors: dict[str, str], cfg: dict, con,
             # the very growers GARP picks. Keeping only what was already among
             # the largest on the day removes "small then, member now" names.
             keep = scored.nlargest(top_mcap, "mcap_cr")["symbol"]
-            scored = evaluate(quarters[quarters["symbol"].isin(keep)], a, raw,
+            scored = evaluate(qa[qa["symbol"].isin(keep)], a, raw,
                               sectors, cfg)
         row = {"start": a, "end": b, "universe_n": len(scored)}
         allret = _period_return(adj, list(scored["symbol"]), a, b)
