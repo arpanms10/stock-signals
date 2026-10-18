@@ -1,0 +1,12 @@
+# Your mutual fund book, as a share of the whole MF portfolio -- no amounts.
+# Copy to config/mf_holdings.csv (git-ignored) and edit.
+#   fund          name as you'd say it, or the AMFI scheme code
+#   pct           % of the total MF portfolio; the column should sum to 100
+#   held_over_1y  optional yes / no / blank: only changes the exit-load / STCG
+#                 warning on a sell verdict
+fund,pct,held_over_1y,notes
+Parag Parikh Flexi Cap,30,yes,
+UTI Nifty 50 Index Fund,25,yes,
+Kotak Emerging Equity,20,no,
+Axis Small Cap,15,,
+HDFC Balanced Advantage,10,yes,
