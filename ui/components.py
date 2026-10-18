@@ -82,14 +82,22 @@ def evidence(level: str, text: str) -> None:
         st.markdown(f":{colour}-badge[{label}] &nbsp; {text}")
 
 
-def pill(text: str, tone: str = "neutral") -> str:
+def pill(text: str, tone: str = "neutral", title: str | None = None) -> str:
+    """A small tinted label. `title` becomes its hover tooltip."""
     tones = {"neutral": ("#e5e7eb", "#374151"), "good": ("#d1fae5", "#065f46"),
              "warn": ("#fef3c7", "#92400e"), "bad": ("#fee2e2", "#991b1b"),
              "info": ("#dbeafe", "#1e40af")}
     bg, fg = tones.get(tone, tones["neutral"])
-    return (f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-            f'border-radius:10px;font-size:11px;font-weight:600;'
+    tip = f' title="{_attr(title)}"' if title else ""
+    cursor = "cursor:help;" if title else ""
+    return (f'<span{tip} style="background:{bg};color:{fg};padding:2px 8px;'
+            f'border-radius:10px;font-size:11px;font-weight:600;{cursor}'
             f'white-space:nowrap;">{text}</span>')
+
+
+def _attr(text: str) -> str:
+    return (str(text).replace("&", "&amp;").replace('"', "&quot;")
+            .replace("<", "&lt;").replace(">", "&gt;"))
 
 
 def money(v) -> str:
@@ -193,6 +201,80 @@ def _short(iso: str) -> str:
         return iso
 
 
+# What each Status can say, for the legend and the hover text. The time
+# states compare sessions since the flag with how long T1 normally takes
+# (config/scoring.yaml targets.horizon_sessions: median, three quarters, nine
+# in ten); the rest say how the entry ended. Swing entries have no time state:
+# their targets are closer and they expire after a few weeks.
+STATUS_HELP = [
+    ("early", "info", "Open. Fewer sessions since the flag than T1 normally "
+                      "takes (the median, {t1_median}). Too soon to read anything."),
+    ("due", "neutral", "Open. Past the {t1_median}-session median; three in four "
+                       "reach T1 by {t1_typical}."),
+    ("late", "warn", "Open. Past {t1_typical} sessions without T1; nine in ten "
+                     "arrive by {t1_slow}."),
+    ("stalled", "bad", "Open. Past {t1_slow} sessions: in the slow tail, or among "
+                       "the {t1_never}% that never reach T1 inside a year."),
+    ("T1 hit (date)", "good", "First target reached that day. The stop moves up "
+                              "to the flagged price; the entry stays open for T2."),
+    ("T2 hit (date)", "good", "Second target reached. The entry is closed."),
+    ("stopped (date)", "bad", "The day's low reached the stop before T1. The entry "
+                              "is closed."),
+    ("T1, then out at entry (date)", "warn", "Reached T1, then fell back to the "
+                                             "raised stop at the flagged price: "
+                                             "closed at break-even."),
+    ("(blank)", "neutral", "A swing entry still open: its targets are nearer than "
+                           "momentum ones, so the session counts do not apply."),
+]
+
+COLUMN_HELP = {
+    "Stock": "The name, and a swing tag if it came from a swing scan",
+    "Flagged": "The day the framework flagged it, not the day you added it",
+    "Then": "Price on the flagged day: everything is measured from here",
+    "Now": "Latest close",
+    "Move": "Now against Then",
+    "Stop": "Below this the idea is wrong. Moves up to Then once T1 is reached",
+    "T1": "First target. The number is how many sessions it normally takes (median)",
+    "T2": "Second target, with its usual session count",
+    "Status": "How the entry ended, or where it stands against the usual time to "
+              "T1. Hover a status for this row's detail",
+    "Days": "Calendar days since the flag (the status counts trading sessions)",
+}
+
+
+def status_help(horizon: dict | None = None) -> list[tuple[str, str, str]]:
+    """STATUS_HELP with the session counts filled in."""
+    t1 = (horizon or {}).get("t1") or {}
+    vals = {"t1_median": t1.get("median", "?"), "t1_typical": t1.get("typical", "?"),
+            "t1_slow": t1.get("slow", "?"), "t1_never": t1.get("never_pct", "?")}
+    return [(s, tone, text.format(**vals)) for s, tone, text in STATUS_HELP]
+
+
+def watching_legend(horizon: dict | None = None) -> str:
+    """Every status the Watching table can show, as HTML rows."""
+    rows = "".join(
+        f'<tr><td style="padding:5px 12px 5px 0;white-space:nowrap;'
+        f'vertical-align:top;">{pill(s, tone)}</td>'
+        f'<td style="padding:5px 0;font-size:13px;">{text}</td></tr>'
+        for s, tone, text in status_help(horizon))
+    return f'<table style="border-collapse:collapse;">{rows}</table>'
+
+
+def outcome_tooltip(r: dict, horizon: dict | None = None) -> str:
+    """Hover text for one row's status: this row's own detail first."""
+    if r.get("stopped_on"):
+        key = "T1, then out at entry (date)" if r.get("t1_hit_on") else "stopped (date)"
+    elif r.get("t2_hit_on"):
+        key = "T2 hit (date)"
+    elif r.get("t1_hit_on"):
+        key = "T1 hit (date)"
+    else:
+        key = r.get("t1_state") or "(blank)"
+    general = dict((s, t) for s, _, t in status_help(horizon)).get(key, "")
+    own = r.get("t1_note") if not (r.get("stopped_on") or r.get("t1_hit_on")) else ""
+    return " ".join(x for x in (own and own[0].upper() + own[1:] + ".", general) if x)
+
+
 def outcome_status(r: dict) -> tuple[str, str]:
     """Status text and tone: how the entry ended, else where it stands
     against the usual time to T1."""
@@ -208,7 +290,8 @@ def outcome_status(r: dict) -> tuple[str, str]:
     return state, HORIZON_TONE.get(state, "neutral")
 
 
-def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> str:
+def watching_table(rows: list[dict], horizon_sessions: dict | None = None,
+                   horizon: dict | None = None) -> str:
     """The observation list as plain HTML.
 
     Deliberately not st.dataframe: Streamlit's virtualised grid computes a
@@ -220,9 +303,12 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
     # rather than repeated as prose under every row.
     t1_n = horizon_sessions.get("t1", "") if horizon_sessions else ""
     t2_n = horizon_sessions.get("t2", "") if horizon_sessions else ""
+    def tip(h: str) -> str:
+        return _attr(COLUMN_HELP.get(h.split(":")[0], ""))
+
     head = ("<tr>" + "".join(
-        f'<th style="text-align:{a};padding:6px 10px;border-bottom:1px solid '
-        f'var(--secondary-background-color,#3336);font-weight:600;'
+        f'<th title="{tip(h)}" style="text-align:{a};padding:6px 10px;border-bottom:1px solid '
+        f'var(--secondary-background-color,#3336);font-weight:600;cursor:help;'
         f'font-size:12px;letter-spacing:.03em;text-transform:uppercase;'
         f'opacity:.7;white-space:nowrap;">{h}</th>'
         for h, a in (("Stock", "left"), ("Flagged", "left"), ("Then", "right"),
@@ -247,7 +333,8 @@ def watching_table(rows: list[dict], horizon_sessions: dict | None = None) -> st
             f'<span style="color:{move_col}">'
             f'{pct(move, signed=True) if move is not None else "--"}</span>',
             money(r.get("stop")), money(r.get("t1")), money(r.get("t2")),
-            pill(state, tone) if state else "",
+            pill(state, tone, outcome_tooltip(r, horizon)) if state else
+            pill("—", "neutral", outcome_tooltip(r, horizon)),
             str(r.get("days") if r.get("days") is not None else "--"),
         ]
         aligns = ["left", "left", "right", "right", "right", "right", "right",

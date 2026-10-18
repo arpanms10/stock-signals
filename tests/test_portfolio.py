@@ -418,3 +418,22 @@ def test_liquidity_ranks_cover_beyond_any_top_n(tmp_path):
     ranks = bc.liquidity_ranks(con, on)
     assert len(ranks) == 5 and ranks["S4"] == 1 and ranks["S0"] == 5
     assert bc.universe_on(con, on, top_n=2) == ["S4", "S3"]
+
+
+def test_watching_legend_covers_every_status_with_real_session_counts():
+    from ui import components as c
+    h = {"t1": {"median": 17, "typical": 45, "slow": 103, "never_pct": 12}}
+    html = c.watching_legend(h)
+    for s in ("early", "due", "late", "stalled", "T1 hit", "T2 hit", "stopped",
+              "T1, then out at entry"):
+        assert s in html
+    assert "103" in html and "12%" in html and "{" not in html
+
+
+def test_status_tooltip_leads_with_the_rows_own_detail():
+    from ui import components as c
+    row = {"t1_state": "late", "t1_note": "50 sessions without reaching T1"}
+    tip = c.outcome_tooltip(row)
+    assert tip.startswith("50 sessions without reaching T1.")
+    html = c.watching_table([{**row, "symbol": "X"}], {"t1": 17})
+    assert 'title="50 sessions' in html and 'title="First target' in html
