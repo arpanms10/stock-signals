@@ -5,13 +5,19 @@
 #                   decision log where possible, so performance is measured
 #                   from the call, not from when you noticed it
 #   baseline_price  price on that date
+#   stop            stop-loss set when the name was flagged; moves up to the
+#                   baseline once T1 is reached
 #   t1, t2          target prices set when the name was flagged
-#   t1_hit_on       first session the price closed at or above T1 (blank until)
-#   t2_hit_on       same for T2
-#   source          why it is here: rank | advisor | manual
+#   stopped_on      session the low reached the stop (blank until); the
+#                   entry is closed from then on
+#   t1_hit_on       first session the high reached T1 (blank until)
+#   t2_hit_on       same for T2; the entry is closed from then on
+#   source          why it is here: rank | advisor | swing | manual
 #   conviction      your own note: watch | interested | avoid
 #   notes           yours
-symbol,added_on,baseline_date,baseline_price,t1,t2,t1_hit_on,t2_hit_on,source,conviction,notes
-ATHERENERG,2026-09-07,2026-09-04,1584.0,1785.0,1986.0,,,rank,watch,
-BHARATFORG,2026-09-07,2026-09-04,1956.0,2116.78,2277.57,,,rank,watch,
-CUPID,2026-09-07,2026-09-04,283.15,318.56,353.98,,,rank,watch,"rank 1, +662% momentum, no fundamentals -- the most extreme claim the ranking makes"
+symbol,added_on,baseline_date,baseline_price,stop,t1,t2,stopped_on,t1_hit_on,t2_hit_on,source,conviction,notes
+ATHERENERG,2026-09-07,2026-09-04,1584.0,1450.0,1785.0,1986.0,2026-09-28,,,rank,watch,
+BHARATFORG,2026-09-07,2026-09-04,1956.0,1848.81,2116.78,2277.57,2026-10-01,,,rank,watch,
+CPPLUS,2026-10-17,2026-10-17,4063.6,3819.78,4429.33,4795.06,,,,rank,watch,
+CUPID,2026-09-07,2026-09-04,283.15,259.54,318.56,353.98,2026-09-18,,,rank,watch,"rank 1, +662% momentum, no fundamentals -- the most extreme claim the ranking makes"
+WELCORP,2026-10-17,2026-10-01,2605.8,2449.45,2840.33,3074.85,,,,rank,watch,
