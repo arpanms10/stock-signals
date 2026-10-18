@@ -139,6 +139,7 @@ and the `.gitignore` keeps holdings out of the repo.
 ```bash
 PYTHONPATH=. .venv/bin/python run_results_backtest.py               # fetch + report
 PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only
+PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only --universe pit   # survivorship-free
 ```
 
 Every Nifty 200 filing for 24 quarters is scored as it would have been on
@@ -163,6 +164,36 @@ Sep 2026).
 (Mean excess over the NIFTY 500. Every row is positive because the universe
 is today's Nifty 200 -- survivors -- which is why only the spreads are read.)
 
+**Re-tested 2026-10-18 on a survivorship-free universe:** each quarter's
+filings come from the 200 largest NSE companies at that quarter end, by
+market cap from the full-market bhavcopy, delisted and merged ones included
+(`run_pit_universe.py`; see [GARP & QARP](picker.md#does-it-work) for how
+it is built and its limits). 3,553 filings, 334 stocks, 27 quarters (Mar
+2020 to Sep 2026); 753 of the filings are from companies not in today's
+Nifty 200.
+
+| | Reaction day | 20 sessions on | 60 sessions on |
+|---|---|---|---|
+| Strong (1,178) | +0.46% | +0.44% | +1.76% |
+| In line (1,562) | -0.15% | +0.30% | +1.68% |
+| Weak (813) | -0.94% | +0.23% | +0.23% |
+| Strong minus weak, per quarter | | +0.04% (t = 0.1) | +1.64% (t = 1.6, better in 14 of 20) |
+| **Rallied minus sold off**, per quarter | | **+1.46% (t = 3.3)** | **+3.51% (t = 2.6)** |
+
+Checks on the rallied-minus-sold-off spread at 60 sessions:
+
+| Subset | Filings | Spread | t |
+|---|---|---|---|
+| All | 3,553 | +3.51% | 2.6 |
+| Priced with open/high/low (drops the 105 priced from closes only) | 3,448 | +3.00% | 2.2 |
+| Companies in today's Nifty 200 | 2,800 | +2.66% | 1.7 |
+| Companies no longer in it | 753 | +4.64% | 2.3 |
+
+The 105 filings from companies the price store never tracked (delisted or
+fallen out of the Nifty 500) are priced from the bhavcopy, which has no
+open, high or low, so their reaction is sized on the close-to-close range,
+not the ATR.
+
 What it says:
 
 1. **The scorecard measures what the market cares about.** Strong cards
@@ -179,7 +210,14 @@ What it says:
    read is the stronger signal, and it is the one the Results tab's
    *Reaction* column shows.
 
-Not yet acted on anywhere. Two things to settle first: a survivorship-free
-universe (stocks that fell out of the index are missing here), and whether a
-rule built on it survives costs -- a 60-session hold after each reaction is a
-lot of turnover in results season.
+4. **Both survive the survivorship-free universe.** The verdict is
+   unchanged: +1.6% over 60 sessions, t = 1.6, still short of evidence. The
+   reaction drift holds at +3.5% (t = 2.6), and is stronger at 20 sessions
+   (+1.5%, t = 3.3). It is not carried by survivors: it is larger among
+   companies that have since left the index. Within today's members alone
+   it is weaker (t = 1.7). Read the drift as real but modest, not as a
+   large-cap anomaly.
+
+Not yet acted on anywhere. Survivorship is settled; what remains is whether
+a rule built on it survives costs -- a 60-session hold after each reaction
+is a lot of turnover in results season.

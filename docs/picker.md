@@ -115,6 +115,8 @@ re-reads the cache rather than NSE.
 ```bash
 PYTHONPATH=. .venv/bin/python run_picker.py --backtest                   # largest 150 on each date (default)
 PYTHONPATH=. .venv/bin/python run_picker.py --backtest --top-by-mcap 0   # all of today's index
+PYTHONPATH=. .venv/bin/python run_pit_universe.py --fetch                # point-in-time universe (once)
+PYTHONPATH=. .venv/bin/python run_picker.py --backtest --universe pit    # the 200 largest on each date
 ```
 
 Rebalance after each results season closes (20 Feb, 5 Jun, 20 Aug, 20 Nov),
@@ -130,12 +132,36 @@ NIFTY 500.
 | All of today's Nifty 200 | **+3.15%** (t = 2.1, ahead 65%) | -3.64% (t = -3.2, ahead 18%) | 43.5% | 11.7% | 28.0% |
 | **Largest 150 by market cap on the day** (default) | **+2.33%** (t = 2.0, ahead 71%) | -2.60% (t = -2.2, ahead 29%) | 35.3% | 12.9% | 24.2% |
 | Largest 100 on the day | +1.08% (t = 1.0, ahead 65%) | -1.74% (t = -1.5, ahead 41%) | 23.4% | 11.2% | 18.5% |
+| **Point in time: 200 largest on the day, whole market** | +0.35% (t = 0.3, ahead 59%) | -1.91% (t = -1.8, ahead 29%) | 20.1% | 10.9% | 18.8% |
+| Point in time, largest 150 of those | +0.74% (t = 0.7, ahead 59%) | -1.74% (t = -1.6, ahead 47%) | 21.2% | 10.7% | 18.0% |
+| Point in time, largest 100 of those | +1.56% (t = 1.5, ahead 71%) | -1.35% (t = -1.2, ahead 41%) | 23.7% | 11.0% | 16.6% |
 
 The NIFTY 500 returned 13.0% a year over the same span. Its gap to the
 equal-weight universe (18-28%) is mostly survivorship: today's members are,
 by construction, the stocks that did well.
 
+The point-in-time rows (re-tested 2026-10-18) drop today's index entirely.
+On each date the universe is the 200 largest NSE companies by market cap
+from the full-market bhavcopy -- delisted, merged and since-demoted ones
+included -- with filings fetched for all of them (386 names over the window,
+192 of them not in today's Nifty 200). Built by `run_pit_universe.py`,
+described in `results/pit_universe.py`. 173-197 members are scored on each
+date (the rest lack eight quarters of filings or a price). Two limits:
+market cap is total, not free float, so companies with a large promoter
+stake rank higher than in the real index; and seven pool names had no NSE
+filing list at all (ABBOTINDIA, MCX, ORIENTBANK, SPICEJET, GRUH, and two
+old tickers since linked to their new ones) and could not be ranked.
+
 What it says:
+
+**On a survivorship-free universe GARP's edge is gone.** +0.35% a quarter,
+t = 0.3, against +2.3% (t = 2.0) on today's index. The edge was hindsight
+about which companies would grow into the Nifty 200, which is what the
+market-cap cut had hinted at. The equal-weight universe itself falls from
+24% to 19% a year once the losers are back in. GARP stays a shortlist to
+research; it does not rank. QARP still lags (-1.9%, t = -1.8).
+
+From the first test, on today's index:
 
 1. **GARP looks good, but part of that is hindsight.** Today's index holds
    companies that grew *into* it after 2022 -- exactly what GARP selects.
@@ -153,6 +179,6 @@ What it says:
    point. Neither list ranks anything else in the framework; both are
    shortlists to research, with the backtest shown beside them.
 
-To make this conclusive: a survivorship-free universe (the top 200 by market
-cap on each date, from `data/market.db`, with filings fetched for the stocks
-that have since dropped out), and more history.
+The survivorship-free test is done (row group above) and GARP failed it.
+What is left untested is longer history: filings before 2020 would add a
+bear market (2018-20) to a window that has none.
