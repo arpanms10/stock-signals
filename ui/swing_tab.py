@@ -221,6 +221,9 @@ def render(on_watch=None) -> None:
     cfg = _cfg()
     s = cfg["swing"]
     st.subheader("Swing: setups to hold for days to a few weeks")
+    c.evidence("none", "The score did not rank setups in the backtest, so each setup "
+                       "comes with its measured hit rate rather than a promise. How it "
+                       "has done is below the list.")
     st.caption("Liquid stocks in an uptrend that show a pullback or a breakout "
                "today, scored, each with an entry, a stop and targets. How it "
                "works and how it has done are below the list.")

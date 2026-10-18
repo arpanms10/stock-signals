@@ -14,7 +14,7 @@ PYTHONPATH=. .venv/bin/python run_swing.py --capital 1000000      # with share c
 PYTHONPATH=. .venv/bin/python run_swing.py --backtest             # -> config/swing_calibration.json
 ```
 
-The dashboard's **Swing** tab shows the same scan (top 10, or the full list
+The dashboard's **Swing** page shows the same scan (top 10, or the full list
 with the toggle), the methodology, and the latest backtest. Nothing is
 computed until **Scan** is pressed; the result is cached for the day.
 

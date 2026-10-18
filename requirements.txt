@@ -45,4 +45,5 @@ soupsieve==2.9.2
 typing_extensions==4.16.0
 urllib3==2.7.0
 websockets==16.1.1
-streamlit>=1.40
+# Top-bar navigation with hidden pages (ui/app.py) needs 1.50+.
+streamlit>=1.50

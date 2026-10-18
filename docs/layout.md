@@ -72,11 +72,15 @@ analysis/lookup.py         ticker / company name / ISIN -> NSE symbol
 analysis/fundamental.py    Fundamental Analyst: one stock, on demand
 analysis/technical.py      Technical Analyst: one stock, on demand
 
-ui/app.py                  dashboard: holdings and market sections
-ui/service.py              cached pipeline feeding the UI
-ui/components.py           badges and formatting
-ui/fno_tab.py              the F&O tab
-ui/analyze_tab.py          the Analyze tab
+ui/app.py                  dashboard: top navigation and page list
+ui/shell.py                search box and data chip on every page
+ui/state.py                cached snapshot, data age, job runner, shared columns
+ui/service.py              cached pipeline feeding the UI; the job list
+ui/components.py           badges, evidence lines and formatting
+ui/views/                  Today, Stocks, Market, Momentum, Search, Data and jobs
+ui/fno_tab.py              the F&O page
+ui/analyze_tab.py          the Analyze a stock page
+ui/mf_tab.py               the Mutual funds and Compare funds pages
 run_ui.py                  launch the dashboard
 ```
 

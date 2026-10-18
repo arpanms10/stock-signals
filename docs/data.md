@@ -136,9 +136,9 @@ file fails to download stops the daily pass there, so no hole is left
 behind it; those symbols fall back to per-symbol fetching. A day with no
 file (a holiday, or today before NSE publishes in the evening) is skipped.
 
-The dashboard runs the same command from **Refresh prices** in the
-sidebar, or **Refresh now** on a stale-prices warning, and reloads the page
-when it finishes.
+The dashboard runs the same command from **Refresh prices** on the Stocks
+page or on Data and jobs (also offered by the data chip when prices are
+stale), and reloads the page when it finishes.
 
 ---
 

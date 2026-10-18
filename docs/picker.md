@@ -15,9 +15,9 @@ PYTHONPATH=. .venv/bin/python run_picker.py --as-of 2025-06-05
 PYTHONPATH=. .venv/bin/python run_picker.py --backtest       # -> config/picker_calibration.json
 ```
 
-The dashboard's **GARP / QARP** tab shows both lists, everything scored,
-the method and the backtest. **Refresh filings** (in the tab and the
-sidebar) runs `--refresh`.
+The dashboard's **GARP / QARP** page shows both lists, everything scored,
+the method and the backtest. **Refresh filings** (on the page and on
+Data and jobs) runs `--refresh`.
 
 ## The two methods
 

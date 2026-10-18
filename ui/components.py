@@ -5,15 +5,22 @@ import datetime as dt
 
 import streamlit as st
 
-# Action -> (letter, background, text colour, tooltip)
+# Action -> (word, background, text colour, tooltip). One set of words and
+# colours for stocks and mutual funds alike, so a Trim reads the same on the
+# Today page whichever book it came from.
 BADGES = {
-    "BUY":  ("B", "#12854a", "#ffffff", "Buy"),
-    "ADD":  ("B", "#12854a", "#ffffff", "Add to the position"),
-    "EXIT": ("S", "#c0392b", "#ffffff", "Sell the whole holding -- thesis broken"),
-    "TRIM": ("T", "#d98324", "#ffffff", "Trim part of the holding -- sizing only"),
-    "HOLD": ("H", "#6b7280", "#ffffff", "No action"),
-    "WATCH": ("W", "#4b5563", "#ffffff",
+    "BUY":  ("Buy", "#E2F1E6", "#1D6436", "Buy"),
+    "ADD":  ("Add", "#E2F1E6", "#1D6436", "Add to the position"),
+    "EXIT": ("Exit", "#FBE7E4", "#9F1D14", "Sell the whole holding -- thesis broken"),
+    "TRIM": ("Trim", "#FBEBD3", "#7A4300", "Trim part of the holding -- sizing only"),
+    "HOLD": ("Hold", "#ECEBE7", "#4A4945", "No action"),
+    "WATCH": ("Watch", "#E4EBF6", "#314A72",
               "Worth buying, but this plan cannot fund it"),
+    "AVOID": ("Avoid", "#FBE7E4", "#9F1D14", "Not held; weak against its category"),
+    "NEUTRAL": ("Neutral", "#ECEBE7", "#4A4945", "Not held; nothing for or against"),
+    "NOT JUDGED": ("Not judged", "#ECEBE7", "#4A4945",
+                   "Not in a category the engine ranks"),
+    "STOP": ("Stop", "#FBE7E4", "#9F1D14", "The stop was reached"),
 }
 
 
@@ -33,22 +40,46 @@ CALM_TIPS = {
 
 
 def badge(action: str, urgent: bool = False) -> str:
-    """A small coloured circle: B green, T amber, S red, H grey.
+    """The verdict as a word on a tinted pill: Exit red, Trim amber, Add green,
+    Watch blue, Hold grey.
 
-    Trim and exit get different letters as well as different colours. They are
+    Trim and exit are different words as well as different colours. They are
     different decisions -- trim is a sizing correction on a holding you keep,
-    exit is a broken thesis -- and two amber-vs-red "S" badges made that
-    distinction depend on noticing a shade.
+    exit is a broken thesis -- and telling them apart must not depend on
+    noticing a shade. Urgent adds a solid red ring and a "!".
     """
-    letter, bg, fg, tip = BADGES.get(action, ("?", "#6b7280", "#fff", action))
+    word, bg, fg, tip = BADGES.get(action, (action.title(), "#ECEBE7", "#4A4945", action))
     tip = (URGENT_TIPS if urgent else CALM_TIPS).get(action, tip)
-    ring = "box-shadow:0 0 0 2px #fde047;" if urgent else ""
-    mark = ("<span style='position:absolute;top:-4px;right:-5px;font-size:11px;"
-            "color:#fde047;font-weight:800;'>!</span>") if urgent else ""
-    return (f'<span title="{tip}" style="position:relative;display:inline-flex;'
-            f'align-items:center;justify-content:center;width:22px;height:22px;'
-            f'border-radius:50%;background:{bg};color:{fg};font-weight:700;'
-            f'font-size:12px;font-family:system-ui;{ring}">{letter}{mark}</span>')
+    ring = "box-shadow:0 0 0 2px #9F1D14;" if urgent else ""
+    mark = "<span style='margin-left:4px;'>!</span>" if urgent else ""
+    return (f'<span title="{tip}" style="display:inline-block;min-width:52px;'
+            f'text-align:center;padding:2px 8px;border-radius:6px;background:{bg};'
+            f'color:{fg};font-weight:600;font-size:12px;white-space:nowrap;'
+            f'{ring}">{word}{mark}</span>')
+
+
+# Level -> (Streamlit badge colour, label). Streamlit's own colours follow
+# the light or dark theme; fixed hex values went unreadable in dark mode.
+EVIDENCE = {
+    "tested": ("green", "Evidence: tested"),
+    "weak": ("orange", "Evidence: weak"),
+    "none": ("gray", "Evidence: no edge"),
+    "experimental": ("gray", "Experimental"),
+    "info": ("blue", "Describes, does not predict"),
+}
+
+
+def muted(text: str) -> str:
+    """Secondary text in markdown, in the theme's grey."""
+    return ":gray[" + str(text).replace("[", "(").replace("]", ")") + "]"
+
+
+def evidence(level: str, text: str) -> None:
+    """One line under a page title saying how far its signals were borne out
+    in a backtest, so the strength of a verdict is visible before reading it."""
+    colour, label = EVIDENCE[level]
+    with st.container(border=True):
+        st.markdown(f":{colour}-badge[{label}] &nbsp; {text}")
 
 
 def pill(text: str, tone: str = "neutral") -> str:

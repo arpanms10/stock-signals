@@ -305,9 +305,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     wg.update_from_store(con)
     watching = wg.report(watch_prices)
 
-    checks = [("market", fr.assess(mkt)), ("prices", fr.assess_prices(con, [])),
-              ("fundamentals", fr.assess_fundamentals())]
-    freshness = [{"kind": k, "label": c.label, "message": c.message} for k, c in checks]
+    freshness = freshness_checks(con, mkt)
     cash = adv.apply_cash_constraint(
         advices, prices, qual, 0.0, sectors=sectors, values=values, book=book,
         max_sector_pct=cfg["risk"]["max_sector_pct"],
@@ -329,6 +327,17 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
                     momentum_table=momentum_table)
 
 
+def freshness_checks(con=None, mkt=None) -> list[dict]:
+    """How old each data source is. Cheap (three small queries), so the
+    header can show it on every page without building the full snapshot."""
+    con = con or store.connect()
+    mkt = mkt or bc.connect(str(ROOT / "data" / "market.db"))
+    checks = [("market", fr.assess(mkt)), ("prices", fr.assess_prices(con, [])),
+              ("fundamentals", fr.assess_fundamentals())]
+    return [{"kind": k, "label": c.label, "message": c.message,
+             "latest": c.latest} for k, c in checks]
+
+
 # ------------------------------------------------------------------ scripts
 
 SCRIPTS = {
@@ -346,6 +355,46 @@ SCRIPTS = {
     "Check quarterly results": ["run_results.py"],
     # New filings for the Nifty 200 behind the GARP / QARP tab.
     "Refresh GARP / QARP filings": ["run_picker.py", "--refresh"],
+    # Month-end NAVs of every Direct Growth fund (Mutual funds pages).
+    "Refresh fund NAVs": ["run_mf.py", "--refresh", "--no-holdings"],
+    # Rewrites config/mf_calibration.json, the Mutual funds evidence line.
+    "Rerun mutual fund backtest": ["run_mf.py", "--backtest"],
+}
+
+# The Data and jobs page, grouped by how often each needs running. Each job:
+# (script label, what reads it, freshness kind or None, how long it takes).
+# "Suggest buckets" is not a data refresh; it sits on the Stocks page.
+JOB_GROUPS = [
+    ("Daily · the weekday job runs these", [
+        ("Refresh prices (watchlist + holdings)", "Stocks, Swing, Momentum, Market",
+         "prices", "minutes"),
+        ("Check quarterly results", "Quarterly results, Today", None, "minutes"),
+    ]),
+    ("Weekly · the Saturday job runs these", [
+        ("Refresh fundamentals (NSE + Yahoo)", "Stocks, GARP / QARP, quality scores",
+         "fundamentals", "minutes"),
+        ("Update full-market data", "Market, Momentum", "market", "about 70 min"),
+        ("Refresh F&O history + validation", "F&O", None, "minutes"),
+    ]),
+    ("Monthly or quarterly", [
+        ("Refresh fund NAVs", "Mutual funds, Compare funds", None,
+         "seconds; about 25 min the first time"),
+        ("Refresh GARP / QARP filings", "GARP / QARP", None, "minutes"),
+    ]),
+    ("Backtests · change the evidence lines, not the data", [
+        ("Rerun swing backtest", "Swing", None, "minutes"),
+        ("Rerun mutual fund backtest", "Mutual funds", None, "about 2 min"),
+    ]),
+]
+
+# What each job writes, for the "Updated" column where no freshness check
+# exists: the file's modification time is when the job last succeeded.
+JOB_OUTPUTS = {
+    "Check quarterly results": ROOT / "data" / "results",
+    "Refresh F&O history + validation": ROOT / "config" / "fno_calibration.json",
+    "Refresh fund NAVs": ROOT / "data" / "mf" / "mf.db",
+    "Rerun swing backtest": ROOT / "config" / "swing_calibration.json",
+    "Rerun mutual fund backtest": ROOT / "config" / "mf_calibration.json",
 }
 
 

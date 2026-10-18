@@ -15,7 +15,7 @@ PYTHONPATH=. .venv/bin/python run_mf.py --excel                    # reports/mf/
 PYTHONPATH=. .venv/bin/python run_mf.py --backtest                 # ~1.5 min
 ```
 
-Also on the dashboard's **Mutual Funds** tab.
+Also on the dashboard: Portfolio › **Mutual funds** for your book, Research › **Compare funds** for any funds.
 
 ## Your book, without amounts
 
