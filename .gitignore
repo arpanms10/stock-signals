@@ -55,6 +55,11 @@ config/results_calibration.json
 # config/picker_calibration.json <- run_picker.py --backtest; the GARP / QARP
 #   tab warns "no backtest yet" without it.
 config/picker_calibration.json
+# config/*_calibration_pit.json <- the survivorship-free re-runs of the picker
+#   and results backtests (run_picker.py / run_results_backtest.py on the
+#   point-in-time universe); regenerable like the above.
+config/picker_calibration_pit.json
+config/results_calibration_pit.json
 
 # --- Environment and noise ---------------------------------------------
 # Excel's lock file while a workbook in history/ is open.
