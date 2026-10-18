@@ -87,12 +87,17 @@ def compare_table(ev: Evaluation, codes: list[int]) -> pd.DataFrame:
         "Downside capture 3y": "downside_capture_3y", "Peers": "peers",
     }
     by_code = {d.code: d for d in ev.decisions}
+    judged = set(verdict.load_rules()["categories"])
     out = {}
     for c in codes:
         col = {}
         r = ev.snap.loc[c] if c in ev.snap.index else pd.Series(dtype=object)
+        # Peer-relative rows mean nothing in a mixed bag like "index funds"
+        # (Nifty 50 next to gold and sector indices): left blank there.
+        ranked = r.get("category") in judged
         for label, key in rows.items():
-            col[label] = r.get(key)
+            peer_relative = key.startswith(("excess", "rank", "consistency", "downside"))
+            col[label] = r.get(key) if ranked or not peer_relative else None
         d = by_code.get(c)
         col["State"] = d.state if d else None
         col["Action"] = d.action if d else None

@@ -160,3 +160,19 @@ def main(con=None) -> dict:
 
 def load_calibration(path: Path = CALIBRATION) -> dict | None:
     return json.loads(path.read_text()) if path.exists() else None
+
+
+def calibration_line(cal: dict | None = None) -> str | None:
+    """One line for the live view: what WEAK and STRONG were worth, holdout years."""
+    cal = cal or load_calibration()
+    if not cal:
+        return None
+    tr = cal["summary"]["train"].get("12m", {})
+    ho = cal["summary"]["holdout"].get("12m", {})
+    if not all(k in d for d in (tr, ho) for k in ("WEAK", "STRONG", "STRONG-WEAK")):
+        return None
+    return (f"Backtest, next 12 months (rank in category, 0.50 = no information): "
+            f"holdout {cal['split']} on, WEAK {ho['WEAK']['mean_rank']:.2f} / STRONG "
+            f"{ho['STRONG']['mean_rank']:.2f} (gap t {ho['STRONG-WEAK']['t']:.1f}); "
+            f"2018-2021, WEAK {tr['WEAK']['mean_rank']:.2f} / STRONG {tr['STRONG']['mean_rank']:.2f}. "
+            f"A weak, unstable edge: treat EXIT as 'look at alternatives', not a forecast.")

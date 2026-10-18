@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 from mf import engine, verdict
+from mf.backtest import calibration_line
 from mf.report import PCT1, _lines, _write_table
 
 ACTION_COLOURS = {"EXIT": "C0392B", "AVOID": "C0392B", "TRIM": "E67E22",
@@ -114,6 +115,7 @@ def build(path: Path, ev: engine.Evaluation) -> Path:
         ("text", "Past category rank predicts future rank weakly. run_mf.py --backtest "
                  "measures what each state was worth on funds that existed at the time, closed "
                  "ones included. Decision support, not advice."),
+        ("text", calibration_line() or "No backtest yet: run_mf.py --backtest."),
     ])
     wb.save(path)
     return path

@@ -108,8 +108,9 @@ def main() -> None:
         from mf import evaluation_report
         out = evaluation_report.build(args.excel, ev)
         print(f"\nWorkbook: {out}")
-    print("\nDecision support, not advice. Past ranking predicts the future weakly; "
-          "see run_mf.py --backtest.")
+    from mf.backtest import calibration_line
+    print("\n" + (calibration_line() or "No backtest yet: run_mf.py --backtest."))
+    print("Decision support, not advice.")
 
 
 if __name__ == "__main__":

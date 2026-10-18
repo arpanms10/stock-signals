@@ -68,6 +68,17 @@ negative result is evidence, and because the infrastructure beneath them --
 data, costs, controls -- is what the momentum work is built on.
 
 
+## Mutual fund states (2026-10-18)
+
+531 Direct Growth funds in 15 equity and hybrid categories, 91 since merged
+or closed, monthly from Jun 2018. The outcome is the fund's rank in its
+category over the next 12 months (0.50 = no information). In 2018-21,
+**STRONG and WEAK funds ranked the same afterwards (gap 0.00, t = 0.1)**.
+From 2022, WEAK funds ranked 0.46 (t = -2.1) and STRONG funds 0.52 (gap
+t = 1.7). Over 36 months the sign flips between halves. Past category rank
+barely predicts, so the verdicts ship with this line beside them. Full
+write-up in [mutual fund evaluation](mf_evaluation.md).
+
 ## GARP & QARP picker (2026-10-17)
 
 Nifty 200, quarterly rebalance after each results season, top 15 equal

@@ -59,6 +59,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
 | `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
 | `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
+| `run_mf.py` | Mutual funds vs their category: EXIT / TRIM / ADD / WATCH for your MF book (`config/mf_holdings.csv`, % only) or any named fund (`--refresh`, `--compare`, `--excel`, `--backtest`) |
 
 Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
 Full flags in [operations](docs/operations.md).
@@ -302,6 +303,7 @@ cannot be rebuilt.
 | [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
+| [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the survivorship-free backtest (a weak edge) |
 | [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |
 | [**Code layout**](docs/layout.md) | Where things live |
 | [ROADMAP](ROADMAP.md) | What is built, and what is still wrong with it |
