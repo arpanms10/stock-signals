@@ -239,6 +239,9 @@ def _px(x) -> str:
 
 def render() -> None:
     st.subheader("F&O: where option writers have put their money")
+    c.evidence("experimental", "Walls, PCR and max pain showed no edge on ~14,000 "
+                               "expiries. The expected range is shown with how often "
+                               "it held.")
     st.caption(
         "The range is spot ± the ATM straddle -- the move the market is pricing -- "
         "with how often the expiry close actually landed inside it (stocks since "

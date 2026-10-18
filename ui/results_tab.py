@@ -34,6 +34,9 @@ def render(run_script=None) -> None:
     today = dt.date.today()
     want = engine.expected_quarter(today)
     st.subheader("Quarterly results")
+    c.evidence("none", "The scorecard did not predict the drift after results (strong "
+                       "minus weak +1.6% over 60 sessions, t 1.6). The price reaction did: "
+                       "rallied minus sold off +3.5% (t 2.6).")
     st.caption(
         "Your holdings, the watch list and the latest swing and momentum picks, "
         "scored from NSE's own filings. Each verdict compares the company with "

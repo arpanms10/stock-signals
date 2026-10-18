@@ -284,12 +284,13 @@ def test_realised_vol_returns_none_on_thin_history():
 
 def test_trim_and_exit_badges_are_visually_distinct():
     """Trim keeps the holding, exit does not. Two 'S' badges made that
-    distinction depend on noticing a shade of red versus amber."""
+    distinction depend on noticing a shade of red versus amber; the badge
+    now says the word."""
     from ui import components as c
-    assert ">T<" in c.badge("TRIM")
-    assert ">S<" in c.badge("EXIT")
-    assert ">B<" in c.badge("BUY") and ">B<" in c.badge("ADD")
-    assert ">H<" in c.badge("HOLD")
+    assert ">Trim<" in c.badge("TRIM")
+    assert ">Exit<" in c.badge("EXIT")
+    assert ">Buy<" in c.badge("BUY") and ">Add<" in c.badge("ADD")
+    assert ">Hold<" in c.badge("HOLD")
     # Colour still carries meaning, but is no longer the only signal.
     assert c.badge("TRIM") != c.badge("EXIT")
 
@@ -356,17 +357,17 @@ def test_urgent_and_calm_badges_differ_in_more_than_a_ring():
 
 
 def test_legend_shows_every_badge_variant(monkeypatch):
-    """Including both S variants, side by side."""
+    """Including both Exit variants, side by side."""
     from ui import components as c
     captured = {}
     monkeypatch.setattr(c.st, "markdown",
                         lambda html, **k: captured.setdefault("html", html))
     c.legend()
     html = captured["html"]
-    for letter in (">B<", ">T<", ">S<", ">H<"):
-        assert letter in html
+    for word in (">Buy<", ">Trim<", ">Exit<", ">Hold<"):
+        assert word in html
     assert "urgent" in html.lower()
-    assert html.count(">S<") >= 2                      # calm and urgent both
+    assert html.count(">Exit<") >= 2                   # calm and urgent both
 
 
 def test_urgent_rows_sort_ahead_of_calm_ones_within_an_action():
