@@ -128,7 +128,17 @@ def correlation(P: pd.DataFrame, codes: list[int], t: pd.Period, months: int = 3
 
 def forward_excess(P: pd.DataFrame, category: pd.Series, t: pd.Period, k: int,
                    codes) -> pd.Series:
-    """Each fund's k-month return from t, minus its category median.
+    return forward_outcome(P, category, t, k, codes)["excess"]
+
+
+def forward_outcome(P: pd.DataFrame, category: pd.Series, t: pd.Period, k: int,
+                    codes) -> pd.DataFrame:
+    """Each fund's k-month return from t against the funds in its category then:
+    `excess` (return minus the median) and `rank` (share of peers beaten).
+
+    Rank is what to average: fund returns are skewed, so mean excess sits
+    above zero for every group and reads as an edge that is not there. Mean
+    rank is 0.5 for a group with no information, exactly.
 
     A fund that stops reporting (merged, closed) is carried at the category
     median from its last NAV -- the holder was moved somewhere, and the worst
@@ -137,7 +147,7 @@ def forward_excess(P: pd.DataFrame, category: pd.Series, t: pd.Period, k: int,
     """
     end = t + k
     if end not in P.index:
-        return pd.Series(dtype=float)
+        return pd.DataFrame(columns=["excess", "rank"], dtype=float)
     R = P.loc[t + 1:end].pct_change(fill_method=None)
     R.iloc[0] = P.loc[t + 1] / P.loc[t] - 1
     out = {}
@@ -151,7 +161,8 @@ def forward_excess(P: pd.DataFrame, category: pd.Series, t: pd.Period, k: int,
         filled = Rp.apply(lambda col: col.fillna(med))
         total = (1 + filled).prod() - 1
         exc = total - total.median()
+        rank = _pct_beaten(total)
         for c in members:
             if c in exc.index:
-                out[c] = exc[c]
-    return pd.Series(out, dtype=float)
+                out[c] = (exc[c], rank[c])
+    return pd.DataFrame.from_dict(out, orient="index", columns=["excess", "rank"], dtype=float)
