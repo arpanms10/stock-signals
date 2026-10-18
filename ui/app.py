@@ -13,6 +13,8 @@ Sections:
   8. GARP / QARP -- fundamental shortlists from NSE filings (ui/picker_tab.py)
   9. ANALYZE     -- any one stock by ticker, name or ISIN: the Fundamental
                     and/or Technical Analyst (ui/analyze_tab.py)
+ 10. MUTUAL FUNDS -- your MF book and any named fund, judged against its
+                    category: exit / trim / add / watch (ui/mf_tab.py)
 
 Read-only throughout. Nothing here places an order.
 """
@@ -153,9 +155,9 @@ for w in snap.warnings:
     st.warning(w)
 
 (tab_hold, tab_market, tab_mom, tab_watch, tab_fno, tab_swing, tab_results,
- tab_pick, tab_analyze) = st.tabs(
+ tab_pick, tab_analyze, tab_mf) = st.tabs(
     ["  My Holdings  ", "  Market  ", "  Momentum  ", "  Watching  ", "  F&O  ",
-     "  Swing  ", "  Results  ", "  GARP / QARP  ", "  Analyze  "])
+     "  Swing  ", "  Results  ", "  GARP / QARP  ", "  Analyze  ", "  Mutual Funds  "])
 
 # =================================================================== HOLDINGS
 with tab_hold:
@@ -712,3 +714,8 @@ with tab_pick:
 with tab_analyze:
     from ui import analyze_tab
     analyze_tab.render()
+
+# ================================================================ MUTUAL FUNDS
+with tab_mf:
+    from ui import mf_tab
+    mf_tab.render()

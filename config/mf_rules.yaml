@@ -1,0 +1,86 @@
+# Mutual fund verdicts (run_mf.py). Every threshold below was set before the
+# backtest ran; run_mf.py --backtest reports what each fund state was worth
+# afterwards. Changing a number here and re-running the backtest on the same
+# years is fitting to the past -- the holdout years are what to trust.
+#
+# Ranks are "share of category peers beaten": 1.0 = best fund in the
+# category, 0.0 = worst. Excess is CAGR minus the category median CAGR, per
+# year (0.02 = 2 percentage points a year).
+
+# Fewer months than this and the fund is WATCH (too young to judge): a 3-year
+# record is the shortest window that spans more than one market phase.
+min_history_months: 36
+
+# Categories the engine judges. Debt funds are left out on purpose: their
+# returns are mostly the duration and credit risk they take, and ranking them
+# on return rewards whoever took the most risk until the year it goes wrong.
+categories:
+  - equity:large cap
+  - equity:large & mid cap
+  - equity:mid cap
+  - equity:small cap
+  - equity:flexi cap
+  - equity:multi cap
+  - equity:focused
+  - equity:value
+  - equity:contra
+  - equity:elss
+  - equity:dividend yield
+  - hybrid:aggressive hybrid
+  - hybrid:balanced advantage
+  - hybrid:multi asset allocation
+  - hybrid:equity savings
+
+# The cheap alternative per category: a Direct Growth index fund (AMFI code).
+# Used for the "vs index fund" columns, and in the WEAK test when it has the
+# history. Large cap has had index funds since 2013; the broader indices'
+# index funds are recent, so most categories rely on the peer median alone
+# for years before ~2021.
+index_funds:
+  equity:large cap: 120716          # UTI Nifty 50 Index Fund (2013-)
+  equity:large & mid cap: 149343    # Edelweiss Nifty Large Midcap 250 (2021-12-)
+  equity:mid cap: 147622            # Motilal Oswal Nifty Midcap 150 (2019-09-)
+  equity:small cap: 147623          # Motilal Oswal Nifty Smallcap 250 (2019-09-)
+  # Broad-market categories against the Nifty 500 (Motilal Oswal, 2019-09-)
+  equity:flexi cap: 147625
+  equity:multi cap: 147625
+  equity:focused: 147625
+  equity:value: 147625
+  equity:contra: 147625
+  equity:elss: 147625
+
+# Fund state, judged on the fund alone. Checked in this order: YOUNG, WEAK,
+# SLIPPING, STRONG, else OK.
+states:
+  weak:
+    # Persistent: bottom of the table over 3 years AND still in the bottom
+    # half over the last one, and materially behind the median. One bad year
+    # in a good record is SLIPPING, not WEAK.
+    rank_3y_max: 0.25
+    rank_1y_max: 0.50
+    excess_3y_max: -0.02
+    # Or: trails the category's index fund by 2+ points a year over 3 years
+    # while no better than mid-table -- paying for active management and not
+    # getting it.
+    vs_index_3y_max: -0.02
+    vs_index_rank_3y_max: 0.50
+  slipping:
+    # A decent 3-year record but a bad last year.
+    rank_1y_max: 0.25
+    excess_1y_max: -0.04
+  strong:
+    rank_3y_min: 0.60
+    consistency_3y_min: 0.50
+    rank_1y_min: 0.25
+    # Not if it fell harder than its peers in their down months.
+    downside_capture_3y_max: 1.10
+
+# Your MF book (config/mf_holdings.csv, percent of the whole MF portfolio).
+# These are allocation preferences, not findings -- edit them to taste.
+allocation:
+  max_fund_pct: 25          # TRIM anything above; ADD only up to this
+  near_duplicate_corr: 0.95 # two held funds this correlated move as one
+  category_max_pct:         # TRIM the weakest fund in a category over its cap
+    equity:small cap: 25
+    equity:mid cap: 30
+    equity:sectoral/thematic: 10

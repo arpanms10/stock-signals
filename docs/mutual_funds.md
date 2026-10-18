@@ -3,7 +3,8 @@
 What Parag Parikh Flexi Cap Fund's manager bought, sold and held, month by
 month, from the fund's own portfolio disclosures.
 
-[← back to the README](../README.md)
+[← back to the README](../README.md) · To judge a fund's *returns* against its
+category, see [mutual fund evaluation](mf_evaluation.md).
 
 ---
 

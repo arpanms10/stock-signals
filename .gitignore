@@ -12,6 +12,8 @@ config/*.xlsx
 config/*.xls
 config/holdings*.csv
 !config/holdings.example.csv
+# Your MF book as percentages (run_mf.py).
+config/mf_holdings.csv
 data/holdings.json
 .env
 # Results scorecards (run_results.py). The figures are public, but the list of
@@ -66,3 +68,9 @@ logs_*.txt
 nohup.out
 reports/
 data/last_weekly_run.txt
+# data/mf/mf.db <- run_mf.py --refresh: month-end NAVs of every Direct
+#   Growth scheme since 2013 from AMFI, ~30MB, rebuilt from scratch in ~20 min.
+data/mf/mf.db
+# config/mf_calibration.json <- run_mf.py --backtest; the MF view shows
+#   "no backtest yet" without it.
+config/mf_calibration.json
