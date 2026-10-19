@@ -184,6 +184,14 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     # volatility, z-scored across the eligible names and averaged 50/50.
     # The z-scoring has to happen at rank time, over the candidates only.
     nse_blend = m.get("score", "ram") == "nse_blend"
+    # Two other factors, ranked by the same machinery (run_factor_backtest.py):
+    #   high52  closeness to the 52-week high: close / max close of 252 days
+    #   lowvol  lowest realised volatility first
+    if m.get("score") == "high52":
+        ram = px / px.rolling(252, min_periods=200).max()
+    elif m.get("score") == "lowvol":
+        ram = -vol
+    gate_200 = m.get("require_above_200dma", True)
     if nse_blend:
         ram6 = (px.shift(sk) / px.shift(6 * TRADING_DAYS_MONTH) - 1) / vol.replace(0, np.nan)
     # selection: overlap holds only names in the top band on BOTH the primary
@@ -366,10 +374,12 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                     continue
                 ma = sma200.loc[ts].get(s, np.nan)
                 px_s = row.get(s, np.nan)
-                if pd.isna(ma) or pd.isna(px_s) or px_s <= ma:
+                if pd.isna(px_s):
+                    continue
+                if gate_200 and (pd.isna(ma) or px_s <= ma):
                     continue
                 # Reject names that have already run far past their own trend.
-                if max_ext and 100 * (px_s / ma - 1) > max_ext:
+                if max_ext and not pd.isna(ma) and 100 * (px_s / ma - 1) > max_ext:
                     continue
                 cand.append(s)
             if nse_blend:

@@ -63,13 +63,14 @@ def main() -> None:
     shutil.copy(HOLDINGS, HOLDINGS.with_suffix(".csv.bak"))
 
     with HOLDINGS.open("w", newline="", encoding="utf-8") as fh:
-        fh.write("# bucket: core | satellite | legacy\n"
-                 "#   core      never sold on momentum rank; only a genuine red\n"
-                 "#             flag (pledge, interest cover, quality collapse)\n"
-                 "#             triggers an exit.\n"
-                 "#   satellite rotated on rank -- falls out of the band, it is\n"
-                 "#             sold. The only bucket momentum acts on.\n"
-                 "#   legacy    red flags apply, rank ignored. The safe default.\n"
+        fh.write("# bucket: core | satellite | trade\n"
+                 "#   core      a decade or more. Never sold on momentum rank;\n"
+                 "#             only a genuine red flag (pledge, interest cover,\n"
+                 "#             quality collapse) triggers an exit.\n"
+                 "#   satellite one to ten years, not a trade. Red flags apply;\n"
+                 "#             rank only prompts a review. The safe default.\n"
+                 "#   trade     bought to trade: rotated on rank -- falls out of\n"
+                 "#             the band, it is sold. Never suggested; set it.\n"
                  "# Values below are this framework's suggestion. Change freely.\n")
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
@@ -84,8 +85,9 @@ def main() -> None:
         counts[b] = counts.get(b, 0) + 1
     print(f"Added `bucket` to {HOLDINGS} (backup at {HOLDINGS}.bak)")
     print("  suggested:", ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
-    print("\nThe ones worth your judgement are the legacy rows -- the framework")
-    print("will not act on any of them until you decide.")
+    print("\nCheck the satellite rows: the framework calls a holding core only")
+    print("on quality, volatility and liquidity, and cannot know how long you")
+    print("mean to hold it. Mark anything bought to trade as trade.")
 
 
 if __name__ == "__main__":

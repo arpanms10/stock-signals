@@ -57,9 +57,9 @@ def build(con, cfg, symbols, holdings) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--capital", type=float, default=1_000_000,
-                    help="capital this framework governs (the satellite)")
+                    help="capital this framework trades (bucket=trade)")
     ap.add_argument("--total-capital", type=float, default=None,
-                    help="your whole portfolio, for the core/satellite note")
+                    help="your whole portfolio, for the framing note")
     ap.add_argument("--universe", default=None,
                     help="nifty50 | nifty200 | nifty500 for the ranking pool")
     ap.add_argument("--rebalance", action="store_true",

@@ -351,6 +351,10 @@ SCRIPTS = {
     # Swing: replays every signal since 2018 and rewrites the summary the
     # Swing tab's Backtest section shows (config/swing_calibration.json).
     "Rerun swing backtest": ["run_swing.py", "--backtest"],
+    # Today's expected ranges: catch the F&O bhavcopy up, record and score.
+    "Record Today ranges": ["record_ranges.py"],
+    # Re-measures how often those bands held (config/range_calibration.json).
+    "Rerun range calibration": ["run_range_backtest.py"],
     # Scores new filings for holdings, watch list and picks (Results tab).
     "Check quarterly results": ["run_results.py"],
     # New filings for the Nifty 200 behind the GARP / QARP tab.
@@ -369,6 +373,7 @@ JOB_GROUPS = [
         ("Refresh prices (watchlist + holdings)", "Stocks, Swing, Momentum, Market",
          "prices", "minutes"),
         ("Check quarterly results", "Quarterly results, Today", None, "minutes"),
+        ("Record Today ranges", "Today", None, "seconds"),
     ]),
     ("Weekly · the Saturday job runs these", [
         ("Refresh fundamentals (NSE + Yahoo)", "Stocks, GARP / QARP, quality scores",
@@ -383,6 +388,7 @@ JOB_GROUPS = [
     ]),
     ("Backtests · change the evidence lines, not the data", [
         ("Rerun swing backtest", "Swing", None, "minutes"),
+        ("Rerun range calibration", "Today", None, "seconds"),
         ("Rerun mutual fund backtest", "Mutual funds", None, "about 2 min"),
     ]),
 ]
@@ -394,6 +400,8 @@ JOB_OUTPUTS = {
     "Refresh F&O history + validation": ROOT / "config" / "fno_calibration.json",
     "Refresh fund NAVs": ROOT / "data" / "mf" / "mf.db",
     "Rerun swing backtest": ROOT / "config" / "swing_calibration.json",
+    "Record Today ranges": ROOT / "history" / "ranges",
+    "Rerun range calibration": ROOT / "config" / "range_calibration.json",
     "Rerun mutual fund backtest": ROOT / "config" / "mf_calibration.json",
 }
 

@@ -80,7 +80,20 @@ def test_no_data():
 
 def test_cache_is_used_within_a_week(tmp_path, monkeypatch):
     monkeypatch.setattr(fa, "CACHE_DIR", tmp_path)
-    data = company()
+    data = dict(company(), v=fa.CACHE_VERSION)
     (tmp_path / "fundamentals_ACME.json").write_text(json.dumps(data))
     got = fa.fetch("ACME", now=dt.datetime(2026, 10, 20))
     assert got == data           # fresh enough: no network attempted
+
+
+def test_cache_from_an_older_version_is_refetched(tmp_path, monkeypatch):
+    monkeypatch.setattr(fa, "CACHE_DIR", tmp_path)
+    (tmp_path / "fundamentals_ACME.json").write_text(json.dumps(company()))
+    import fetch_fundamentals as ff
+    calls = []
+    monkeypatch.setattr(ff, "fetch_rows",
+                        lambda *a, **k: calls.append(1) or ([], {}))
+    monkeypatch.setattr("data.sources.nse_fundamentals.shareholding_history",
+                        lambda *a, **k: [])
+    got = fa.fetch("ACME", now=dt.datetime(2026, 10, 20))
+    assert calls and got["v"] == fa.CACHE_VERSION

@@ -122,16 +122,14 @@ def main() -> None:
         bucket_of[sym], bucket_reason[sym] = b, why
 
     split = bk.suggest_split(tradeable, values, bucket_of)
-    print(section("1. CORE vs SATELLITE"))
-    print("  Core      = owned for the business. Held THROUGH momentum signals;")
-    print("              sold only when the business deteriorates.")
-    print("  Satellite = owned for the trend. Rotates on rank -- that rotation")
-    print("              is exactly what makes momentum work.")
-    print("  Legacy    = bought before this framework existed. Red flags still")
-    print("              apply, but it is NOT rotated on momentum: selling on a")
-    print("              rule that was not used to buy is applying it")
-    print("              retroactively.\n")
-    for b in ("core", "satellite", "legacy"):
+    print(section("1. CORE / SATELLITE"))
+    print("  Core      = owned for the business, a decade or more. Held THROUGH")
+    print("              momentum signals; sold only when the business deteriorates.")
+    print("  Satellite = one to ten years, not a trade. Red flags and sizing")
+    print("              apply; falling out of the ranking prompts a review only.")
+    print("  Trade     = bucket=trade in config/holdings.csv. Rotates on rank --")
+    print("              that rotation is exactly what makes momentum work.\n")
+    for b in ("core", "satellite", "trade"):
         names = [s for s in tradeable if bucket_of[s] == b]
         if not names:
             continue

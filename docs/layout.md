@@ -19,8 +19,8 @@ portfolio.py               holdings from CSV or Kite snapshot
 fundamentals.py            quality score, incl. the lender rubric
 instruments.py             equity vs fund vs DVR classification
 import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.csv, buckets kept;
-                           --satellite SYMBOL... marks momentum buys
-set_buckets.py             pre-fill the core/satellite/legacy column
+                           --trade SYMBOL... marks positions bought to trade
+set_buckets.py             pre-fill the core/satellite column
 record_momentum.py         monthly momentum picks -> history/momentum_picks.xlsx
 record_fno.py              monthly F&O ranges -> history/fno_ranges.xlsx, scored at expiry
 history/                   records kept in git (momentum picks, F&O ranges)
@@ -51,7 +51,7 @@ scoring/timing.py          five buckets -> 0-100
 signals/engine.py          entries, exits, stops, sizing (pure functions)
 strategy/momentum.py       12-1 cross-sectional ranking
 strategy/advisor.py        buy / add / trim / exit decisions
-strategy/buckets.py        core / satellite / legacy classification
+strategy/buckets.py        core / satellite / trade classification
 strategy/tax.py            capital gains, LT/ST delivery, trim timing
 strategy/allocation.py     target weights, drift, concentration
 strategy/risk_monitor.py   stops and alerts on held positions

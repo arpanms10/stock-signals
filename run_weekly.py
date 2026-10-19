@@ -60,7 +60,7 @@ def step(name: str, args: list[str], log, timeout: int = 3600) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--portfolio", type=float, default=None,
-                    help="total capital, for the core/satellite framing note")
+                    help="total capital, for the framing note")
     ap.add_argument("--skip-refresh", action="store_true",
                     help="report on cached data without fetching")
     args = ap.parse_args()
@@ -112,6 +112,10 @@ def main() -> int:
         # closing chain, so a cycle is logged ~15-20 sessions before expiry.
         if not step("Record F&O ranges", ["record_fno.py"], log, timeout=1800):
             failures.append("F&O record")
+        # Today's ranges: re-measure the bands' hit rates on the extended
+        # history (config/range_calibration.json, which Today quotes).
+        if not step("Range calibration", ["run_range_backtest.py"], log, timeout=1800):
+            failures.append("range calibration")
 
     STATE.write_text(f"{dt.datetime.now().isoformat(timespec='seconds')}\n"
                      f"{'FAILED: ' + ', '.join(failures) if failures else 'ok'}\n")

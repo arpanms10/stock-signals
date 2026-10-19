@@ -21,7 +21,7 @@ def render() -> None:
     with top[0]:
         state.page_title("Stocks", f"Prices to {snap.as_of} · market {snap.regime}")
     if top[1].button("Suggest buckets", width="stretch", key="stocks_buckets",
-                     help="Runs set_buckets.py: pre-fills core / satellite / legacy "
+                     help="Runs set_buckets.py: pre-fills core or satellite "
                           "for holdings without one, then reloads."):
         state.run_and_reload("Suggest buckets", service.SCRIPTS["Suggest buckets"])
     label = "Refresh prices (watchlist + holdings)"
@@ -29,7 +29,7 @@ def render() -> None:
                      help="Runs run_backfill.py, then reloads."):
         state.run_and_reload(label, service.SCRIPTS[label])
     state.refreshed_notice()
-    c.evidence("tested", "Satellite verdicts follow the momentum rank, which held up in a "
+    c.evidence("tested", "Trade verdicts follow the momentum rank, which held up in a "
                          "survivorship-free backtest. Exits on red flags are rules on "
                          "balance-sheet facts, not forecasts.")
     for w in snap.warnings:
@@ -69,16 +69,18 @@ def _holdings(snap) -> None:
 
         left, right = st.columns([3, 2])
         with left:
-            st.subheader("Core / satellite / legacy")
-            st.caption("Core is held through momentum signals. Satellite rotates "
-                       "on rank. Legacy gets red-flag checks but is never sold on "
-                       "a rule that was not used to buy it.")
-            for b in ("core", "satellite", "legacy"):
+            st.subheader("Core / Satellite")
+            st.caption("Core: owned for a decade or more, held through momentum "
+                       "signals. Satellite: one to ten years -- red flags and "
+                       "sizing apply, and falling out of the ranking asks for a "
+                       "review, never a sale. Trade (bucket=trade in "
+                       "config/holdings.csv): rotates on rank and its stop.")
+            for b in ("core", "satellite", "trade"):
                 grp = h[h["bucket"] == b]
                 if grp.empty:
                     continue
                 val = grp["value"].sum()
-                st.markdown(f"**{b.upper()}** — {len(grp)} holdings, "
+                st.markdown(f"**{b.capitalize()}** — {len(grp)} holdings, "
                             f"{c.money(val)} "
                             f"({100 * val / snap.book_value:.0f}% of book)")
                 st.dataframe(
@@ -161,7 +163,7 @@ def _holdings(snap) -> None:
             head = st.columns([0.5, 3, 2, 2, 2.5])
             head[0].markdown(c.badge(r["action"], urgent), unsafe_allow_html=True)
             head[1].markdown(
-                f"**{r['symbol']}** &nbsp; {c.pill(r['bucket'], 'info')}"
+                f"**{r['symbol']}** &nbsp; {c.pill(r['bucket'].capitalize(), 'info')}"
                 + (f" &nbsp; {c.pill('URGENT', 'bad')}" if urgent else ""),
                 unsafe_allow_html=True)
             head[2].markdown(

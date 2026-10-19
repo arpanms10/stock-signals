@@ -27,10 +27,12 @@ import numpy as np
 import pandas as pd
 
 import fundamentals as fu
+from analysis import sector as sec
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_DIR = ROOT / "data" / "cache" / "analysis"
 MAX_AGE = dt.timedelta(days=7)
+CACHE_VERSION = 2      # 2: Yahoo margins, EBITDA, debt and cash for the sector checklist
 
 STANCES = ["Strong", "Sound", "Mixed", "Weak"]
 
@@ -55,6 +57,7 @@ class FundamentalReport:
     as_of: str = ""                    # latest quarter on file
     fetched_at: str = ""
     sources: str = ""
+    sector_checks: sec.Checklist | None = None
 
 
 # --------------------------------------------------------------------- data
@@ -82,7 +85,8 @@ def fetch(symbol: str, refresh: bool = False, now: dt.datetime | None = None) ->
     if path.exists() and not refresh:
         try:
             data = json.loads(path.read_text())
-            if now - dt.datetime.fromisoformat(data["fetched_at"]) < MAX_AGE:
+            if (now - dt.datetime.fromisoformat(data["fetched_at"]) < MAX_AGE
+                    and data.get("v") == CACHE_VERSION):
                 return data
         except Exception:
             pass
@@ -99,9 +103,12 @@ def fetch(symbol: str, refresh: bool = False, now: dt.datetime | None = None) ->
         promoter = []
     keep = ("sector", "industry", "longName", "marketCap", "trailingPE",
             "forwardPE", "priceToBook", "dividendYield", "currentPrice",
-            "financialCurrency", "earningsGrowth", "revenueGrowth")
+            "financialCurrency", "earningsGrowth", "revenueGrowth",
+            "grossMargins", "ebitdaMargins", "operatingMargins", "returnOnAssets",
+            "enterpriseToEbitda", "ebitda", "totalDebt", "totalCash",
+            "freeCashflow", "netIncomeToCommon", "payoutRatio")
     data = {
-        "symbol": symbol.upper(),
+        "symbol": symbol.upper(), "v": CACHE_VERSION,
         "fetched_at": now.isoformat(timespec="seconds"),
         "rows": [{k: _clean(v) for k, v in r.items()} for r in rows],
         "info": {k: _clean(info.get(k)) for k in keep if info.get(k) is not None},
@@ -370,6 +377,9 @@ def analyse(data: dict, sector: str = "") -> FundamentalReport:
             summary += (" Scored as a bank (asset quality first)." if kind == "bank" else
                         " Scored as a non-bank lender: debt/equity and cash flow are left out.")
 
+    group = sec.group_of(sector, info.get("sector", ""), info.get("industry", ""), kind)
+    checks = sec.checklist(group, cur.to_dict(), info)
+
     promoter = [p for p in data.get("promoter", []) if p.get("promoter_pct") is not None]
     notes = [f for f in q.flags if not any(w in f for w in ("HIGH", "RISING", "below 2",
                                                           "highly leveraged", "not arriving"))]
@@ -378,7 +388,7 @@ def analyse(data: dict, sector: str = "") -> FundamentalReport:
         _metrics(cur, kind), quarters, promoter, val, val_note, kind,
         results_quarter(cur.get("notes")) or str(cur.get("quarter", "")),
         data.get("fetched_at", ""),
-        str(cur.get("notes", "") or ""))
+        str(cur.get("notes", "") or ""), checks)
 
 
 def analyse_symbol(symbol: str, sector: str = "", refresh: bool = False) -> FundamentalReport:

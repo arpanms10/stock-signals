@@ -40,13 +40,15 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | | |
 |---|---|
 | `run_ui.py` | Dashboard, localhost only: Today, Portfolio, Ideas, Market and Research menus ([dashboard](docs/dashboard.md)) |
+| `record_ranges.py` / `run_range_backtest.py` | Today's expected ranges: forward log and calibration ([ranges](docs/ranges.md)) |
 | `run_advisor.py` | Verdicts on your book, as text |
 | `run_momentum.py` | Rank the universe |
 | `run_pit_momentum.py` | Survivorship-free backtest |
+| `run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
 | `run_weekly.py` | Refresh everything, then report |
 | `install_schedule.py` | Install / check / remove the scheduled jobs (weekly, `--swing-daily`, `--fno-intraday`) |
 | `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
-| `set_buckets.py` | Pre-fill core / satellite / legacy |
+| `set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
 | `record_momentum.py` | Save this month's momentum picks to `history/` |
 | `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
 | `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
@@ -69,20 +71,20 @@ Full flags in [operations](docs/operations.md).
 
 After buying, download your holdings from Kite (Console's `.xlsx` carries the
 long/short-term split; the web `.csv` also works), put the file in `config/`,
-and import it. Name the momentum buys with `--satellite` so they are rotated on
-rank:
+and import it. Name anything bought purely to trade with `--trade` so it is
+rotated on rank:
 
 ```bash
-PYTHONPATH=. .venv/bin/python import_kite_holdings.py --satellite CPPLUS SANSERA
+PYTHONPATH=. .venv/bin/python import_kite_holdings.py --trade CPPLUS SANSERA
 ```
 
 - Quantities and average prices come from Kite; your `bucket`, `notes` and
   `purchase_date` are kept for every stock you still hold. The old file is
   backed up to `config/holdings.csv.bak`.
-- **A new holding imported without `--satellite` has a blank bucket, and blank
-  is not satellite** -- the framework only ever suggests core or legacy. The
+- **A new holding imported without `--trade` has a blank bucket, and blank is
+  not trade** -- the framework only ever suggests core or satellite. The
   importer lists new holdings and reminds you.
-- `--satellite` overrides any existing bucket, and warns about any symbol that
+- `--trade` overrides any existing bucket, and warns about any symbol that
   is not in the Kite file.
 - Optionally add `purchase_date` (YYYY-MM-DD) to the new rows in
   `config/holdings.csv`: Kite does not export it, and the trailing stop is
@@ -302,7 +304,7 @@ touches git or your broker.
 | Job | When | Runs | Install | Check | Remove |
 |---|---|---|---|---|---|
 | Weekly report | Saturday 09:30 | `run_weekly.py`: refresh everything, advisor report, momentum and F&O records | `install_schedule.py --day saturday` | `install_schedule.py --status` | `install_schedule.py --remove` |
-| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
+| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results, record Today's ranges | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
 | F&O intraday | Weekdays 09:30-15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent | `install_schedule.py --fno-intraday` | `install_schedule.py --fno-intraday --status` | `install_schedule.py --fno-intraday --remove` |
 
 All commands run as `PYTHONPATH=. .venv/bin/python install_schedule.py ...`.
@@ -351,6 +353,7 @@ cannot be rebuilt.
 | [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
 | [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
 | [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
+| [**Expected ranges**](docs/ranges.md) | Today's next-session and 5-session ranges for Nifty and core holdings, how often they held, the forward log |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
 | [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the survivorship-free backtest (a weak edge) |
@@ -369,9 +372,11 @@ cannot be rebuilt.
 | **H** Hold | No action, stated rather than left as silence |
 
 Conflating trim and exit is how people average down into failures and take
-profits on their winners. Holdings sit in one of three buckets — **core** (never
-sold on rank), **satellite** (rotates on rank), **legacy** (red flags apply,
-rank ignored; the safe default for anything bought before this existed).
+profits on their winners. Holdings are **core** (a decade or more, never sold
+on rank) or **satellite** (one to ten years, not a trade: red flags and sizing
+apply, and falling out of the ranking only prompts a review; the default).
+Anything bought purely to trade is marked **trade** in `config/holdings.csv`,
+and only that rotates on rank. An old `legacy` value is read as satellite.
 
 ## Results
 
