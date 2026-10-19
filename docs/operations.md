@@ -41,6 +41,11 @@ did not tune on* before believing the result.
 PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
 ```
 
+GitHub Actions runs the same suite on every pull request and push to main
+(`.github/workflows/tests.yml`). The tests use fixtures only -- no local
+database, cache, holdings file or network -- so a test that needs any of those
+will fail in CI before it reaches main.
+
 ---
 
 

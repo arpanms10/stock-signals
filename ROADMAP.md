@@ -85,8 +85,9 @@ listed in `config/etfs.csv` with reasons.
 
 ### DONE · Dashboard
 
-Two sections — holdings with verdicts and trade plans, market with entry
-levels. Localhost only, deploy button disabled.
+Top-bar menus: Today, Portfolio, Ideas, Market, Research, and Data and jobs.
+Each page states how far its signals held up in a backtest. Localhost only
+([dashboard](docs/dashboard.md)).
 
 `ui/`
 
@@ -96,10 +97,39 @@ Kept the regime filter, ATR stops and R-multiple targets. Changed the Timing
 Score from a trigger to a ranking input. Dropped the 50 DMA trend-break exit,
 the RSI trim and the entry cooldown — all shown to hurt or add nothing.
 
-### NOT BUILT · Telegram, scheduling, event calendar
+### DONE · Scheduling, freshness and the results calendar
 
-Deliberately deferred. See Part 2 — stale data is a real failure mode and
-scheduling is the fix, but the advice needs to be executable first.
+launchd jobs: Saturday (`run_weekly.py`), weekday evenings after the close
+(`run_swing_daily.py`), and half-hourly F&O snapshots in market hours
+(`install_schedule.py`). The data chip and a warning line on every page say
+when a source is behind; Data and jobs runs whatever is stale. Results dates
+for everything you follow are on Today and Quarterly results.
+
+### DONE · Forward records
+
+Every recommendation that can be scored later is written down before the
+outcome is known, append-only: the advisor's verdicts (`decision_log.py`),
+monthly momentum picks, every swing scan, the monthly F&O ranges, and the
+daily Today ranges for every F&O underlying (`history/`).
+
+### DONE · Today, expected ranges, sector checklist
+
+Today gathers every decision from every page, plus next-session and
+five-session ranges for Nifty and core holdings with their measured hit rate
+([ranges](docs/ranges.md)). Analyze a stock adds a sector checklist: the
+long-term metrics that matter for that sector, and what to check by hand.
+
+### DONE · Tested and shown with their verdicts
+
+Swing setups, the F&O read, the quarterly results verdict, GARP / QARP and the
+mutual fund states were each built, backtested and either shown calibrated or
+kept as reading aids. 52-week high and low volatility failed a pre-registered
+rule and were not built further. See [validation](docs/validation.md).
+
+### NOT BUILT · Telegram
+
+Deliberately deferred: the dashboard and macOS notifications from the jobs
+cover it.
 
 ---
 
@@ -141,42 +171,14 @@ side.
 
 ## Part 2 — What is still wrong
 
-Ordered by how much they undermine the tool's usefulness.
+Ordered by how much they undermine the tool's usefulness. Reviewed
+2026-10-19; what was fixed since the first version of this list is at the end.
 
-### 1. The advice is not executable
+### 1. The drawdown, not the return, is the real problem
 
-The advisor suggests roughly ₹4.5L of adds against ₹1.1L raised from sells.
-There is no cash constraint anywhere in `strategy/advisor.py`. A plan that
-cannot be executed is a ranked wish-list.
-
-**Fix:** rank adds by conviction, fund them from the sells in the same plan,
-stop when the money runs out. Show the shortfall explicitly rather than
-implying every line can be actioned.
-
-### 2. The largest risk in the book produces no action
-
-Financial Services sits at ~27% against a 25% cap, across eight holdings. The
-sector rule in `advise()` only trims **satellites** — and all eight are core or
-legacy. The one concentration the framework identifies, it does nothing about.
-
-**Fix:** enforce the sector cap across all buckets. A core holding can be
-trimmed for concentration without any view on the business — that is exactly
-what the trim/exit distinction exists to express.
-
-### 3. Nothing records what actually happened
-
-The roadmap called for three months of paper trading. There is no mechanism to
-log what the advisor said on a date and what the stock did afterward, so live
-behaviour can never be compared against the backtest.
-
-**Fix:** a decision log — every run appends its verdicts with date and price to
-a table. Three months of that is worth more than ten years of backtest.
-
-### 4. The drawdown, not the return, is the real problem
-
-−36% to −42%, against the index's −38%. The return is now well clear of the
-index (23% a year against 10%, on the continuous price history), but the fall
-is still the part most people cannot sit through.
+−36% to −42%, against the index's −38%. The return is well clear of the index
+(23% a year against 10%, on the continuous price history), but the fall is
+the part most people cannot sit through.
 
 **Tried, 2026-10-11:** volatility targeting (on liquidity ranks 201-500, an
 untouched universe) cut volatility from 25% to 20% but cost about 6 points of
@@ -185,39 +187,55 @@ stops: tight ones cut the fall and cost 3-9 points a year. Neither adopted
 ([validation](docs/validation.md)). Still open: something that reacts faster
 than a monthly, 60-day volatility estimate.
 
-**Validation constraint:** the 2023–26 holdout is spent. It was used for the v1
-exit experiments, and momentum was then run across the full period on the
-argument that it is a different strategy class. That argument is defensible but
-not clean. Declare everything from today forward as live out-of-sample and stop
-touching 2023–26.
+**Validation constraint:** the 2023–26 holdout is spent for momentum and the
+v1 rules. Declare everything from today forward as live out-of-sample. (It is
+still unseen for 52-week high and low volatility, which failed on train.)
 
-### 5. The universe can admit junk
+### 2. Nothing else has an edge yet
 
-Top-200 by turnover has no market-cap or price floor. A thinly-held smallcap
-pumped for a month is precisely what ranks first on risk-adjusted momentum.
+Momentum is the only ranking that beat the index after costs on a
+survivorship-free universe. Swing setups, OI walls / PCR / max pain, the
+results verdict, GARP, QARP, 52-week high and low volatility did not. The one
+other signal that survived, the post-results reaction drift (t=2.6), failed
+its cost test as a long-only rule.
 
-**Fix:** a minimum price and market cap in `liquid_universe()`.
+**Next:** let the forward logs build. Due for review in early November 2026:
+the Today ranges (from 16 Oct), swing scans (from 13 Oct), the first scored F&O
+cycle, and the intraday F&O snapshots. An untested idea still open: promoter
+and insider buying, as an event study (needs NSE's disclosure feed first).
 
-### 6. Quality scores are shallower than they look
+### 3. The universe has no market-cap floor
 
-Growth needs five quarters of results; one is on file. So "quality 96" is a
-snapshot of ratios, not a trend — and trend is what separates a good business
-from a good quarter. Banks have no capital adequacy at all; it is not in NSE's
-XBRL.
+Price (₹20) and turnover (₹5 cr a day) floors are in place, which stops
+penny stocks. A thinly held mid-cap pumped on volume can still rank. A cap on
+distance above the 200 DMA was tested and left off: the results did not trend
+as the cap tightened (`config/scoring.yaml`).
 
-**Fix:** fetch 5–8 quarters per symbol. Enter `car_pct` by hand or from RBI
-data. Track the ₹1.25L LTCG exemption across the year instead of applying the
-rate flat.
+**Fix:** a free-float market-cap floor in `liquid_universe()`. Market cap is
+on file only as total, not free float.
 
-### 7. Data goes stale silently
+### 4. Quality scores still miss some figures
 
-Every refresh is manual. A dashboard showing three-week-old prices with no
-warning is a genuine failure mode, and the one most likely to cause a bad
-decision.
+Six quarters are fetched now, so growth is a trend. But banks' capital
+adequacy and CASA are not in NSE's XBRL or Yahoo: the sector checklist shows
+them as "not on file". The LTCG exemption is spread across one plan's sales,
+not tracked against gains already taken earlier in the financial year.
 
-**Fix:** a `launchd` job at 16:30 IST on trading days, and a staleness banner
-in the UI when the newest bar is more than a few sessions old. Silence must
-never mean "nothing happened".
+**Fix:** enter `car_pct` and `casa_pct` by hand or from RBI data; keep a
+year-to-date realised-gains figure for the exemption.
+
+### Fixed since the first version of this list
+
+- **The advice was not executable.** Adds are now funded from the sells in
+  the same plan, best first, and stop when the money runs out; the shortfall
+  is shown (`strategy/advisor.py`).
+- **The largest risk produced no action.** The sector cap trims every bucket,
+  core included, as sizing with no view on the business.
+- **Nothing recorded what happened.** `decision_log.py`, plus the forward
+  records above.
+- **Data went stale silently.** Scheduled jobs, the data chip, and a warning
+  line on every page.
+- **Penny stocks could rank first.** Price and turnover floors.
 
 ---
 
@@ -230,4 +248,5 @@ Unchanged, and they are the reason the numbers above can be trusted.
 - **The bar is buy-and-hold of the same names**, never the index alone.
 - Report failures as plainly as wins. A tool that only reports its successes is
   worse than no tool.
-- Paper-trade before real money — which needs item 3 above to exist first.
+- Paper-trade before real money: the decision log and forward records are
+  how; give them months, not weeks.
