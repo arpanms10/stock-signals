@@ -13,6 +13,8 @@ weekday evening (install_schedule.py --swing-daily).
      stops hit and targets reached are dated there (watching.py).
   4. Score any new quarterly results for the stocks you follow, and measure
      the price reaction to the ones already scored (run_results.py).
+  5. Catch the F&O history up and record the day's ranges for every F&O
+     underlying -- the forward log behind Today's ranges (record_ranges.py).
 
 Idempotent: a holiday, or a second run the same evening, finds the price
 date already recorded and writes nothing. Weekends are skipped outright.
@@ -69,6 +71,8 @@ def main(argv=None) -> int:
         if not step("Score new quarterly results", ["run_results.py"],
                     log, timeout=1800):
             failures.append("results")
+        if not step("Record Today ranges", ["record_ranges.py"], log, timeout=1800):
+            failures.append("ranges record")
     if failures:
         notify("Stock signals: swing record FAILED", ", ".join(failures))
         print(f"failed: {', '.join(failures)} -- see reports/swing_daily.log",
