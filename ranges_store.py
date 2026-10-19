@@ -186,3 +186,53 @@ def summary(scored: pd.DataFrame, cal: dict | None = None) -> pd.DataFrame:
                      "backtest_pct": rg.hit_rate(cal, m, "index" if k == "NIFTY" else k, h,
                                                  symbol=k)})
     return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------------------ Today
+
+def sessions_after(day: str, n: int, holidays=()) -> str:
+    """The n-th trading day after `day` (weekdays less NSE holidays)."""
+    hol = [h.isoformat() if isinstance(h, dt.date) else str(h) for h in holidays]
+    return str(np.busday_offset(day, n, roll="forward", holidays=hol))
+
+
+def today_rows(con, symbols: list[str], closes_of=None, cal: dict | None = None,
+               holidays=()) -> list[dict]:
+    """The bands Today shows, in the order asked: the latest F&O close's
+    implied band where the symbol has options, else a realised band from
+    `closes_of(symbol)` -> pd.Series of closes indexed by date."""
+    fo = build(con)
+    by = {r["symbol"]: r for r in fo.to_dict("records")} if not fo.empty else {}
+    out = []
+    for sym in symbols:
+        r = by.get(sym)
+        if r is not None and r.get("sigma_implied"):
+            method, kind, sigma = "implied", r["kind"], r["sigma_implied"]
+            day, spot, res = r["price_date"], r["spot"], r.get("results_on")
+            src = r.get("iv_from")
+        else:
+            c = closes_of(sym) if closes_of else None
+            if c is None or len(c) == 0:
+                continue
+            c = pd.Series(c, dtype=float).dropna()
+            sigma = realised(c)
+            if sigma is None:
+                continue
+            method, kind, src = "realised", (r or {}).get("kind", "equity"), ""
+            day, spot = str(c.index[-1])[:10], float(c.iloc[-1])
+            res = _results_ahead(con, day).get(sym)
+        res = res if isinstance(res, str) else None        # NaN from the frame
+        row = {"symbol": sym, "kind": kind, "method": method, "iv_from": src,
+               "price_date": day, "spot": spot, "results_on": res}
+        for h in rg.HORIZONS:
+            end = sessions_after(day, h, holidays)
+            lo, hi = rg.band(spot, sigma, h)
+            in_window = bool(res) and day < res <= end
+            row.update({f"end_{h}": end, f"low_{h}": lo, f"high_{h}": hi,
+                        f"move_pct_{h}": rg.move_pct(sigma, h),
+                        f"results_{h}": in_window,
+                        f"hit_{h}": rg.hit_rate(cal, method, kind, h,
+                                                in_window if kind == "equity" else None,
+                                                symbol=sym)})
+        out.append(row)
+    return out

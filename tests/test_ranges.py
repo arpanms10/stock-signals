@@ -135,3 +135,29 @@ def test_score_flags_results_inside_the_window(con, tmp_path):
     assert a["results"].all()
     summ = rs.summary(sc, CAL)
     assert {"equity", "index", "NIFTY"} <= set(summ["group"])
+
+
+def test_today_rows_falls_back_to_realised_for_a_stock_without_options(con):
+    closes = pd.Series([100.0, 101, 100, 102, 101] * 5,
+                       index=pd.date_range("2026-09-01", periods=25, freq="B").date)
+    rows = rs.today_rows(con, ["NIFTY", "NOOPT", "MISSING"],
+                         closes_of=lambda s: closes if s == "NOOPT" else None, cal=CAL)
+    assert [r["symbol"] for r in rows] == ["NIFTY", "NOOPT"]
+    n, x = rows
+    assert n["method"] == "implied" and n["iv_from"] == "next"       # 1 session left
+    assert n["hit_5"] == 72.0 and n["low_1"] < n["spot"] < n["high_1"]
+    assert x["method"] == "realised" and x["price_date"] == str(closes.index[-1])
+    assert x["end_1"] > x["price_date"]
+
+
+def test_sessions_after_skips_weekends_and_holidays():
+    assert rs.sessions_after("2026-10-16", 1) == "2026-10-19"
+    assert rs.sessions_after("2026-10-16", 1, [dt.date(2026, 10, 19)]) == "2026-10-20"
+    assert rs.sessions_after("2026-10-16", 5) == "2026-10-23"
+
+
+def test_today_rows_flags_results_inside_the_window(con):
+    rows = rs.today_rows(con, ["AAA"], cal=CAL)
+    # The fixture's latest day is DAYS[29]; its results date (DAYS[26]) is past.
+    assert rows[0]["results_1"] is False
+    assert rows[0]["hit_1"] == 75.0
