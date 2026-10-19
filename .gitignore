@@ -49,6 +49,8 @@ config/fno_reach.json
 # config/range_calibration.json <- run_range_backtest.py (Saturday job); Today
 #   shows the ranges without a hit rate until it exists.
 config/range_calibration.json
+# config/factor_calibration.json <- run_factor_backtest.py (52-week high, low vol).
+config/factor_calibration.json
 # config/swing_calibration.json <- run_swing.py --backtest; the Swing tab
 #   shows "no backtest yet" without it.
 config/swing_calibration.json
