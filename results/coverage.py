@@ -20,17 +20,17 @@ MOMENTUM = ROOT / "history" / "momentum_picks.xlsx"
 
 
 def _holdings() -> list[str]:
-    import portfolio as pf
+    from book import portfolio as pf
     return [h["tradingsymbol"] for h in pf.load_holdings()]
 
 
 def _watch() -> list[str]:
-    import watching as wg
+    from book import watching as wg
     return wg.symbols()
 
 
 def _swing() -> list[str]:
-    import swing_store as ss
+    from records import swing_store as ss
     s, r = ss.scans(), ss.runs()
     if s.empty or r.empty:
         return []

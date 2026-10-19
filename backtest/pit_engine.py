@@ -184,7 +184,7 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     # volatility, z-scored across the eligible names and averaged 50/50.
     # The z-scoring has to happen at rank time, over the candidates only.
     nse_blend = m.get("score", "ram") == "nse_blend"
-    # Two other factors, ranked by the same machinery (run_factor_backtest.py):
+    # Two other factors, ranked by the same machinery (research/run_factor_backtest.py):
     #   high52  closeness to the 52-week high: close / max close of 252 days
     #   lowvol  lowest realised volatility first
     if m.get("score") == "high52":

@@ -1,6 +1,6 @@
 """Fetch, score and store: the one place the results pipeline is wired up.
 
-run_results.py, the daily job and the dashboard all go through `refresh()`,
+scripts/run_results.py, the daily job and the dashboard all go through `refresh()`,
 so a filing is scored the same way whichever of them saw it first.
 """
 from __future__ import annotations

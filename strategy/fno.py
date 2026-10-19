@@ -2,7 +2,7 @@
 
 Pure functions over a chain DataFrame (see data/sources/nse_derivatives.py:
 one row per strike, ce_* and pe_* columns). No I/O, so the backtest in
-run_fno_backtest.py runs exactly this code on historical bhavcopy chains.
+scripts/run_fno_backtest.py runs exactly this code on historical bhavcopy chains.
 
 What open interest is evidence of: where option WRITERS have put money. A
 large put OI below spot means writers are paid as long as price stays above
@@ -315,7 +315,7 @@ def expected_range(spot: float, move: float | None, support: Wall | None,
 
     The live default until validation (2026-10-08) showed the walls only made
     the range narrower, never more accurate: it held exactly as often as its
-    width predicted. Kept so run_fno_backtest.py can keep reporting it.
+    width predicted. Kept so scripts/run_fno_backtest.py can keep reporting it.
     Returns (low, high, low_from, high_from).
     """
     lo_c, hi_c = [], []

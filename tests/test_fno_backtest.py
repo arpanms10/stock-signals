@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import run_fno_backtest as bt
+from scripts import run_fno_backtest as bt
 
 
 def obs_frame(n=600, seed=1, size_from=None):

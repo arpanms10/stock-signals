@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 import setup_project as sp
-import userfiles as uf
+from book import userfiles as uf
 
 
 def test_every_dataset_runs_scripts_that_exist():

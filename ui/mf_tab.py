@@ -2,8 +2,8 @@
 funds side by side (Research › Compare funds).
 
 Reads config/mf_holdings.csv or .xlsx (percent of the MF book, no amounts) and
-the NAV history in data/mf/mf.db (run_mf.py --refresh). Same engine as
-run_mf.py.
+the NAV history in data/mf/mf.db (scripts/run_mf.py --refresh). Same engine as
+scripts/run_mf.py.
 """
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def _cat(k: str | None) -> str:
 
 
 def _fmt(v, key: str) -> str:
-    from run_mf import _fmt as fmt
+    from scripts.run_mf import _fmt as fmt
     return fmt(v, key)
 
 
@@ -62,7 +62,7 @@ def _evidence() -> None:
     if line:
         c.evidence("weak", line)
     else:
-        st.warning("No backtest yet -- run it from Data and jobs (or `run_mf.py "
+        st.warning("No backtest yet -- run it from Data and jobs (or `scripts/run_mf.py "
                    "--backtest`) to see what these states were worth historically.")
 
 
@@ -141,7 +141,7 @@ def _workbook(ev: engine.Evaluation) -> bytes | None:
 def _refresh_button(where, run_script) -> None:
     label = "Refresh fund NAVs"
     if run_script and where.button("Refresh NAVs", width="stretch", key="mf_refresh",
-                                   help="Runs run_mf.py --refresh: downloads any month "
+                                   help="Runs scripts/run_mf.py --refresh: downloads any month "
                                         "of AMFI NAVs not on file, then reloads."):
         from ui import service
         run_script(label, service.SCRIPTS[label])

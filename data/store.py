@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS corporate_actions (
     subject TEXT,
     PRIMARY KEY (symbol, ex_date, subject)
 );
--- F&O snapshots: one row per strike per NSE update (run_fno.py saves one per
+-- F&O snapshots: one row per strike per NSE update (scripts/run_fno.py saves one per
 -- run). Keyed on NSE's own timestamp, so re-running between NSE updates
 -- replaces rather than duplicates. OI is in contracts.
 CREATE TABLE IF NOT EXISTS option_snapshots (

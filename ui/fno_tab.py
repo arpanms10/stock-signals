@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-import fno_report
+from records import fno_report
 from data.sources import nse_derivatives as nsed
 from ui import components as c
 
@@ -114,7 +114,7 @@ def _vol_row(vc) -> None:
                 ("history not current" if vc.iv_hist_n == 0 else f"{vc.iv_hist_n} days of history"),
                 delta_color="off", delta_arrow="off",
                 help="Share of the past year's daily straddle IVs below today's. "
-                     "Needs 120 days of F&O history (run_fno_backtest.py --ingest).")
+                     "Needs 120 days of F&O history (scripts/run_fno_backtest.py --ingest).")
     m[2].metric("Realised (20d)", f"{vc.rv20:.1f}%" if vc.rv20 else "--",
                 f"IV/RV {vc.iv_rv:.2f}" if vc.iv_rv else None,
                 delta_color="off", delta_arrow="off",
@@ -408,9 +408,9 @@ def render() -> None:
     if len(h) >= 2:
         st.altair_chart(_pcr_line(h), width="stretch")
         st.caption(f"From {len(h)} stored snapshots today. Each Analyse or "
-                   "`run_fno.py` run adds one.")
+                   "`scripts/run_fno.py` run adds one.")
     else:
-        st.caption("One snapshot so far today. Each refresh or `run_fno.py` "
+        st.caption("One snapshot so far today. Each refresh or `scripts/run_fno.py` "
                    "run stores another, and this becomes a line.")
 
     with st.expander("Option chain table"):

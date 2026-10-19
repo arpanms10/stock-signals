@@ -591,7 +591,7 @@ def read_me(discs, splits, m0, m1) -> list[tuple[str, str]]:
                  f"downloaded from amc.ppfas.com. Holdings are the same for every plan; only the "
                  f"NAV differs, and the Direct Growth NAV is used throughout."),
         ("text", f"Generated {dt.date.today():%d %b %Y}. Re-run: "
-                 f"PYTHONPATH=. .venv/bin/python run_mf_ppfas.py"),
+                 f"PYTHONPATH=. .venv/bin/python scripts/run_mf_ppfas.py"),
         ("blank", ""),
         ("sub", "Sheets"),
         ("bullet", "Year Summary: the whole year in plain English. Start here."),

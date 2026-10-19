@@ -64,7 +64,7 @@ def assess(con, today: dt.date | None = None,
     row = con.execute("SELECT MAX(date) FROM market_days WHERE rows > 0").fetchone()
     if not row or not row[0]:
         return Freshness("stale", None, 999,
-                         f"No {source} at all. Run run_market_ingest.py.")
+                         f"No {source} at all. Run scripts/run_market_ingest.py.")
     latest = dt.date.fromisoformat(row[0])
 
     # Trading sessions since the last recorded one -- the table cannot tell
@@ -97,7 +97,7 @@ def assess_prices(con, symbols: list[str], today: dt.date | None = None) -> Fres
     rows = con.execute("SELECT symbol, MAX(date) FROM prices GROUP BY symbol").fetchall()
     if not rows:
         return Freshness("stale", None, 999,
-                         "No price history. Run run_backfill.py.")
+                         "No price history. Run scripts/run_backfill.py.")
     lasts = sorted(dt.date.fromisoformat(r[1]) for r in rows)
     latest = lasts[len(lasts) // 2]
     behind = sessions_since(latest, today)
@@ -120,13 +120,13 @@ def assess_fundamentals(path=None, today: dt.date | None = None,
     """
     from pathlib import Path
 
-    import fundamentals as fu
+    from scoring import fundamentals as fu
 
     today = today or dt.date.today()
     path = Path(path or fu.FUNDAMENTALS_PATH)
     if not path.exists():
         return Freshness("stale", None, 999,
-                         "No fundamentals on file. Run fetch_fundamentals.py.")
+                         "No fundamentals on file. Run scripts/fetch_fundamentals.py.")
     modified = dt.date.fromtimestamp(path.stat().st_mtime)
     age = (today - modified).days
     if age <= warn_days // 2:

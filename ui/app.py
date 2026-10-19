@@ -70,7 +70,7 @@ def _results():
 
 
 def _picker():
-    import portfolio as pf
+    from book import portfolio as pf
     from ui import picker_tab
     fresh = {f["kind"]: f for f in state.freshness()}
     as_of = fresh.get("market", {}).get("latest")

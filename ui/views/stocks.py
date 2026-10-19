@@ -21,12 +21,12 @@ def render() -> None:
     with top[0]:
         state.page_title("Stocks", f"Prices to {snap.as_of} · market {snap.regime}")
     if top[1].button("Suggest buckets", width="stretch", key="stocks_buckets",
-                     help="Runs set_buckets.py: pre-fills core or satellite "
+                     help="Runs scripts/set_buckets.py: pre-fills core or satellite "
                           "for holdings without one, then reloads."):
         state.run_and_reload("Suggest buckets", service.SCRIPTS["Suggest buckets"])
     label = "Refresh prices (watchlist + holdings)"
     if top[2].button("Refresh prices", width="stretch", key="stocks_prices",
-                     help="Runs run_backfill.py, then reloads."):
+                     help="Runs scripts/run_backfill.py, then reloads."):
         state.run_and_reload(label, service.SCRIPTS[label])
     state.refreshed_notice()
     c.evidence("tested", "Trade verdicts follow the momentum rank, which held up in a "
@@ -50,7 +50,7 @@ def _holdings(snap) -> None:
     h = pd.DataFrame(snap.holdings)
     if h.empty:
         st.info("No holdings yet. Fill in `config/holdings.xlsx` (its *How to "
-                "fill* sheet explains each column), or run `import_kite_holdings.py` "
+                "fill* sheet explains each column), or run `scripts/import_kite_holdings.py` "
                 "on a broker download. `setup_project.py` creates the blank file.")
     else:
         invested = (h["quantity"] * h["avg_price"]).sum()
@@ -250,7 +250,7 @@ def _watching(snap) -> None:
     w = pd.DataFrame(snap.watching)
     if w.empty:
         st.info("Nothing being watched yet. Add candidates from the Market or "
-                "Swing tab, or run `run_daily.py --watch-add SYMBOL`.")
+                "Swing tab, or run `scripts/run_daily.py --watch-add SYMBOL`.")
     else:
         settled = w[w["days"].fillna(0) >= 21]
         cols = st.columns(4)
@@ -311,7 +311,7 @@ def _watching(snap) -> None:
         add_sym = st.text_input("Add a symbol", placeholder="e.g. CUPID",
                                 key="watch_add_input")
         if st.button("Add to watch list") and add_sym.strip():
-            import watching as wg
+            from book import watching as wg
             ok, msg = wg.add(add_sym.strip().upper(), source="manual")
             (st.success if ok else st.info)(msg)
             state.clear()
@@ -320,6 +320,6 @@ def _watching(snap) -> None:
             drop = st.selectbox("Stop watching", [""] + list(w["symbol"]),
                                 key="watch_drop")
             if st.button("Remove") and drop:
-                import watching as wg
+                from book import watching as wg
                 st.info(wg.remove(drop)[1])
                 state.clear()

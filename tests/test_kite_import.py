@@ -1,6 +1,6 @@
 """Kite export -> holdings.csv conversion."""
-import import_kite_holdings as kite
-import portfolio as pf
+from scripts import import_kite_holdings as kite
+from book import portfolio as pf
 
 
 def test_kite_web_csv():

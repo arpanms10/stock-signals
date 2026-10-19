@@ -89,7 +89,7 @@ def test_cache_is_used_within_a_week(tmp_path, monkeypatch):
 def test_cache_from_an_older_version_is_refetched(tmp_path, monkeypatch):
     monkeypatch.setattr(fa, "CACHE_DIR", tmp_path)
     (tmp_path / "fundamentals_ACME.json").write_text(json.dumps(company()))
-    import fetch_fundamentals as ff
+    from scripts import fetch_fundamentals as ff
     calls = []
     monkeypatch.setattr(ff, "fetch_rows",
                         lambda *a, **k: calls.append(1) or ([], {}))

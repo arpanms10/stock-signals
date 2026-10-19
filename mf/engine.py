@@ -1,4 +1,4 @@
-"""Glue for run_mf.py and the dashboard: load, measure, decide."""
+"""Glue for scripts/run_mf.py and the dashboard: load, measure, decide."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -40,7 +40,7 @@ def evaluate(queries: list[str], use_holdings: bool = True,
     con = con or navdb.connect()
     sch = navdb.schemes(con)
     if sch.empty:
-        raise SystemExit("No NAV history yet: run  run_mf.py --refresh  first.")
+        raise SystemExit("No NAV history yet: run  scripts/run_mf.py --refresh  first.")
     newest = sch["last_month"].max()
     names = dict(zip(sch["code"], sch["name"]))
     category = sch.set_index("code")["category"]

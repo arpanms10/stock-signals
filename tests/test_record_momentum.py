@@ -3,7 +3,7 @@ import datetime as dt
 
 from openpyxl import load_workbook
 
-import record_momentum as rm
+from scripts import record_momentum as rm
 
 
 def pick(sym, rank=1, price=100.0):

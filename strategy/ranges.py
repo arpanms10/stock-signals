@@ -17,9 +17,9 @@ Two sources for the one-session standard deviation, as a fraction of spot:
             stock with no options; also logged for every F&O name so the two
             can be compared.
 
-Pure functions; no I/O. run_range_backtest.py measures exactly this code on
+Pure functions; no I/O. scripts/run_range_backtest.py measures exactly this code on
 the bhavcopy history and writes the hit rates to config/range_calibration.json;
-record_ranges.py logs it forward.
+scripts/record_ranges.py logs it forward.
 """
 from __future__ import annotations
 

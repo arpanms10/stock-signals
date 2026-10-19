@@ -157,7 +157,7 @@ def entry_levels(symbols: list[str], market: list[dict]) -> None:
                                      e.get("t2"), f"Needs: {e['note']}"),
                         unsafe_allow_html=True)
 
-    import watching as wg
+    from book import watching as wg
     already = set(wg.symbols())
     if row["symbol"] in already:
         st.caption(f"✓ {row['symbol']} is on your watch list.")

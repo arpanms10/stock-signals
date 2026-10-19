@@ -173,7 +173,7 @@ def test_high_quality_but_volatile_is_not_core():
 
 def _cfg_and_quality(score, flags=()):
     from scoring import timing
-    import fundamentals as fu
+    from scoring import fundamentals as fu
     return timing.load_config(), fu.Quality("X", score, {}, list(flags))
 
 

@@ -6,7 +6,7 @@ only this page. Each row opens the page it came from.
 
 The one addition is Expected ranges: NIFTY and the core holdings, spot +/-
 one standard deviation for the next session and the next five, with how
-often such a band has held (strategy/ranges.py, run_range_backtest.py). A
+often such a band has held (strategy/ranges.py, scripts/run_range_backtest.py). A
 size of move, not a direction -- no directional read here has tested well.
 """
 from __future__ import annotations
@@ -98,10 +98,10 @@ def _results_due(today: dt.date) -> list[tuple[dt.date, str]]:
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _range_rows(symbols: tuple[str, ...]) -> list[dict]:
-    import ranges_store as rs
+    from records import ranges_store as rs
     from data import fo_bhavcopy as fb
     from data import store
-    from record_ranges import load_calibration
+    from scripts.record_ranges import load_calibration
     try:
         from data.sources.nse_derivatives import trading_holidays
         y = dt.date.today().year
@@ -125,7 +125,7 @@ def _range_rows(symbols: tuple[str, ...]) -> list[dict]:
 @st.cache_data(ttl=900, show_spinner=False)
 def _range_log() -> dict:
     """Forward-log hit rates: {(group, horizon): (hit %, n, first day)}."""
-    import ranges_store as rs
+    from records import ranges_store as rs
     from data import fo_bhavcopy as fb
     con = fb.connect()
     try:

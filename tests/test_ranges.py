@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import ranges_store as rs
+from records import ranges_store as rs
 from data import fo_bhavcopy as fb
 from strategy import ranges as rg
 

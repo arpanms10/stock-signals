@@ -2,7 +2,7 @@
 
 Computed on demand from data/results/universe_quarters.csv and the local
 price store, cached for the session. 'Refresh filings' runs
-run_picker.py --refresh; the backtest section reads
+scripts/run_picker.py --refresh; the backtest section reads
 config/picker_calibration.json.
 """
 from __future__ import annotations
@@ -51,11 +51,11 @@ def render(as_of: dt.date, held: set[str], run_script=None) -> None:
 
     top = st.columns([3, 1.2])
     if run_script and top[1].button("Refresh filings", width="stretch", key="pick_refresh",
-                                    help="Runs run_picker.py --refresh: lists every "
+                                    help="Runs scripts/run_picker.py --refresh: lists every "
                                          "company's filings and reads any new ones "
                                          "(a few minutes)."):
         _scored.clear()
-        run_script("Refresh GARP / QARP filings", ["run_picker.py", "--refresh"])
+        run_script("Refresh GARP / QARP filings", ["scripts/run_picker.py", "--refresh"])
 
     scored = _scored(as_of, cfg["universe"])
     if scored.empty:
@@ -135,7 +135,7 @@ def render(as_of: dt.date, held: set[str], run_script=None) -> None:
 
 def _verdict() -> None:
     if not CALIBRATION.exists():
-        st.warning("No backtest yet -- run `run_picker.py --backtest` before trusting "
+        st.warning("No backtest yet -- run `scripts/run_picker.py --backtest` before trusting "
                    "either list.")
         return
     cal = json.loads(CALIBRATION.read_text())

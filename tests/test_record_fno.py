@@ -3,7 +3,7 @@ import datetime as dt
 
 from openpyxl import load_workbook
 
-import record_fno as rf
+from scripts import record_fno as rf
 
 EXP = dt.date(2026, 10, 27)
 

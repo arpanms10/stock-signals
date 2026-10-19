@@ -1,4 +1,4 @@
-"""Did the fund state predict how the fund did next? (run_mf.py --backtest)
+"""Did the fund state predict how the fund did next? (scripts/run_mf.py --backtest)
 
 At every month-end from mid-2018 (SEBI categories in force), every Direct
 Growth fund in a judged category is given its state with exactly the live

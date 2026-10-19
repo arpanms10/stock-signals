@@ -8,7 +8,7 @@ leverage. The ordinary rubric does not merely miss these -- it inverts them.
 import pandas as pd
 import pytest
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 
 
 def bank_row(**kw):

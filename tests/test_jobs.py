@@ -2,13 +2,13 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import jobs
+from ops import jobs
 
 ROOT = Path("/opt/stock signals")          # a space, to test quoting
 
 
 def test_every_job_has_plain_words_and_a_script_that_exists():
-    here = Path(jobs.__file__).parent
+    here = jobs.ROOT
     for j in jobs.JOBS.values():
         assert j.what and j.feeds and j.when.describe()
         assert (here / j.script).exists(), j.script

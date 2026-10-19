@@ -1,6 +1,6 @@
 """Results tab: this season's quarterly results for the stocks you follow.
 
-Reads what run_results.py stored (data/results/); the Check button runs it.
+Reads what scripts/run_results.py stored (data/results/); the Check button runs it.
 Nothing here fetches on page load except NSE's results calendar, which is
 cached for half a day and shared with the Swing tab.
 """
@@ -59,9 +59,9 @@ def render(run_script=None) -> None:
     top[4].write("")
     if run_script and top[4].button("Check for new results", type="primary",
                                     width="stretch", key="results_run",
-                                    help="Runs run_results.py: scores new filings "
+                                    help="Runs scripts/run_results.py: scores new filings "
                                          "and updates price reactions."):
-        run_script("Check quarterly results", ["run_results.py"])
+        run_script("Check quarterly results", ["scripts/run_results.py"])
 
     f1, f2 = st.columns([3, 2])
     picked = f1.pills("Followed because", SOURCES, selection_mode="multi",
@@ -85,13 +85,13 @@ def render(run_script=None) -> None:
 
 
 def _backtest() -> None:
-    """What run_results_backtest.py found, from config/results_calibration.json."""
+    """What research/run_results_backtest.py found, from config/results_calibration.json."""
     import json
     from pathlib import Path
     path = Path(__file__).resolve().parents[1] / "config" / "results_calibration.json"
     with st.expander("Has the verdict predicted anything? (backtest)"):
         if not path.exists():
-            st.caption("No backtest yet. Run `run_results_backtest.py` (about an hour "
+            st.caption("No backtest yet. Run `research/run_results_backtest.py` (about an hour "
                        "the first time: it reads ~3,000 filings).")
             return
         cal = json.loads(path.read_text())

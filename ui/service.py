@@ -23,10 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import fundamentals as fu           # noqa: E402
-import instruments as ins           # noqa: E402
-import portfolio as pf              # noqa: E402
-import watching as wg               # noqa: E402
+from scoring import fundamentals as fu           # noqa: E402
+from data import instruments as ins           # noqa: E402
+from book import portfolio as pf              # noqa: E402
+from book import watching as wg               # noqa: E402
 from data import bhavcopy as bc     # noqa: E402
 from data import freshness as fr    # noqa: E402
 from data import quality as dq      # noqa: E402
@@ -295,7 +295,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
                                        r["rank_main"] or 10**6,
                                        r["rank_cmp"] or 10**6))
 
-    # Watched names carry their own price history, fetched by run_daily.py.
+    # Watched names carry their own price history, fetched by scripts/run_daily.py.
     watch_prices = {}
     for sym in wg.symbols():
         f = frames.get(sym)
@@ -343,28 +343,28 @@ def freshness_checks(con=None, mkt=None) -> list[dict]:
 # ------------------------------------------------------------------ scripts
 
 SCRIPTS = {
-    "Refresh prices (watchlist + holdings)": ["run_backfill.py", "--years", "10"],
-    "Refresh fundamentals (NSE + Yahoo)": ["fetch_fundamentals.py"],
-    "Update full-market data": ["run_market_ingest.py", "--years", "10"],
-    "Suggest buckets": ["set_buckets.py"],
+    "Refresh prices (watchlist + holdings)": ["scripts/run_backfill.py", "--years", "10"],
+    "Refresh fundamentals (NSE + Yahoo)": ["scripts/fetch_fundamentals.py"],
+    "Update full-market data": ["scripts/run_market_ingest.py", "--years", "10"],
+    "Suggest buckets": ["scripts/set_buckets.py"],
     # F&O: the bhavcopy history behind IV percentile, realised vol and the
     # validation's hit rates and reach curves (rewritten on every run).
-    "Refresh F&O history + validation": ["run_fno_backtest.py", "--ingest"],
+    "Refresh F&O history + validation": ["scripts/run_fno_backtest.py", "--ingest"],
     # Swing: replays every signal since 2018 and rewrites the summary the
     # Swing tab's Backtest section shows (config/swing_calibration.json).
-    "Rerun swing backtest": ["run_swing.py", "--backtest"],
+    "Rerun swing backtest": ["scripts/run_swing.py", "--backtest"],
     # Today's expected ranges: catch the F&O bhavcopy up, record and score.
-    "Record Today ranges": ["record_ranges.py"],
+    "Record Today ranges": ["scripts/record_ranges.py"],
     # Re-measures how often those bands held (config/range_calibration.json).
-    "Rerun range calibration": ["run_range_backtest.py"],
+    "Rerun range calibration": ["scripts/run_range_backtest.py"],
     # Scores new filings for holdings, watch list and picks (Results tab).
-    "Check quarterly results": ["run_results.py"],
+    "Check quarterly results": ["scripts/run_results.py"],
     # New filings for the Nifty 200 behind the GARP / QARP tab.
-    "Refresh GARP / QARP filings": ["run_picker.py", "--refresh"],
+    "Refresh GARP / QARP filings": ["scripts/run_picker.py", "--refresh"],
     # Month-end NAVs of every Direct Growth fund (Mutual funds pages).
-    "Refresh fund NAVs": ["run_mf.py", "--refresh", "--no-holdings"],
+    "Refresh fund NAVs": ["scripts/run_mf.py", "--refresh", "--no-holdings"],
     # Rewrites config/mf_calibration.json, the Mutual funds evidence line.
-    "Rerun mutual fund backtest": ["run_mf.py", "--backtest"],
+    "Rerun mutual fund backtest": ["scripts/run_mf.py", "--backtest"],
 }
 
 # The Data and jobs page, grouped by how often each needs running. Each job:

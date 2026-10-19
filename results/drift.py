@@ -1,6 +1,6 @@
 """Post-results reaction drift as a trading rule, after costs.
 
-run_results_backtest.py found that stocks which rallied on their results
+research/run_results_backtest.py found that stocks which rallied on their results
 (>= 1 ATR on the reaction day) kept beating those that sold off. That is a
 spread across events; this asks whether a long-only book built on it, paying
 costs on every trade, beats simply holding the universe.

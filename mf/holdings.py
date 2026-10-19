@@ -54,8 +54,8 @@ def _header(c) -> str:
 
 def read_raw(path: Path) -> pd.DataFrame:
     if path.suffix.lower() in (".xlsx", ".xls"):
-        # The first sheet that isn't the "How to fill" guide (userfiles.py).
-        import userfiles as uf
+        # The first sheet that isn't the "How to fill" guide (book/userfiles.py).
+        from book import userfiles as uf
         sheets = pd.ExcelFile(path).sheet_names
         data = next((n for n in sheets if n.strip().lower() != uf.GUIDE_SHEET.lower()),
                     sheets[0])
