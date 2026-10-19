@@ -90,6 +90,8 @@ def _render_fundamental(r: fa.FundamentalReport) -> None:
         st.caption(r.valuation_note + " No free sector-P/E data exists, so this "
                    "is not a comparison with peers.")
 
+    _render_sector(r.sector_checks)
+
     if r.quarters:
         st.markdown("**Quarterly results** (₹ crore, newest first)")
         _table(r.quarters, {"quarter": ("Quarter", "{}"),
@@ -108,6 +110,38 @@ def _render_fundamental(r: fa.FundamentalReport) -> None:
         st.caption(f"ℹ️ {n}")
     st.caption(f"Latest results: {r.as_of or '—'} · sources: {r.sources or '—'} · "
                f"fetched {r.fetched_at.replace('T', ' ') or '—'} (kept for a week)")
+
+
+READING = {"good": ("🟢", "good"), "watch": ("🟡", "watch"), "weak": ("🔴", "weak")}
+
+
+def _render_sector(cl) -> None:
+    """The sector's own long-term questions: computed where the figures exist,
+    named where they don't."""
+    if cl is None:
+        return
+    with st.container(border=True):
+        st.markdown(f"**Sector checklist · {cl.label}** &nbsp; "
+                    f"{c.pill('Describes, does not predict', 'info')}",
+                    unsafe_allow_html=True)
+        st.caption(f"Value it on **{cl.value_on}**. Readings use rule-of-thumb "
+                   "thresholds for the sector; they have not been backtested.")
+        if cl.checks:
+            rows = []
+            for k in cl.checks:
+                mark, word = READING.get(k.reading, ("", ""))
+                rows.append({"Check": k.label, "Value": k.value,
+                             "Reading": f"{mark} {word}".strip() or "—",
+                             "Why it matters here": k.why or "—"})
+            st.table(pd.DataFrame(rows).set_index("Check"))
+        elif cl.group == "other":
+            st.caption("No sector-specific checks for this sector; the Quality "
+                       "Score above covers the general ones.")
+        if cl.missing:
+            st.caption("Not on file for this stock: " + ", ".join(cl.missing) + ".")
+        if cl.manual:
+            st.markdown("**Check by hand** (not in any free data feed)")
+            st.markdown("\n".join(f"- {m}" for m in cl.manual))
 
 
 # --------------------------------------------------------------- technical
