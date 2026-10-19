@@ -1,29 +1,34 @@
 # Automation
 
-The Saturday launchd job, and the failure modes it guards against.
+The Saturday job, and the failure modes it guards against. All five jobs
+(daily, weekly, monthly, quarterly, fno-intraday) are listed in the README's
+[Scheduled jobs](../README.md#scheduled-jobs).
 
 [← back to the README](../README.md)
 
 ---
 
 ```bash
-.venv/bin/python install_schedule.py --day saturday --hour 9 --minute 30 \
-    --portfolio 2000000
+.venv/bin/python install_schedule.py --install weekly --portfolio 2000000
 .venv/bin/python install_schedule.py --status
-.venv/bin/python install_schedule.py --remove
+.venv/bin/python install_schedule.py --remove weekly
 ```
 
-Installs a **launchd** agent that runs `run_weekly.py`: refresh prices, market
+Installs a job (launchd on macOS, cron on Linux, Task Scheduler on Windows;
+see `jobs.py`) that runs `run_weekly.py`: refresh prices, market
 data and fundamentals, then the advisor, writing a dated report to `reports/`.
-Everything runs locally on this Mac; nothing goes to a server.
+Everything runs locally; nothing goes to a server.
 
 Saturday because the market is closed -- the data is Friday's close, a stable
 snapshot that will not shift while the report is written, and one you read
 before Monday's open.
 
-**launchd rather than cron**: if the Mac is asleep at the scheduled time the job
-runs when it next wakes. Cron would skip the week silently, which on a laptop
-that is shut at weekends is the normal case rather than the exception.
+**On macOS, launchd rather than cron**: if the Mac is asleep at the scheduled
+time the job runs when it next wakes. Cron would skip the week silently, which
+on a laptop that is shut at weekends is the normal case rather than the
+exception. Windows tasks are created with "run as soon as possible after a
+missed start" for the same reason. Linux uses cron, so there a missed week is
+caught up by the next run (every step fetches only what is missing).
 
 The failure this guards against is a scheduled job that quietly stops working
 and leaves you reading a month-old report without noticing. So a macOS

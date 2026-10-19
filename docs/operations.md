@@ -51,6 +51,9 @@ will fail in CI before it reaches main.
 
 # Setup
 
+`python3 setup_project.py` does all of this, asking first
+([getting started](../GETTING_STARTED.md)). By hand:
+
 Dependencies are declared in two places, for two purposes:
 
 - **`requirements.txt`** — exact pinned versions, verified working. Use this to

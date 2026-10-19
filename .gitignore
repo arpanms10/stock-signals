@@ -91,4 +91,6 @@ config/mf_calibration.json
 # --- Local tool files --------------------------------------------------
 # Claude Code session files: preview server config, PR description drafts,
 # worktree bookkeeping. Machine-local, never part of the project.
-.claude/
+.claude/*
+# ...except the project skills, which are part of the project (/setup).
+!.claude/skills/

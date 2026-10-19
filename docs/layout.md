@@ -14,11 +14,15 @@ config/etfs.csv            instruments excluded from the universe, with reasons
 config/equities.csv        the company-equity pool the ranking selects from
 config/scoring.yaml        weights, thresholds, risk limits, tax rates
 
+setup_project.py           guided setup: environment, databases, your files, data, jobs
+userfiles.py               the files you fill in (holdings, MF, watch list) as .xlsx or .csv
+jobs.py                    the scheduled jobs, for launchd, cron and Task Scheduler
+install_schedule.py        --list / --status / --install / --remove for those jobs
 watchlist.py               read/write/validate the watchlist
-portfolio.py               holdings from CSV or Kite snapshot
+portfolio.py               holdings from config/holdings.xlsx/.csv or the Kite snapshot
 fundamentals.py            quality score, incl. the lender rubric
 instruments.py             equity vs fund vs DVR classification
-import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.csv, buckets kept;
+import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
                            --trade SYMBOL... marks positions bought to trade
 set_buckets.py             pre-fill the core/satellite column
 record_momentum.py         monthly momentum picks -> history/momentum_picks.xlsx
