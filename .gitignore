@@ -84,3 +84,8 @@ data/mf/mf.db
 # config/mf_calibration.json <- run_mf.py --backtest; the MF view shows
 #   "no backtest yet" without it.
 config/mf_calibration.json
+
+# --- Local tool files --------------------------------------------------
+# Claude Code session files: preview server config, PR description drafts,
+# worktree bookkeeping. Machine-local, never part of the project.
+.claude/
