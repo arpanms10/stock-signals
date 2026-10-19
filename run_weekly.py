@@ -60,7 +60,7 @@ def step(name: str, args: list[str], log, timeout: int = 3600) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--portfolio", type=float, default=None,
-                    help="total capital, for the core/satellite framing note")
+                    help="total capital, for the framing note")
     ap.add_argument("--skip-refresh", action="store_true",
                     help="report on cached data without fetching")
     args = ap.parse_args()

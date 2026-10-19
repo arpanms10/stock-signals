@@ -5,22 +5,22 @@ and the engine is built around it:
 
     TRIM (partial)  The position is too BIG, not bad. Sizing problem.
                     -> overweight vs target, sector over its cap, or a
-                       satellite whose rank has slipped but is still eligible.
+                       trade below its stop with the thesis intact.
                     Sell down to the target and keep owning it.
 
     EXIT (whole)    The REASON to own it is gone. Thesis problem.
                     -> quality below the floor, a hard fundamental red flag,
-                       or a satellite that has fallen out of the ranking
-                       entirely.
+                       or a trade that has fallen out of the ranking.
                     Sell all of it; there is no size at which a broken thesis
                     is the right size.
 
 Conflating the two is how people average down into failures and take profits
 on their winners -- exactly backwards.
 
-Core holdings are deliberately immune to rank-based exits. A core name falling
-out of the momentum ranking is not a sell signal; only the business
-deteriorating is. That distinction is why v1 turned an 85% rise in TCS into
+Core and satellite holdings are deliberately immune to rank-based exits. A
+core name falling out of the momentum ranking is not a sell signal; only the
+business deteriorating is. A satellite (held one to ten years) gets a review
+prompt instead. Only bucket=trade rotates on rank. That distinction is why v1 turned an 85% rise in TCS into
 1.3% -- it treated a compounder as a trade.
 
 Everything here is a suggestion with its reasoning attached. Nothing is placed.
@@ -174,15 +174,15 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
     if rank_universe and rank_universe < full:
         exit_rank = max(int(exit_rank * rank_universe / full),
                         m.get("n_hold", 15) + 5)
-    if bucket == "satellite" and rank is not None and rank > exit_rank:
+    if bucket == "trade" and rank is not None and rank > exit_rank:
         a.action, a.urgency = "EXIT", "review"
         a.qty = qty
-        a.reasons.append(f"satellite holding has fallen to rank {rank} of "
+        a.reasons.append(f"trade has fallen to rank {rank} of "
                          f"{rank_universe}, past the exit threshold of {exit_rank}")
-        a.reasons.append("satellites are owned for the trend; the trend is over")
+        a.reasons.append("trades are owned for the trend; the trend is over")
         return a
 
-    if bucket == "satellite" and rank is None:
+    if bucket == "trade" and rank is None:
         # Absence from the ranking has two very different causes: the stock is
         # genuinely in a downtrend, or we simply have no data for it. Only the
         # first is a reason to sell, and a quality score is what distinguishes
@@ -195,7 +195,7 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
             return a
         a.action, a.urgency = "EXIT", "review"
         a.qty = qty
-        a.reasons.append("satellite holding is below its 200 DMA, so it is "
+        a.reasons.append("trade is below its 200 DMA, so it is "
                          "outside the eligible universe -- the trend that "
                          "justified holding it has ended")
         return a
@@ -226,10 +226,10 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
         return _attach_plan(a, holding, price, cfg, row)
 
     if sector_over_cap:
-        # Applies to core and legacy too, not just satellite. Concentration is
+        # Applies to every bucket, not just trades. Concentration is
         # a property of the book, not of a bucket: eight financials that each
         # look like a fine business are still one bet on Indian credit. An
-        # earlier version only trimmed satellites, so the single largest risk
+        # earlier version only trimmed rotated holdings, so the single largest risk
         # the framework could identify produced no action at all.
         a.action = "TRIM"
         a.qty = max(round(qty * sector_trim_fraction), 1)
@@ -242,27 +242,27 @@ def advise(symbol: str, bucket: str, holding: dict, price: float,
                              "view on the business -- you keep owning it")
         return _attach_plan(a, holding, price, cfg, row)
 
-    # ---- rank verdicts for unclassified holdings -----------------------
-    # Deliberately after the sizing checks above. A legacy holding still gets
+    # ---- rank verdicts for satellites -----------------------------------
+    # Deliberately after the sizing checks above. A satellite still gets
     # trimmed for concentration -- that is a property of the book, not a view
-    # on the stock -- and only then falls through to "no rank-based action".
-    if bucket == "legacy" and rank is not None and rank > exit_rank:
+    # on the stock -- and only then gets a review prompt, never a rank exit:
+    # it is held for years, not traded.
+    if bucket == "satellite" and rank is not None and rank > exit_rank:
         a.action, a.urgency = "HOLD", "review"
-        a.reasons.append(f"rank {rank} of {rank_universe} would trigger a "
-                         f"satellite exit, but this is unclassified")
-        a.reasons.append("it was not bought on momentum, so it is not sold on "
-                         "momentum -- set bucket=satellite in "
-                         "config/holdings.csv if you want it rotated")
+        a.reasons.append(f"rank {rank} of {rank_universe}, past the "
+                         f"{exit_rank} where a trade would be sold")
+        a.reasons.append("a satellite is held for years, not sold on rank -- "
+                         "review whether the reason you own it still holds")
         return a
 
-    if bucket == "legacy" and rank is None:
+    if bucket == "satellite" and rank is None:
         a.action, a.urgency = "HOLD", "review"
-        a.reasons.append("outside the momentum universe, but unclassified -- "
-                         "no rank-based action taken")
+        a.reasons.append("outside the momentum universe (below its 200 DMA) -- "
+                         "the trend has gone; review the thesis, no sale implied")
         return a
 
     # ---- ADD / HOLD ---------------------------------------------------
-    if risk.get("stop_breached") and bucket == "satellite":
+    if risk.get("stop_breached") and bucket == "trade":
         a.action, a.urgency = "TRIM", "review"
         a.qty = max(qty * 0.5, 1)
         a.reasons.append("below its stop with the thesis still intact -- "
@@ -327,8 +327,8 @@ def sanity_warnings(advices: list[Advice], ranked_universe: int,
     unscored = [a for a in advices if "no quality score" in " ".join(a.reasons)]
     if len(unscored) > len(advices) * 0.25:
         out.append(
-            f"{len(unscored)} holdings have no quality score, so they default "
-            f"to satellite and rotate on rank alone. Filling "
+            f"{len(unscored)} holdings have no quality score, so none of them "
+            f"can be suggested as core and they default to satellite. Filling "
             f"config/fundamentals.csv would change several of these.")
     return out
 

@@ -128,25 +128,31 @@ def test_regime_note_reports_state_and_duration(cfg):
 
 # ------------------------------------------------------------------ buckets
 
-def test_unknown_holdings_default_to_legacy_not_satellite():
-    """A position already on the books was not bought on momentum, so it must
-    not be sold on momentum without the user saying so. Defaulting these to
-    satellite produced a wall of exits that was an artefact of the framework,
-    not a finding about the holdings."""
+def test_unknown_holdings_default_to_satellite_never_trade():
+    """A position already on the books was not necessarily bought to trade,
+    so it must not be sold on momentum without the user saying so. Rotating
+    these on rank produced a wall of exits that was an artefact of the
+    framework, not a finding about the holdings."""
     from strategy import buckets as bk
     b, why = bk.classify("X", quality_score=None, volatility=0.2,
                          liquidity_rank=10)
-    assert b == "legacy"
+    assert b == "satellite"
     b2, _ = bk.classify("Y", quality_score=55.0, volatility=0.2,
                         liquidity_rank=10)
-    assert b2 == "legacy"
+    assert b2 == "satellite"
 
 
 def test_declared_bucket_always_wins():
     from strategy import buckets as bk
-    for declared in ("core", "satellite", "legacy"):
+    for declared in ("core", "satellite", "trade", " Trade "):
         b, why = bk.classify("X", 95.0, 0.15, 5, declared=declared)
-        assert b == declared and "set by you" in why
+        assert b == declared.strip().lower() and "set by you" in why
+
+
+def test_legacy_is_read_as_satellite():
+    from strategy import buckets as bk
+    b, why = bk.classify("X", 95.0, 0.15, 5, declared="legacy")
+    assert b == "satellite" and "rename" in why
 
 
 def test_high_quality_low_volatility_is_core():
@@ -160,7 +166,7 @@ def test_high_quality_but_volatile_is_not_core():
     from strategy import buckets as bk
     b, why = bk.classify("X", quality_score=90.0, volatility=0.55,
                          liquidity_rank=10)
-    assert b == "legacy" and "volatility" in why
+    assert b == "satellite" and "volatility" in why
 
 
 # ------------------------------------------------------------------ advisor
@@ -171,29 +177,39 @@ def _cfg_and_quality(score, flags=()):
     return timing.load_config(), fu.Quality("X", score, {}, list(flags))
 
 
-def test_legacy_is_never_exited_on_rank_alone():
+def test_satellite_is_never_exited_on_rank_alone():
     from strategy import advisor as adv
     cfg, q = _cfg_and_quality(80.0)
-    a = adv.advise("X", "legacy", {"quantity": 10, "average_price": 100.0},
-                   110.0, 1100.0, 100000.0, q, rank=180, rank_universe=200,
-                   risk={}, cfg=cfg)
-    assert a.action == "HOLD"
-    assert any("retroactively" in r or "not bought on momentum" in r
-               for r in a.reasons)
+    for rank in (180, None):
+        a = adv.advise("X", "satellite", {"quantity": 10, "average_price": 100.0},
+                       110.0, 1100.0, 100000.0, q, rank=rank, rank_universe=200,
+                       risk={}, cfg=cfg)
+        assert a.action == "HOLD" and a.urgency == "review"
+        assert any("review" in r for r in a.reasons)
 
 
-def test_satellite_is_exited_on_rank():
+def test_trade_is_exited_on_rank():
     from strategy import advisor as adv
     cfg, q = _cfg_and_quality(80.0)
-    a = adv.advise("X", "satellite", {"quantity": 10, "average_price": 100.0},
+    a = adv.advise("X", "trade", {"quantity": 10, "average_price": 100.0},
                    110.0, 1100.0, 100000.0, q, rank=180, rank_universe=200,
                    risk={}, cfg=cfg)
     assert a.action == "EXIT" and a.qty == 10
 
 
+def test_only_a_trade_is_halved_below_its_stop():
+    from strategy import advisor as adv
+    cfg, q = _cfg_and_quality(80.0)
+    for bucket, want in (("trade", "TRIM"), ("satellite", "HOLD")):
+        a = adv.advise("X", bucket, {"quantity": 10, "average_price": 100.0},
+                       110.0, 1100.0, 100000.0, q, rank=20, rank_universe=200,
+                       risk={"stop_breached": True}, cfg=cfg)
+        assert a.action == want
+
+
 def test_hard_flag_exits_whole_position_in_every_bucket():
     from strategy import advisor as adv
-    for bucket in ("core", "satellite", "legacy"):
+    for bucket in ("core", "satellite", "trade"):
         cfg, q = _cfg_and_quality(85.0, ["pledge RISING: 10% -> 30%"])
         a = adv.advise("X", bucket, {"quantity": 10, "average_price": 100.0},
                        110.0, 1100.0, 100000.0, q, rank=1, rank_universe=200,
@@ -240,10 +256,10 @@ def test_exit_rank_scales_to_a_thin_universe():
     """Rank 40 of 79 is mid-pack; rank 40 of 200 is trailing."""
     from strategy import advisor as adv
     cfg, q = _cfg_and_quality(80.0)
-    thin = adv.advise("X", "satellite", {"quantity": 10, "average_price": 100.0},
+    thin = adv.advise("X", "trade", {"quantity": 10, "average_price": 100.0},
                       110.0, 1100.0, 100000.0, q, rank=25, rank_universe=79,
                       risk={}, cfg=cfg)
-    wide = adv.advise("X", "satellite", {"quantity": 10, "average_price": 100.0},
+    wide = adv.advise("X", "trade", {"quantity": 10, "average_price": 100.0},
                       110.0, 1100.0, 100000.0, q, rank=25, rank_universe=200,
                       risk={}, cfg=cfg)
     assert thin.action == "EXIT"                # past the scaled threshold
@@ -252,7 +268,7 @@ def test_exit_rank_scales_to_a_thin_universe():
 
 def test_sanity_warning_fires_on_a_wall_of_exits():
     from strategy import advisor as adv
-    advices = [adv.Advice(symbol=f"S{i}", bucket="satellite", action="EXIT")
+    advices = [adv.Advice(symbol=f"S{i}", bucket="trade", action="EXIT")
                for i in range(8)] + \
               [adv.Advice(symbol="H", bucket="core", action="HOLD")]
     warns = adv.sanity_warnings(advices, 200, 200)
@@ -396,9 +412,9 @@ def test_core_needs_known_liquidity_and_volatility():
     objection: IRCTC, liquidity rank 562, was suggested as core."""
     from strategy import buckets as bk
     assert bk.classify("X", 90.0, 0.20, 10)[0] == "core"
-    assert bk.classify("X", 90.0, 0.20, None)[0] == "legacy"
-    assert bk.classify("X", 90.0, None, 10)[0] == "legacy"
-    assert bk.classify("X", 90.0, 0.20, 562)[0] == "legacy"
+    assert bk.classify("X", 90.0, 0.20, None)[0] == "satellite"
+    assert bk.classify("X", 90.0, None, 10)[0] == "satellite"
+    assert bk.classify("X", 90.0, 0.20, 562)[0] == "satellite"
 
 
 def test_liquidity_ranks_cover_beyond_any_top_n(tmp_path):

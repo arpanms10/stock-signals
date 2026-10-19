@@ -25,7 +25,7 @@ arithmetic to the reader.
 
 ## Concentration
 
-The sector cap applies to **every bucket**, not just satellite. Concentration
+The sector cap applies to **every bucket**, not just trade. Concentration
 is a property of the book: eight financials that each look like a fine business
 are still one bet on Indian credit. Trims start with the weakest names in the
 sector and stop the moment it is compliant, and no single holding gives up more

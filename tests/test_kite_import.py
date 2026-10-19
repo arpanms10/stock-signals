@@ -75,9 +75,9 @@ def test_web_csv_without_isin_still_catches_series():
     assert [s for s, _ in skipped] == ["NXST-RR", "SGBJUN31-GB"]
 
 
-def test_mark_satellite_overrides_and_reports_missing():
+def test_mark_trade_overrides_and_reports_missing():
     rows = [{"symbol": "CPPLUS", "bucket": ""}, {"symbol": "TCS", "bucket": "core"},
-            {"symbol": "XYZ", "bucket": "legacy"}]
-    marked, missing = kite.mark_satellite(rows, ["cpplus", "XYZ-BE", "NOPE"])
+            {"symbol": "XYZ", "bucket": "satellite"}]
+    marked, missing = kite.mark_trade(rows, ["cpplus", "XYZ-BE", "NOPE"])
     assert marked == ["CPPLUS", "XYZ"] and missing == ["NOPE"]
-    assert [r["bucket"] for r in rows] == ["satellite", "core", "satellite"]
+    assert [r["bucket"] for r in rows] == ["trade", "core", "trade"]

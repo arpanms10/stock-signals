@@ -47,7 +47,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_weekly.py` | Refresh everything, then report |
 | `install_schedule.py` | Install / check / remove the scheduled jobs (weekly, `--swing-daily`, `--fno-intraday`) |
 | `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
-| `set_buckets.py` | Pre-fill core / satellite / legacy |
+| `set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
 | `record_momentum.py` | Save this month's momentum picks to `history/` |
 | `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
 | `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
@@ -70,20 +70,20 @@ Full flags in [operations](docs/operations.md).
 
 After buying, download your holdings from Kite (Console's `.xlsx` carries the
 long/short-term split; the web `.csv` also works), put the file in `config/`,
-and import it. Name the momentum buys with `--satellite` so they are rotated on
-rank:
+and import it. Name anything bought purely to trade with `--trade` so it is
+rotated on rank:
 
 ```bash
-PYTHONPATH=. .venv/bin/python import_kite_holdings.py --satellite CPPLUS SANSERA
+PYTHONPATH=. .venv/bin/python import_kite_holdings.py --trade CPPLUS SANSERA
 ```
 
 - Quantities and average prices come from Kite; your `bucket`, `notes` and
   `purchase_date` are kept for every stock you still hold. The old file is
   backed up to `config/holdings.csv.bak`.
-- **A new holding imported without `--satellite` has a blank bucket, and blank
-  is not satellite** -- the framework only ever suggests core or legacy. The
+- **A new holding imported without `--trade` has a blank bucket, and blank is
+  not trade** -- the framework only ever suggests core or satellite. The
   importer lists new holdings and reminds you.
-- `--satellite` overrides any existing bucket, and warns about any symbol that
+- `--trade` overrides any existing bucket, and warns about any symbol that
   is not in the Kite file.
 - Optionally add `purchase_date` (YYYY-MM-DD) to the new rows in
   `config/holdings.csv`: Kite does not export it, and the trailing stop is
@@ -371,9 +371,11 @@ cannot be rebuilt.
 | **H** Hold | No action, stated rather than left as silence |
 
 Conflating trim and exit is how people average down into failures and take
-profits on their winners. Holdings sit in one of three buckets — **core** (never
-sold on rank), **satellite** (rotates on rank), **legacy** (red flags apply,
-rank ignored; the safe default for anything bought before this existed).
+profits on their winners. Holdings are **core** (a decade or more, never sold
+on rank) or **satellite** (one to ten years, not a trade: red flags and sizing
+apply, and falling out of the ranking only prompts a review; the default).
+Anything bought purely to trade is marked **trade** in `config/holdings.csv`,
+and only that rotates on rank. An old `legacy` value is read as satellite.
 
 ## Results
 

@@ -81,8 +81,9 @@ def test_cash_on_hand_extends_the_budget():
 # ------------------------------------------------------------- sector cap
 
 def test_sector_trim_covers_every_bucket(cfg):
-    """The eight financials in a real book were core and legacy, so a rule that
-    only trimmed satellites produced no action on the largest risk present."""
+    """The eight financials in a real book were core and unrotated, so a rule
+    that only trimmed rotated holdings produced no action on the largest risk
+    present."""
     values = {"A": 20000.0, "B": 20000.0, "C": 60000.0}
     sectors = {"A": "Financial Services", "B": "Financial Services", "C": "IT"}
     quality = {"A": q(60.0), "B": q(90.0), "C": q(80.0)}
@@ -554,7 +555,7 @@ def test_files_without_the_stop_columns_still_load(tmp_path):
 
 def _book(values, scores):
     """advise_book inputs at a flat price of 100, book of 100,000."""
-    inputs = {s: dict(symbol=s, bucket="legacy",
+    inputs = {s: dict(symbol=s, bucket="satellite",
                       holding={"quantity": v / 100, "average_price": 100.0,
                                "lt_quantity": v / 100, "st_quantity": 0.0},
                       price=100.0, value=v, book_value=100000.0,

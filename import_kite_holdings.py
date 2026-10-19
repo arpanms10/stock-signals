@@ -18,7 +18,7 @@ own something.
 
     PYTHONPATH=. .venv/bin/python import_kite_holdings.py            # newest Kite file in config/
     PYTHONPATH=. .venv/bin/python import_kite_holdings.py path/to/holdings.xlsx
-    PYTHONPATH=. .venv/bin/python import_kite_holdings.py --satellite CPPLUS SANSERA
+    PYTHONPATH=. .venv/bin/python import_kite_holdings.py --trade CPPLUS SANSERA
 """
 from __future__ import annotations
 
@@ -242,18 +242,19 @@ def _source_kind(path: Path) -> str:
     return "ours"
 
 
-def mark_satellite(rows: list[dict], symbols) -> tuple[list[str], list[str]]:
-    """Set bucket=satellite on the named holdings. Returns (marked, missing).
+def mark_trade(rows: list[dict], symbols) -> tuple[list[str], list[str]]:
+    """Set bucket=trade on the named holdings. Returns (marked, missing).
 
     A new holding otherwise arrives with a blank bucket, and the framework
-    never suggests satellite on its own -- so a momentum buy would be treated
-    as legacy and never rotated, which defeats the reason it was bought.
+    never suggests trade on its own -- so a position bought to trade would be
+    held as a satellite and never rotated, which defeats the reason it was
+    bought.
     """
     wanted = {clean_symbol(s) for s in symbols}
     marked = []
     for r in rows:
         if r["symbol"] in wanted:
-            r["bucket"] = "satellite"
+            r["bucket"] = "trade"
             marked.append(r["symbol"])
     return sorted(marked), sorted(wanted - set(marked))
 
@@ -280,8 +281,8 @@ def main() -> None:
     ap.add_argument("source", nargs="?", type=Path,
                     help="Kite export (.csv or .xlsx); default: newest in config/")
     ap.add_argument("--out", type=Path, default=pf.HOLDINGS_CSV)
-    ap.add_argument("--satellite", nargs="+", metavar="SYMBOL", default=[],
-                    help="mark these holdings as satellite (momentum buys to be "
+    ap.add_argument("--trade", nargs="+", metavar="SYMBOL", default=[],
+                    help="mark these holdings as trade (bought to trade, "
                          "rotated on rank); overrides any existing bucket")
     args = ap.parse_args()
 
@@ -301,7 +302,7 @@ def main() -> None:
         for k in KEPT:
             r[k] = old.get(k, "")
     rows.sort(key=lambda r: r["symbol"])
-    marked, missing = mark_satellite(rows, args.satellite)
+    marked, missing = mark_trade(rows, args.trade)
 
     if out.exists():
         shutil.copy2(out, out.with_name(out.name + ".bak"))
@@ -320,14 +321,14 @@ def main() -> None:
         if new:
             print(f"  new:     {', '.join(new)}")
             unmarked = [s for s in new if s not in marked]
-            if unmarked and not args.satellite:
-                print("           a new holding with a blank bucket is NOT "
-                      "satellite -- if these\n           were momentum buys, "
-                      "re-run with --satellite " + " ".join(unmarked))
+            if unmarked and not args.trade:
+                print("           a new holding with a blank bucket is NOT a "
+                      "trade -- if these\n           were bought to trade, "
+                      "re-run with --trade " + " ".join(unmarked))
         if gone:
             print(f"  removed: {', '.join(gone)}")
     if marked:
-        print(f"  marked satellite: {', '.join(marked)}")
+        print(f"  marked trade: {', '.join(marked)}")
     if missing:
         print(f"  !! not in this Kite file, so not marked: {', '.join(missing)}")
     if skipped:

@@ -46,13 +46,15 @@ you keep, **exit** is a broken thesis and always the whole position.
 
 `strategy/advisor.py`
 
-### DONE · Core / satellite / legacy
+### DONE · Core / satellite, and trade
 
-Classified on business characteristics, never price direction. **Legacy** was
-not in the original plan and had to be added: defaulting unclassified holdings
-to satellite meant rank-based exits fired on positions bought years earlier on
-other reasoning, which produced a recommendation to liquidate 60% of the book
-on first run. Legacy takes red flags but never rank.
+Classified on business characteristics, never price direction. Rotating
+unclassified holdings on rank fired exits on positions bought years earlier on
+other reasoning -- a recommendation to liquidate 60% of the book on first run.
+So only what you mark **trade** rotates on rank. **Satellite** (one to ten
+years) takes red flags and sizing, and a review prompt when it leaves the
+ranking; it is the default. Renamed 2026-10-19 from core / satellite / legacy,
+where "satellite" meant the rotated bucket.
 
 `strategy/buckets.py`
 

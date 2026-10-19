@@ -24,7 +24,7 @@ market to be ranked.
 | Menu | Page | What it shows |
 |---|---|---|
 | | **Today** (home) | Everything that wants a decision, from every page: exits, trims and stops reached under *Act now*; adds, slipping funds and targets reached under *Review*; results due this week; the market regime; *Expected ranges* for Nifty and core holdings ([ranges](ranges.md)). Each row opens the page it came from |
-| Portfolio | **Stocks** | *Holdings*: book value, P&L, core / satellite / legacy, sector exposure, then one card per holding with its action, trade plan, reasons, flags and tax. *Watching*: the watch list measured from the day each name was flagged. **Suggest buckets** is here |
+| Portfolio | **Stocks** | *Holdings*: book value, P&L, core / satellite (and trade, if any), sector exposure, then one card per holding with its action, trade plan, reasons, flags and tax. *Watching*: the watch list measured from the day each name was flagged. **Suggest buckets** is here |
 | | **Mutual funds** | Your MF book against each fund's category ([mutual fund evaluation](mf_evaluation.md)) |
 | Ideas | **Momentum** | Top band on both lookbacks, with universe size and Recompute under *Ranking settings* |
 | | **Swing**, **Quarterly results**, **GARP / QARP** | As before; see [swing](swing.md), [results](results.md), [picker](picker.md) |

@@ -46,8 +46,10 @@ HOLDINGS_HELP = """\
 #                  column and the remainder is inferred.
 #   purchase_date  optional, YYYY-MM-DD. Improves trailing-stop accuracy; when
 #                  absent a bounded lookback is used instead of a guess.
-#   bucket         core | satellite | (blank = let the framework suggest one)
-#                  Core is held through momentum signals; satellite rotates.
+#   bucket         core | satellite | trade (blank = the framework suggests
+#                  core or satellite). Core: a decade or more, held through
+#                  momentum signals. Satellite: one to ten years, never sold
+#                  on rank. Trade: bought to trade; rotates on rank.
 #   notes          yours
 """
 

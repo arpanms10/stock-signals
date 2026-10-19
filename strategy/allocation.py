@@ -157,5 +157,5 @@ def core_satellite_note(satellite_value: float, total_value: float) -> str:
     return (f"This framework governs {pct:.0f}% of your capital "
             f"({satellite_value:,.0f} of {total_value:,.0f}). The remaining "
             f"{100 - pct:.0f}% is assumed to be index exposure. Every backtest "
-            f"run here says an index fund beat these rules -- so the satellite "
-            f"is meant to stay a satellite.")
+            f"run here says an index fund beat these rules -- so the part "
+            f"traded on them is meant to stay small.")

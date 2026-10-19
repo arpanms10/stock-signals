@@ -1,24 +1,25 @@
-"""Core vs satellite classification.
+"""Core / satellite classification, plus trade for positions bought to trade.
 
-The two buckets exist because they answer to different evidence, and mixing
+The buckets exist because they answer to different evidence, and mixing
 them is how people talk themselves into selling their best long-term holdings
 during a drawdown.
 
-  CORE       Owned for the business, not the trend. Held THROUGH momentum
-             signals -- a core name falling out of the ranking is not a sell.
-             Sold only when the business itself deteriorates.
-  SATELLITE  Owned for the trend. Rotates on rank, which is the whole point:
-             the momentum backtest only works because losers are dropped.
-  LEGACY     Bought before this framework existed, on reasoning it has no
-             record of. Genuine red flags still apply -- a rising pledge is a
-             rising pledge whoever bought the stock -- but it is NOT rotated on
-             momentum rank. Selling a position because it fails a rule that was
-             not used to buy it is applying that rule retroactively, and on a
-             long-term book it produces a wall of exits that is an artefact of
-             the framework rather than a finding about the holdings.
+  CORE       Owned for the business, for a decade or more. Held THROUGH
+             momentum signals -- a core name falling out of the ranking is not
+             a sell. Sold only when the business itself deteriorates.
+  SATELLITE  Owned for one to ten years, still as an investment, not a trade.
+             Red flags, the quality floor and sizing apply, but it is NOT sold
+             on momentum rank: falling out of the ranking asks you to review
+             the thesis, it does not exit. The default for anything unset.
+  TRADE      Bought to trade. Rotates on rank and halves below its stop: the
+             momentum backtest only works because losers are dropped. Only
+             what you mark bucket=trade in config/holdings.csv is treated so.
 
-Getting this wrong in either direction is costly. Treat everything as
-satellite and you churn quality compounders on noise -- which is exactly how
+"legacy" (the old name for "bought before this framework, not rotated") is
+read as satellite, which now carries exactly those rules.
+
+Getting this wrong in either direction is costly. Treat everything as a
+trade and you churn quality compounders on noise -- which is exactly how
 v1 turned an 85% rise in TCS into 1.3%. Treat everything as core and you never
 sell anything, and the momentum edge disappears.
 """
@@ -27,8 +28,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+BUCKETS = ("core", "satellite", "trade")
+ALIASES = {"legacy": "satellite"}
+
 # What makes a holding core-like. None of these is about price direction --
-# that is the satellite question.
+# that is the trade question.
 CORE_QUALITY_FLOOR = 70.0        # a business you would hold through a bad year
 CORE_MAX_VOLATILITY = 0.32       # annualised; above this it is a trade
 CORE_MIN_LIQUIDITY_RANK = 150    # obscure names are not core holdings
@@ -51,15 +55,19 @@ def realised_vol(frame) -> float | None:
 
 def classify(symbol: str, quality_score: float | None, volatility: float | None,
              liquidity_rank: int | None, declared: str = "",
-             default_unknown: str = "legacy") -> tuple[str, str]:
+             default_unknown: str = "satellite") -> tuple[str, str]:
     """Return (bucket, reason). A declared bucket always wins.
 
     `default_unknown` is what a holding becomes when it is clearly not core.
-    It defaults to "legacy" rather than "satellite" because a position already
-    on the books was not bought on momentum, so it should not be sold on
-    momentum without you saying so first.
+    It is satellite, never trade: a position on the books was not
+    necessarily bought on momentum, so it is not sold on momentum unless you
+    mark it bucket=trade yourself.
     """
-    if declared in ("core", "satellite", "legacy"):
+    declared = (declared or "").strip().lower()
+    if declared in ALIASES:
+        return (ALIASES[declared], f"'{declared}' in config/holdings.csv is read as "
+                                   f"{ALIASES[declared]}; rename it there")
+    if declared in BUCKETS:
         return declared, "set by you in config/holdings.csv"
 
     reasons = []
@@ -100,29 +108,23 @@ def classify(symbol: str, quality_score: float | None, volatility: float | None,
 
 def suggest_split(holdings: dict, values: dict[str, float],
                   buckets: dict[str, str]) -> dict:
-    """Current core/satellite split by value, with a view on the balance."""
+    """Current core / satellite / trade split by value, with a view on it."""
     total = sum(values.values())
     if total <= 0:
         return {}
     core = sum(v for s, v in values.items() if buckets.get(s) == "core")
-    legacy = sum(v for s, v in values.items() if buckets.get(s) == "legacy")
-    sat = total - core - legacy
+    trade = sum(v for s, v in values.items() if buckets.get(s) == "trade")
+    sat = total - core - trade
     core_pct = 100 * core / total
     if core_pct < 40:
-        view = ("Satellite-heavy. Most of the book rides on rank, which means "
-                "most of it can be wrong at once -- momentum drawdowns are "
-                "correlated across holdings.")
-    elif core_pct > 80:
-        view = ("Almost entirely core. Nothing here rotates, so the momentum "
-                "work in this framework is doing very little for you.")
+        view = ("Core is under 40% of the book. Satellites are held for years "
+                "but not for decades -- most of the book is a medium-term view.")
     else:
-        view = "A reasonable balance between businesses held and trends rented."
-    if legacy > total * 0.25:
-        view = (f"{100 * legacy / total:.0f}% of the book is unclassified. Those "
-                f"holdings get red-flag checks but are not rotated on rank -- "
-                f"decide which are core and which are satellite, in "
-                f"config/holdings.csv, before the momentum side does anything "
-                f"useful for you.")
-    return {"core_value": core, "satellite_value": sat, "legacy_value": legacy,
+        view = "Most of the book is owned for the long term."
+    if trade > total * 0.25:
+        view = (f"{100 * trade / total:.0f}% of the book is marked trade. That "
+                f"part rotates on rank and its drawdowns are correlated -- "
+                f"momentum losers tend to fall together.")
+    return {"core_value": core, "satellite_value": sat, "trade_value": trade,
             "core_pct": core_pct, "satellite_pct": 100 * sat / total,
-            "legacy_pct": 100 * legacy / total, "view": view}
+            "trade_pct": 100 * trade / total, "view": view}
