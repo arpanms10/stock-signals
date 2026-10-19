@@ -205,9 +205,10 @@ SEBI category and gives **EXIT / TRIM / ADD / WATCH / HOLD**, with reasons.
 It uses month-end NAVs of Direct Growth plans from AMFI's free files, and
 funds that later closed or merged are included.
 
-**Your book, no amounts.** Put `config/mf_holdings.csv` **or**
-`config/mf_holdings.xlsx` in config/; both are git-ignored, so keep only one.
-List each fund and its share of your whole MF portfolio, summing to 100:
+**Your book, no amounts.** Fill in `config/mf_holdings.xlsx`, which
+`setup_project.py` creates with a *How to fill* sheet (a `.csv` with the same
+columns also works; keep only one). Both are git-ignored. List each fund and
+its share of your whole MF portfolio, summing to 100:
 
 | fund | pct | held_over_1y |
 |---|---|---|
