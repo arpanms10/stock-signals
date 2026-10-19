@@ -112,6 +112,10 @@ def main() -> int:
         # closing chain, so a cycle is logged ~15-20 sessions before expiry.
         if not step("Record F&O ranges", ["record_fno.py"], log, timeout=1800):
             failures.append("F&O record")
+        # Today's ranges: re-measure the bands' hit rates on the extended
+        # history (config/range_calibration.json, which Today quotes).
+        if not step("Range calibration", ["run_range_backtest.py"], log, timeout=1800):
+            failures.append("range calibration")
 
     STATE.write_text(f"{dt.datetime.now().isoformat(timespec='seconds')}\n"
                      f"{'FAILED: ' + ', '.join(failures) if failures else 'ok'}\n")
