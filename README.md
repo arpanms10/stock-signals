@@ -40,6 +40,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | | |
 |---|---|
 | `run_ui.py` | Dashboard, localhost only: Today, Portfolio, Ideas, Market and Research menus ([dashboard](docs/dashboard.md)) |
+| `record_ranges.py` / `run_range_backtest.py` | Today's expected ranges: forward log and calibration ([ranges](docs/ranges.md)) |
 | `run_advisor.py` | Verdicts on your book, as text |
 | `run_momentum.py` | Rank the universe |
 | `run_pit_momentum.py` | Survivorship-free backtest |
@@ -302,7 +303,7 @@ touches git or your broker.
 | Job | When | Runs | Install | Check | Remove |
 |---|---|---|---|---|---|
 | Weekly report | Saturday 09:30 | `run_weekly.py`: refresh everything, advisor report, momentum and F&O records | `install_schedule.py --day saturday` | `install_schedule.py --status` | `install_schedule.py --remove` |
-| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
+| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results, record Today's ranges | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
 | F&O intraday | Weekdays 09:30-15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent | `install_schedule.py --fno-intraday` | `install_schedule.py --fno-intraday --status` | `install_schedule.py --fno-intraday --remove` |
 
 All commands run as `PYTHONPATH=. .venv/bin/python install_schedule.py ...`.
@@ -351,6 +352,7 @@ cannot be rebuilt.
 | [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
 | [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
 | [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
+| [**Expected ranges**](docs/ranges.md) | Today's next-session and 5-session ranges for Nifty and core holdings, how often they held, the forward log |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
 | [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
 | [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the survivorship-free backtest (a weak edge) |
