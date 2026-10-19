@@ -49,8 +49,9 @@ def render() -> None:
 def _holdings(snap) -> None:
     h = pd.DataFrame(snap.holdings)
     if h.empty:
-        st.info("No holdings found. Put them in `config/holdings.csv` "
-                "(a broker export works as-is).")
+        st.info("No holdings yet. Fill in `config/holdings.xlsx` (its *How to "
+                "fill* sheet explains each column), or run `import_kite_holdings.py` "
+                "on a broker download. `setup_project.py` creates the blank file.")
     else:
         invested = (h["quantity"] * h["avg_price"]).sum()
         pnl = snap.book_value - invested

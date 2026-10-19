@@ -100,43 +100,46 @@ def _to_float(v) -> float:
         return 0.0
 
 
-def read_csv_holdings(path: Path | str = HOLDINGS_CSV) -> list[dict]:
-    """Holdings from CSV -- our template or a broker export. Same shape out."""
-    import csv
+def read_csv_holdings(path: Path | str | None = None) -> list[dict]:
+    """Holdings from config/holdings.xlsx or .csv -- our template or a broker
+    export. Same shape out. (The name predates the workbook.)"""
+    import userfiles as uf
 
-    path = Path(path)
-    if not path.exists():
+    path = Path(path) if path else uf.path_for("holdings")
+    header, rows_in = uf.read(path)
+    cols = _map_columns(header)
+    if "symbol" not in cols or "quantity" not in cols:
         return []
-    with path.open(encoding="utf-8-sig") as fh:
-        reader = csv.DictReader(r for r in fh if not r.lstrip().startswith("#"))
-        cols = _map_columns(reader.fieldnames or [])
-        if "symbol" not in cols or "quantity" not in cols:
-            return []
-        out = []
-        for r in reader:
-            sym = str(r.get(cols["symbol"], "")).strip().strip('"').upper()
-            if not sym:
-                continue
-            qty = _to_float(r.get(cols["quantity"]))
-            if qty <= 0:
-                continue
-            lt = _to_float(r.get(cols.get("lt_quantity"))) if "lt_quantity" in cols else None
-            st = _to_float(r.get(cols.get("st_quantity"))) if "st_quantity" in cols else None
-            # If only one side is given, the rest of the holding is the other.
-            if lt is not None and st is None:
-                st = max(qty - lt, 0.0)
-            elif st is not None and lt is None:
-                lt = max(qty - st, 0.0)
-            out.append({
-                "tradingsymbol": sym,
-                "quantity": qty,
-                "lt_quantity": lt,
-                "st_quantity": st,
-                "average_price": _to_float(r.get(cols.get("avg_price"))),
-                "purchase_date": str(r.get(cols.get("purchase_date"), "") or "").strip(),
-                "bucket": str(r.get(cols.get("bucket"), "") or "").strip().lower(),
-                "notes": str(r.get(cols.get("notes"), "") or "").strip(),
-            })
+    out = []
+    for r in rows_in:
+        sym = str(r.get(cols["symbol"], "")).strip().strip('"').upper()
+        if not sym:
+            continue
+        qty = _to_float(r.get(cols["quantity"]))
+        if qty <= 0:
+            continue
+        lt = _to_float(r.get(cols.get("lt_quantity"))) if "lt_quantity" in cols else None
+        st = _to_float(r.get(cols.get("st_quantity"))) if "st_quantity" in cols else None
+        # A blank cell is "not given", not zero: only a filled side counts.
+        if lt is not None and not str(r.get(cols["lt_quantity"], "")).strip():
+            lt = None
+        if st is not None and not str(r.get(cols["st_quantity"], "")).strip():
+            st = None
+        # If only one side is given, the rest of the holding is the other.
+        if lt is not None and st is None:
+            st = max(qty - lt, 0.0)
+        elif st is not None and lt is None:
+            lt = max(qty - st, 0.0)
+        out.append({
+            "tradingsymbol": sym,
+            "quantity": qty,
+            "lt_quantity": lt,
+            "st_quantity": st,
+            "average_price": _to_float(r.get(cols.get("avg_price"))),
+            "purchase_date": str(r.get(cols.get("purchase_date"), "") or "").strip(),
+            "bucket": str(r.get(cols.get("bucket"), "") or "").strip().lower(),
+            "notes": str(r.get(cols.get("notes"), "") or "").strip(),
+        })
     return out
 
 

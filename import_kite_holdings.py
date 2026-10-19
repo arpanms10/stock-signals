@@ -1,4 +1,4 @@
-"""Turn a Kite holdings download into config/holdings.csv.
+"""Turn a Kite holdings download into config/holdings.xlsx (or .csv).
 
 Drop the file Kite gives you into config/ and run this. Both exports work:
 
@@ -11,7 +11,7 @@ The header row is found wherever it sits, so the Console preamble and its
 Mutual Funds sheet are skipped rather than misread. Bonds, REITs, InvITs and
 ETFs are left out, and listed, because the framework ranks equities only.
 
-An existing holdings.csv is not thrown away: it is copied to holdings.csv.bak,
+An existing holdings file is not thrown away: it is copied to holdings.*.bak,
 and the bucket, notes and purchase_date you set by hand are carried over for
 every symbol you still hold. Kite knows your quantities; only you know why you
 own something.
@@ -36,8 +36,10 @@ CONFIG = Path(__file__).parent / "config"
 
 # Files in config/ that belong to the framework, never a broker export.
 OWN_FILES = {"holdings.csv", "holdings.csv.bak", "holdings.example.csv",
+             "holdings.xlsx", "holdings.xlsx.bak", "mf_holdings.csv",
+             "mf_holdings.xlsx", "mf_holdings.example.csv",
              "fundamentals.csv", "fundamentals.example.csv", "watching.csv",
-             "watchlist.csv", "equities.csv", "etfs.csv"}
+             "watching.xlsx", "watchlist.csv", "equities.csv", "etfs.csv"}
 
 # Console splits the position across several columns; the holding is their sum.
 # Pledged shares are still yours -- leaving them out would understate the book.
@@ -268,19 +270,19 @@ def _fmt(v) -> str:
 
 
 def write_holdings(rows: list[dict], path: Path) -> None:
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        fh.write(pf.HOLDINGS_HELP)
-        w = csv.DictWriter(fh, fieldnames=pf.HOLDINGS_COLUMNS)
-        w.writeheader()
-        for r in rows:
-            w.writerow({c: _fmt(r.get(c)) for c in pf.HOLDINGS_COLUMNS})
+    """config/holdings.xlsx keeps its "How to fill" sheet; a .csv gets the
+    help as comments (userfiles.py)."""
+    import userfiles as uf
+    uf.write(path, uf.HOLDINGS, [{c: _fmt(r.get(c)) for c in pf.HOLDINGS_COLUMNS}
+                                 for r in rows], pf.HOLDINGS_COLUMNS)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("source", nargs="?", type=Path,
                     help="Kite export (.csv or .xlsx); default: newest in config/")
-    ap.add_argument("--out", type=Path, default=pf.HOLDINGS_CSV)
+    ap.add_argument("--out", type=Path, default=None,
+                    help="default: config/holdings.xlsx if you have one, else .csv")
     ap.add_argument("--trade", nargs="+", metavar="SYMBOL", default=[],
                     help="mark these holdings as trade (bought to trade, "
                          "rotated on rank); overrides any existing bucket")
@@ -295,7 +297,8 @@ def main() -> None:
         sys.exit(f"{src.name}: no holdings table found (looked for a header row "
                  "with Instrument/Symbol and Qty./Quantity).")
 
-    out: Path = args.out
+    import userfiles as uf
+    out: Path = args.out or uf.path_for("holdings")
     previous = {h["tradingsymbol"]: h for h in pf.read_csv_holdings(out)}
     for r in rows:
         old = previous.get(r["symbol"], {})

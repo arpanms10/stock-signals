@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import csv
 import shutil
-from pathlib import Path
 
 import fundamentals as fu
 import portfolio as pf
@@ -19,17 +18,25 @@ from data.sources import universe as uni
 from scoring import pipeline, timing
 from strategy import buckets as bk
 
-HOLDINGS = Path("config/holdings.csv")
+import userfiles as uf
+
+BUCKET_HELP = ("# bucket: core | satellite | trade\n"
+               "#   core      a decade or more. Never sold on momentum rank;\n"
+               "#             only a genuine red flag (pledge, interest cover,\n"
+               "#             quality collapse) triggers an exit.\n"
+               "#   satellite one to ten years, not a trade. Red flags apply;\n"
+               "#             rank only prompts a review. The safe default.\n"
+               "#   trade     bought to trade: rotated on rank -- falls out of\n"
+               "#             the band, it is sold. Never suggested; set it.\n"
+               "# Values below are this framework's suggestion. Change freely.\n")
 
 
 def main() -> None:
-    rows_in = list(csv.DictReader(
-        l for l in HOLDINGS.open(encoding="utf-8-sig")
-        if not l.lstrip().startswith("#")))
+    HOLDINGS = uf.path_for("holdings")
+    fields, rows_in = uf.read(HOLDINGS)
     if not rows_in:
         print("No holdings found.")
         return
-    fields = list(rows_in[0].keys())
     sym_col = next((f for f in fields
                     if (f or "").strip().lower() in
                     ("instrument", "symbol", "tradingsymbol")), fields[0])
@@ -60,25 +67,21 @@ def main() -> None:
 
     if "bucket" not in [f.strip().lower() for f in fields]:
         fields.append("bucket")
-    shutil.copy(HOLDINGS, HOLDINGS.with_suffix(".csv.bak"))
+    shutil.copy(HOLDINGS, HOLDINGS.with_name(HOLDINGS.name + ".bak"))
+    for r in rows_in:
+        sym = str(r.get(sym_col, "")).strip().strip('"').upper()
+        if sym in suggestions and not (r.get("bucket") or "").strip():
+            r["bucket"] = suggestions[sym][0]
 
-    with HOLDINGS.open("w", newline="", encoding="utf-8") as fh:
-        fh.write("# bucket: core | satellite | trade\n"
-                 "#   core      a decade or more. Never sold on momentum rank;\n"
-                 "#             only a genuine red flag (pledge, interest cover,\n"
-                 "#             quality collapse) triggers an exit.\n"
-                 "#   satellite one to ten years, not a trade. Red flags apply;\n"
-                 "#             rank only prompts a review. The safe default.\n"
-                 "#   trade     bought to trade: rotated on rank -- falls out of\n"
-                 "#             the band, it is sold. Never suggested; set it.\n"
-                 "# Values below are this framework's suggestion. Change freely.\n")
-        w = csv.DictWriter(fh, fieldnames=fields)
-        w.writeheader()
-        for r in rows_in:
-            sym = str(r.get(sym_col, "")).strip().strip('"').upper()
-            if sym in suggestions and not (r.get("bucket") or "").strip():
-                r["bucket"] = suggestions[sym][0]
-            w.writerow({f: r.get(f, "") for f in fields})
+    if HOLDINGS.suffix.lower() == ".xlsx":
+        uf.write(HOLDINGS, uf.HOLDINGS, rows_in, fields)
+    else:
+        with HOLDINGS.open("w", newline="", encoding="utf-8") as fh:
+            fh.write(BUCKET_HELP)
+            w = csv.DictWriter(fh, fieldnames=fields)
+            w.writeheader()
+            for r in rows_in:
+                w.writerow({f: r.get(f, "") for f in fields})
 
     counts: dict[str, int] = {}
     for b, _ in suggestions.values():
