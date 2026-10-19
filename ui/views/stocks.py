@@ -268,15 +268,16 @@ def _watching(snap) -> None:
               .get("horizon_sessions") or {})
         st.markdown(
             c.watching_table(snap.watching,
-                             {k: v.get("median") for k, v in _h.items()}),
+                             {k: v.get("median") for k, v in _h.items()}, _h),
             unsafe_allow_html=True)
         st.caption(
             "**T1:17** and **T2:37** are how many sessions each target normally "
-            "takes — measured across 9,650 real paths, not forecast. "
-            "**Status** compares this position against that: *early*, *due*, "
-            "*late*, *stalled*, or how fast it was reached. Calibration, not a "
-            "rule: slow positions returned 7.4% over the next six months "
-            "against 9.6% for fast ones, too small a gap to trade on.")
+            "takes — measured across 9,650 real paths, not forecast. Hover a column "
+            "heading or a status for what it means. Calibration, not a rule: slow "
+            "positions returned 7.4% over the next six months against 9.6% for "
+            "fast ones, too small a gap to trade on.")
+        with st.expander("What each status means"):
+            st.markdown(c.watching_legend(_h), unsafe_allow_html=True)
 
         if "outcome" in w:
             hit = lambda col: int((w[col].fillna("") != "").sum())
