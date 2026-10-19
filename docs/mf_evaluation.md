@@ -8,11 +8,11 @@ for each, with the reasons and the numbers behind them.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_mf.py --refresh                  # first run ~25 min, then seconds a month
-PYTHONPATH=. .venv/bin/python run_mf.py                            # your book
-PYTHONPATH=. .venv/bin/python run_mf.py "parag parikh flexi cap" "hdfc flexi cap" --compare
-PYTHONPATH=. .venv/bin/python run_mf.py --excel                    # reports/mf/MF_Evaluation.xlsx
-PYTHONPATH=. .venv/bin/python run_mf.py --backtest                 # ~1.5 min
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --refresh                  # first run ~25 min, then seconds a month
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py                            # your book
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py "parag parikh flexi cap" "hdfc flexi cap" --compare
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --excel                    # reports/mf/MF_Evaluation.xlsx
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --backtest                 # ~1.5 min
 ```
 
 Also on the dashboard: Portfolio › **Mutual funds** for your book, Research › **Compare funds** for any funds.
@@ -110,7 +110,7 @@ risk, until the year it goes wrong.
 
 ## Does it work? Mostly no
 
-`run_mf.py --backtest` gave every fund in a judged category a state at every
+`scripts/run_mf.py --backtest` gave every fund in a judged category a state at every
 month-end from June 2018, using only NAVs up to that month and the same rules
 as the live view. It then looked at the fund's **rank in its category over the
 following 12 and 36 months**. Funds that later merged or closed stay in,
@@ -160,6 +160,6 @@ category), concentration and near-duplicates.
 | `mf/metrics.py` | Peer-relative measures at a month; forward outcome for the backtest |
 | `mf/verdict.py` | State and action |
 | `mf/holdings.py` | `config/mf_holdings.csv` |
-| `mf/engine.py`, `run_mf.py`, `ui/mf_tab.py` | Glue, CLI, dashboard |
+| `mf/engine.py`, `scripts/run_mf.py`, `ui/mf_tab.py` | Glue, CLI, dashboard |
 | `mf/backtest.py` | The test above; writes `config/mf_calibration.json` |
 | `tests/test_mf_engine.py` | Parsing, lookup, metrics and verdicts |

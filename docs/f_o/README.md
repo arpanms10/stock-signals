@@ -9,10 +9,10 @@ and about 213 stocks.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY BANKNIFTY RELIANCE --excel
-PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --expiry 2026-11-23
-PYTHONPATH=. .venv/bin/python run_fno.py --selftest       # are NSE's endpoints still working?
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY BANKNIFTY RELIANCE --excel
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py RELIANCE --expiry 2026-11-23
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py --selftest       # are NSE's endpoints still working?
 ```
 
 The dashboard has the same view under the **F&O** tab. Nothing is fetched
@@ -82,12 +82,12 @@ Until 2026-10-08 the range was the tighter of the OI wall and the straddle on
 each side, and the PCR thresholds were index ones for everything. Validation
 showed the walls only made the range narrower, never more accurate, and that
 index thresholds labelled 71% of stocks "bearish". Both were changed.
-`run_fno_backtest.py` still reports the old range for comparison.
+`scripts/run_fno_backtest.py` still reports the old range for comparison.
 
 ## Check an option
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --option 22000PE --lots 2
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY --option 22000PE --lots 2
 ```
 
 The dashboard has the same panel below "Reach a level": pick put or call, a
@@ -149,7 +149,7 @@ column of the reach check in [validation](validation.md).
 ## Reach: is a target or stop realistic?
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --level 1250 1150
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py RELIANCE --level 1250 1150
 ```
 
 For any price, plus both walls automatically:
@@ -177,7 +177,7 @@ judge whether a target is realistic for this expiry, or how often a stop at
 that distance would have been hit, not whether price is headed there.
 
 The curves live in `config/fno_reach.json`, rebuilt by every
-`run_fno_backtest.py` run from the observations 5 and 10 sessions out. Out
+`scripts/run_fno_backtest.py` run from the observations 5 and 10 sessions out. Out
 of sample (built on Jan 2024 – Jun 2025, tested on Jul 2025 onward), the
 historical numbers were within about 1–4 points of what happened, and the
 model ran 2–4 points high for stocks. See [validation](validation.md).
@@ -185,16 +185,16 @@ model ran 2–4 points high for stocks. See [validation](validation.md).
 ## Intraday snapshots
 
 ```bash
-PYTHONPATH=. .venv/bin/python install_schedule.py --fno-intraday           # install
-PYTHONPATH=. .venv/bin/python install_schedule.py --fno-intraday --remove  # remove
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --fno-intraday           # install
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --fno-intraday --remove  # remove
 ```
 
-Installs a second launchd agent that runs `snapshot_fno.py` every 30 minutes,
+Installs a second launchd agent that runs `scripts/snapshot_fno.py` every 30 minutes,
 09:30–15:30 on weekdays, for the forward-log basket. It skips exchange
 holidays and does nothing outside market hours, and it only runs while the
 Mac is awake.
 
-The same install adds a second agent, `keep_awake_fno.py`, at 09:20 on
+The same install adds a second agent, `scripts/keep_awake_fno.py`, at 09:20 on
 weekdays. On an NSE trading day it runs macOS's own `caffeinate -i` until
 15:35, which stops the Mac sleeping when idle. That's a process holding a
 sleep assertion, not a change to system settings, and it ends with the
@@ -211,8 +211,8 @@ needs before it can be tested. Until then it's labelled untested.
 To see how a day went, after the close:
 
 ```bash
-PYTHONPATH=. .venv/bin/python snapshot_fno.py --report                      # today
-PYTHONPATH=. .venv/bin/python snapshot_fno.py --report --date 2026-10-08 --excel
+PYTHONPATH=. .venv/bin/python scripts/snapshot_fno.py --report                      # today
+PYTHONPATH=. .venv/bin/python scripts/snapshot_fno.py --report --date 2026-10-08 --excel
 ```
 
 It prints one row per underlying: snapshots taken, first and last time,
@@ -224,26 +224,26 @@ same PCR line ("PCR through the day").
 
 ## Keeping it current
 
-The Saturday job (`run_weekly.py`) now also:
+The Saturday job (`scripts/run_weekly.py`) now also:
 
-1. runs `run_fno.py --selftest`, which checks every live NSE endpoint
+1. runs `scripts/run_fno.py --selftest`, which checks every live NSE endpoint
    answers with real data (NSE changed this API once already, and one
    retired endpoint answers 200 with an empty body);
-2. runs `run_fno_backtest.py --ingest`, which adds the week's bhavcopy,
+2. runs `scripts/run_fno_backtest.py --ingest`, which adds the week's bhavcopy,
    index history and results dates, then re-runs the validation. That
    rewrites `config/fno_calibration.json` (the hit rates the range quotes)
    and `config/fno_reach.json` (the reach curves), so neither goes stale or
    needs editing by hand. Both are local build outputs, not in git (like
    `data/fo_history.db` they are built from); a fresh checkout gets them
-   from the first `run_fno_backtest.py --ingest`.
+   from the first `scripts/run_fno_backtest.py --ingest`.
 
 `--ingest-old` adds the 2019–2023 index history; it only needs running once.
 
 ## Forward log
 
 ```bash
-PYTHONPATH=. .venv/bin/python record_fno.py               # score expired cycles, record this one
-PYTHONPATH=. .venv/bin/python record_fno.py --check-only  # score only
+PYTHONPATH=. .venv/bin/python scripts/record_fno.py               # score expired cycles, record this one
+PYTHONPATH=. .venv/bin/python scripts/record_fno.py --check-only  # score only
 ```
 
 `history/fno_ranges.xlsx` gets one tab per monthly expiry. Each tab holds
@@ -278,12 +278,12 @@ data/sources/nse_derivatives.py   live chain, futures, expiries, lot sizes, F&O 
 data/sources/nse_events.py        results dates from board-meeting announcements
 data/fo_bhavcopy.py               historical chains from the F&O bhavcopy
 strategy/fno.py                   PCR, walls, max pain, straddle, range (pure)
-fno_report.py                     load + text + Excel, shared by CLI and UI
-run_fno.py                        command line
-run_fno_backtest.py               the validation; writes the calibration files
-record_fno.py                     the monthly forward log
-snapshot_fno.py                   intraday snapshots (launchd)
-run_option_backtest.py            option rule backtest (docs/f_o/backtest.md)
+records/fno_report.py                     load + text + Excel, shared by CLI and UI
+scripts/run_fno.py                        command line
+scripts/run_fno_backtest.py               the validation; writes the calibration files
+scripts/record_fno.py                     the monthly forward log
+scripts/snapshot_fno.py                   intraday snapshots (launchd)
+research/run_option_backtest.py            option rule backtest (docs/f_o/backtest.md)
 ui/fno_tab.py                     dashboard tab
 ```
 

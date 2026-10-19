@@ -7,7 +7,7 @@ Setup, the watchlist, tuning, tests, and the daily signal run.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_daily.py --no-fetch --portfolio 1000000
+PYTHONPATH=. .venv/bin/python scripts/run_daily.py --no-fetch --portfolio 1000000
 ```
 
 - `--portfolio` — your capital, in rupees. Drives position sizing, so set it honestly.

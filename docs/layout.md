@@ -6,8 +6,33 @@ Where everything lives and why the seams sit where they do.
 
 ---
 
+## At a glance
+
 ```
-config/holdings.csv        your positions (broker export works as-is)
+setup_project.py   start here: guided setup on a new computer
+run_ui.py          open the dashboard
+scripts/           everything you or the scheduled jobs run: refreshes, records, reports
+research/          backtests and experiments behind docs/validation.md
+config/            settings, and the files you fill in (holdings, MF book, watch list)
+data/ history/     downloaded data (not in git) / forward records (in git)
+docs/              how each part works, and what the tests found
+tests/             the test suite (pytest)
+
+book/              your book: holdings, watch lists, the files you fill in, decision log
+records/           forward-record stores and their reports
+ops/               the scheduled jobs (launchd, cron, Task Scheduler)
+analysis/ backtest/ data/ indicators/ mf/ picker/ results/ scoring/ signals/
+strategy/ ui/      the engine, by subject (below)
+```
+
+Every script finds the project's packages on its own, so `python
+scripts/run_backfill.py` works from the project folder without setting
+`PYTHONPATH`.
+
+## In detail
+
+```
+config/holdings.xlsx       your positions (or .csv; a broker export works as-is)
 config/watchlist.csv       stocks to track
 config/fundamentals.csv    quality inputs, auto-filled from NSE + Yahoo
 config/etfs.csv            instruments excluded from the universe, with reasons
@@ -15,19 +40,23 @@ config/equities.csv        the company-equity pool the ranking selects from
 config/scoring.yaml        weights, thresholds, risk limits, tax rates
 
 setup_project.py           guided setup: environment, databases, your files, data, jobs
-userfiles.py               the files you fill in (holdings, MF, watch list) as .xlsx or .csv
-jobs.py                    the scheduled jobs, for launchd, cron and Task Scheduler
-install_schedule.py        --list / --status / --install / --remove for those jobs
-watchlist.py               read/write/validate the watchlist
-portfolio.py               holdings from config/holdings.xlsx/.csv or the Kite snapshot
-fundamentals.py            quality score, incl. the lender rubric
-instruments.py             equity vs fund vs DVR classification
-import_kite_holdings.py    Kite .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
+book/userfiles.py          the files you fill in (holdings, MF, watch list) as .xlsx or .csv
+book/portfolio.py          holdings from config/holdings.xlsx/.csv or the Kite snapshot
+book/watching.py           the watch list: baselines, stops and targets reached
+book/watchlist.py          read/write/validate the watchlist
+book/decision_log.py       every advisor verdict, dated, for scoring later
+ops/jobs.py                the scheduled jobs, for launchd, cron and Task Scheduler
+scripts/install_schedule.py   --list / --status / --install / --remove for those jobs
+scoring/fundamentals.py    quality score, incl. the lender rubric
+data/instruments.py        equity vs fund vs DVR classification
+scripts/import_kite_holdings.py   Kite .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
                            --trade SYMBOL... marks positions bought to trade
-set_buckets.py             pre-fill the core/satellite column
-record_momentum.py         monthly momentum picks -> history/momentum_picks.xlsx
-record_fno.py              monthly F&O ranges -> history/fno_ranges.xlsx, scored at expiry
-history/                   records kept in git (momentum picks, F&O ranges)
+scripts/set_buckets.py     pre-fill the core/satellite column
+scripts/record_momentum.py monthly momentum picks -> history/momentum_picks.xlsx
+scripts/record_fno.py      monthly F&O ranges -> history/fno_ranges.xlsx, scored at expiry
+scripts/record_swing.py    every swing scan -> history/swing/ (records/swing_store.py)
+scripts/record_ranges.py   daily Today ranges -> history/ranges/ (records/ranges_store.py)
+history/                   records kept in git (momentum picks, F&O, swing, ranges)
 
 data/sources/prices.py     OHLCV via jugaad-data
 data/sources/nse_fundamentals.py   results, shareholding and pledge from XBRL
@@ -38,13 +67,13 @@ results/reaction.py        reaction day, move in ATRs, vs NIFTY 500
 results/coverage.py        holdings + watch list + swing and momentum picks
 results/engine.py          fetch -> score -> store; badges for other tables
 results/store.py           data/results/*.csv (outside git: coverage shows holdings)
-run_results.py             daily results run and report
-run_results_backtest.py    post-results drift test -> config/results_calibration.json
+scripts/run_results.py     daily results run and report
+research/run_results_backtest.py   post-results drift test -> config/results_calibration.json
 
 picker/metrics.py          point-in-time TTM growth, P/E, PEG, quality inputs
 picker/score.py            percentile ranks, GARP / QARP gates and scores
 picker/engine.py           evaluate on a date, quarterly backtest
-run_picker.py              today's shortlists, --refresh, --backtest
+scripts/run_picker.py      today's shortlists, --refresh, --backtest
 data/corporate_actions.py  split/bonus parsing and back-adjustment
 data/bhavcopy.py           full-market history -- the survivorship-free universe
 data/quality.py            suspect-bar detection and quarantine
@@ -68,8 +97,8 @@ backtest/reconcile.py      rebuild sampled trades from source before trusting me
 data/sources/nse_derivatives.py   live option chain, futures, expiries, lot sizes
 data/fo_bhavcopy.py        historical F&O chains -> data/fo_history.db
 strategy/fno.py            PCR, OI walls, max pain, straddle, range (pure)
-fno_report.py              F&O load/text/Excel, shared by CLI and dashboard
-run_fno.py                 F&O analysis; run_fno_backtest.py validates it
+records/fno_report.py      F&O load/text/Excel, shared by CLI and dashboard
+scripts/run_fno.py         F&O analysis; scripts/run_fno_backtest.py validates it
 docs/f_o/                  F&O docs: overview, data traps, validation
 
 analysis/lookup.py         ticker / company name / ISIN -> NSE symbol
@@ -93,4 +122,4 @@ as the nightly job, so the backtest stays evidence about what you actually run.
 
 ---
 
-See also: [ROADMAP](../ROADMAP.md) for what is built and what is still wrong.
+See also: [ROADMAP](ROADMAP.md) for what is built and what is still wrong.

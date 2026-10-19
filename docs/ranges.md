@@ -8,8 +8,8 @@ next five sessions -- not which way.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_range_backtest.py   # calibrate on F&O history
-PYTHONPATH=. .venv/bin/python record_ranges.py        # fetch, record, score
+PYTHONPATH=. .venv/bin/python scripts/run_range_backtest.py   # calibrate on F&O history
+PYTHONPATH=. .venv/bin/python scripts/record_ranges.py        # fetch, record, score
 ```
 
 ## Why a range, not a direction
@@ -34,7 +34,7 @@ The five-session band is √5 times as wide. A normal distribution would put
 
 ## Calibration
 
-`run_range_backtest.py` runs that code on every F&O underlying and every day in
+`scripts/run_range_backtest.py` runs that code on every F&O underlying and every day in
 `data/fo_history.db`: indices since 2019, stocks since 2024, about 570,000
 bands. Windows where the price moved more than 60% are dropped as
 splits or bonuses (359 of them). It writes `config/range_calibration.json`,
@@ -62,7 +62,7 @@ Run of 2026-10-19:
 
 ## Forward log
 
-`record_ranges.py` (in the weekday job, `run_swing_daily.py`) does three things:
+`scripts/record_ranges.py` (in the weekday job, `scripts/run_swing_daily.py`) does three things:
 
 1. Catches the F&O bhavcopy up to the latest close.
 2. Records every F&O underlying's bands for that close to

@@ -8,10 +8,10 @@ plan each -- and what the backtest says about them.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_swing.py                        # top 10, Nifty 200
-PYTHONPATH=. .venv/bin/python run_swing.py --universe nifty500 --all
-PYTHONPATH=. .venv/bin/python run_swing.py --capital 1000000      # with share counts
-PYTHONPATH=. .venv/bin/python run_swing.py --backtest             # -> config/swing_calibration.json
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py                        # top 10, Nifty 200
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --universe nifty500 --all
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --capital 1000000      # with share counts
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --backtest             # -> config/swing_calibration.json
 ```
 
 The dashboard's **Swing** page shows the same scan (top 10, or the full list
@@ -21,16 +21,16 @@ computed until **Scan** is pressed; the result is cached for the day.
 ## The forward record
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_swing_daily.py               # refresh + record (what the job runs)
-PYTHONPATH=. .venv/bin/python record_swing.py                  # record one scan now
-PYTHONPATH=. .venv/bin/python record_swing.py --update         # rebuild the workbook only
-PYTHONPATH=. .venv/bin/python run_swing.py --recorded          # replay the recorded scans
-PYTHONPATH=. .venv/bin/python install_schedule.py --install daily   # weekdays 19:30
+PYTHONPATH=. .venv/bin/python scripts/run_swing_daily.py               # refresh + record (what the job runs)
+PYTHONPATH=. .venv/bin/python scripts/record_swing.py                  # record one scan now
+PYTHONPATH=. .venv/bin/python scripts/record_swing.py --update         # rebuild the workbook only
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --recorded          # replay the recorded scans
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install daily   # weekdays 19:30
 ```
 
 What the tab suggested on a day can't be rebuilt later, because the code,
 the config and the index membership all move on. So every scan is written
-down once, in full, as plain CSV under `history/swing/` (`swing_store.py`):
+down once, in full, as plain CSV under `history/swing/` (`records/swing_store.py`):
 
 | File | One row per | Holds |
 |---|---|---|
@@ -55,8 +55,8 @@ and a Summary sheet. Edits made in Excel are overwritten. The Swing tab's
 the workbook. The Backtest view shows the forward record above the
 historical backtest.
 
-**Keeping it gap-free.** `install_schedule.py --install daily` runs
-`run_swing_daily.py` every weekday at 19:30. It catches Nifty 500 prices up
+**Keeping it gap-free.** `scripts/install_schedule.py --install daily` runs
+`scripts/run_swing_daily.py` every weekday at 19:30. It catches Nifty 500 prices up
 and records each universe. A missed run (Mac asleep) fires on wake, and a
 holiday or second run writes nothing new. The job never touches git: commit
 `history/swing/` yourself, for example with each week's other changes.
@@ -141,8 +141,8 @@ data.
 ## Alternative rankings, train / holdout (2026-10-13)
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_swing_experiment.py                        # train
-PYTHONPATH=. .venv/bin/python run_swing_experiment.py --holdout --ranking X  # once
+PYTHONPATH=. .venv/bin/python research/run_swing_experiment.py                        # train
+PYTHONPATH=. .venv/bin/python research/run_swing_experiment.py --holdout --ranking X  # once
 ```
 
 The same setups and plan; only the order of the day's setups changes. Train

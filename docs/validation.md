@@ -127,7 +127,7 @@ found after looking. Nothing ranks on the reaction. Full write-up in
 
 ## 52-week high and low volatility (2026-10-19)
 
-`run_factor_backtest.py`. Two factors with strong published evidence, run
+`research/run_factor_backtest.py`. Two factors with strong published evidence, run
 through the momentum engine: the point-in-time top 200 by liquidity, rebuilt
 monthly, delisted names included, 15 names equal-weighted, costs included. No
 200-DMA gate. The pass rule is in the script's docstring and was committed
@@ -178,7 +178,7 @@ has beaten the index after costs on a survivorship-free universe.
 > (a 1:1 bonus = -50%), a demerger as a loss, a ticker change or a spell in
 > the trade-for-trade series as a forced sale at -5%, and a day with no
 > price valued the holding at zero. All five are fixed ([data](data.md)).
-> The live ranking was never affected; only `run_pit_momentum.py` was.
+> The live ranking was never affected; only `research/run_pit_momentum.py` was.
 
 Same setup as before: top 200 by liquidity, monthly, 15 stocks, full costs,
 `risk_off_scale: 1.0`, four start dates a week apart, data to 2026-10-09.
@@ -259,7 +259,7 @@ the book has shrunk. On the top 200 the worst fall got deeper on one start.
 Question: the list is rebuilt monthly, so a stock that falls mid-month is held
 until the next rebalance. Would a trailing stop help, and at what distance?
 
-`run_pit_momentum.py --stop pct|atr` trails the highest close since entry.
+`research/run_pit_momentum.py --stop pct|atr` trails the highest close since entry.
 A stop is judged on the close and sold at the **next session's close**, the
 same lag the rebalance has. After a stop, the cash either waits for the next
 rebalance (`--stop-refill cash`) or buys the best name from the last ranking
@@ -370,8 +370,8 @@ tested here. Tested now on the survivorship-free engine, data 2016-10 to
 2026-10, top 200 by liquidity, monthly rebalance, 15 names, full costs:
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --skip-months 0   # plain 12-month return
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --skip-months 1   # 12-1 (current)
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --skip-months 0   # plain 12-month return
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --skip-months 1   # 12-1 (current)
 ```
 
 > **Corrected 2026-10-04.** The first version of this section was run with
@@ -421,8 +421,8 @@ top 15 on both, and sold when it falls past 30 on either. That holds a
 varying number of stocks, 10.8 on average.
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --lookback-months 9
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --selection overlap
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --lookback-months 9
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --selection overlap
 ```
 
 **15 stocks, CAGR %:**
@@ -468,8 +468,8 @@ never did this, so the backtest behind the advice was not testing what the
 advice actually tells you to do. Tested by switching it off (`risk_off_scale: 1.0`):
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 0.5
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 1.0
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --risk-off-scale 0.5
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --risk-off-scale 1.0
 ```
 
 **CAGR %, half the stocks in RISK-OFF (0.5) vs no change (1.0):**
@@ -561,7 +561,7 @@ actually sorts by.
 # Backtest
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_backtest.py --shuffle
+PYTHONPATH=. .venv/bin/python research/run_backtest.py --shuffle
 ```
 
 `--shuffle` runs a randomised-entry control alongside the strategy. **If the
@@ -572,11 +572,11 @@ adding nothing.** Also accepts `--start` / `--end` for holdout testing.
 # Experiments (train / holdout)
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_experiment.py                       # compare on train
-PYTHONPATH=. .venv/bin/python run_experiment.py --holdout --variant X # ONE shot
+PYTHONPATH=. .venv/bin/python research/run_experiment.py                       # compare on train
+PYTHONPATH=. .venv/bin/python research/run_experiment.py --holdout --variant X # ONE shot
 ```
 
-Variants live in `VARIANTS` in `run_experiment.py`. Each should embody a
+Variants live in `VARIANTS` in `research/run_experiment.py`. Each should embody a
 *hypothesis about why the strategy fails*, not a threshold sweep -- so that a win
 is interpretable rather than accidental. Choose on train, then run the holdout
 once. Never iterate against holdout results.

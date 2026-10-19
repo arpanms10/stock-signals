@@ -31,10 +31,10 @@ By hand, if you prefer:
 
 ```bash
 uv venv && uv pip install -r requirements.txt
-PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10      # ~70 min, once
-PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty500 --years 10
-PYTHONPATH=. .venv/bin/python fetch_fundamentals.py
-PYTHONPATH=. .venv/bin/python install_schedule.py --install recommended   # optional
+PYTHONPATH=. .venv/bin/python scripts/run_market_ingest.py --years 10      # ~70 min, once
+PYTHONPATH=. .venv/bin/python scripts/run_backfill.py --universe nifty500 --years 10
+PYTHONPATH=. .venv/bin/python scripts/fetch_fundamentals.py
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended   # optional
 ```
 
 ## Commands
@@ -43,32 +43,36 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --install recommended   # opti
 |---|---|
 | `setup_project.py` | Guided setup on a new computer; `--check` for status ([getting started](GETTING_STARTED.md)) |
 | `run_ui.py` | Dashboard, localhost only: Today, Portfolio, Ideas, Market and Research menus ([dashboard](docs/dashboard.md)) |
-| `record_ranges.py` / `run_range_backtest.py` | Today's expected ranges: forward log and calibration ([ranges](docs/ranges.md)) |
-| `run_advisor.py` | Verdicts on your book, as text |
-| `run_momentum.py` | Rank the universe |
-| `run_pit_momentum.py` | Survivorship-free backtest |
-| `run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
-| `run_weekly.py` | Refresh everything, then report |
-| `install_schedule.py` | Scheduled jobs on macOS, Linux or Windows: `--list`, `--status`, `--install`, `--remove` |
-| `import_kite_holdings.py` | Broker holdings download → `config/holdings.xlsx` (or `.csv`) |
-| `set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
-| `record_momentum.py` | Save this month's momentum picks to `history/` |
-| `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
-| `run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
-| `record_fno.py` | Monthly F&O forward log → `history/fno_ranges.xlsx`, scored at expiry |
-| `run_option_backtest.py` | What a simple option rule would have done, after costs (`--compare`, `--excel`) |
-| `run_swing.py` | Swing setups in the Nifty 200/500, scored, with a trade plan (`--all`, `--capital`, `--backtest`, `--recorded`) |
-| `run_swing_experiment.py` | Alternative swing rankings on a train / holdout split |
-| `record_swing.py` | Record the day's swing scan in `history/swing/`, rebuild `history/swing_picks.xlsx` with outcomes |
-| `run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
-| `run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
-| `run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
-| `run_drift_backtest.py` | Whether buying stocks that rallied on their results beats the universe after costs (point-in-time universe) |
-| `run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
-| `run_mf.py` | Mutual funds vs their category: EXIT / TRIM / ADD / WATCH for your MF book (`config/mf_holdings.csv` or `.xlsx`, % only) or any named fund (`--refresh`, `--compare`, `--excel`, `--backtest`) |
+| `scripts/record_ranges.py` / `scripts/run_range_backtest.py` | Today's expected ranges: forward log and calibration ([ranges](docs/ranges.md)) |
+| `scripts/run_advisor.py` | Verdicts on your book, as text |
+| `scripts/run_momentum.py` | Rank the universe |
+| `research/run_pit_momentum.py` | Survivorship-free backtest |
+| `research/run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
+| `scripts/run_weekly.py` | Refresh everything, then report |
+| `scripts/install_schedule.py` | Scheduled jobs on macOS, Linux or Windows: `--list`, `--status`, `--install`, `--remove` |
+| `scripts/import_kite_holdings.py` | Broker holdings download → `config/holdings.xlsx` (or `.csv`) |
+| `scripts/set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
+| `scripts/record_momentum.py` | Save this month's momentum picks to `history/` |
+| `scripts/run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
+| `scripts/run_fno_backtest.py` | How often that range actually held (`--ingest` first) |
+| `scripts/record_fno.py` | Monthly F&O forward log → `history/fno_ranges.xlsx`, scored at expiry |
+| `research/run_option_backtest.py` | What a simple option rule would have done, after costs (`--compare`, `--excel`) |
+| `scripts/run_swing.py` | Swing setups in the Nifty 200/500, scored, with a trade plan (`--all`, `--capital`, `--backtest`, `--recorded`) |
+| `research/run_swing_experiment.py` | Alternative swing rankings on a train / holdout split |
+| `scripts/record_swing.py` | Record the day's swing scan in `history/swing/`, rebuild `history/swing_picks.xlsx` with outcomes |
+| `scripts/run_swing_daily.py` | Refresh prices, record the swing scans, check the watch list for stops and targets, score new results -- what the daily job runs |
+| `scripts/run_results.py` | Quarterly results: score new filings for holdings, watch list and picks; price reaction; who reports next |
+| `research/run_results_backtest.py` | Whether the results verdict predicts post-results drift (Nifty 200, 24 quarters) |
+| `research/run_drift_backtest.py` | Whether buying stocks that rallied on their results beats the universe after costs (point-in-time universe) |
+| `scripts/run_picker.py` | GARP and QARP shortlists for the Nifty 200 from filings (`--refresh`, `--as-of`, `--backtest`) |
+| `scripts/run_mf.py` | Mutual funds vs their category: EXIT / TRIM / ADD / WATCH for your MF book (`config/mf_holdings.csv` or `.xlsx`, % only) or any named fund (`--refresh`, `--compare`, `--excel`, `--backtest`) |
 
-Scripts need `PYTHONPATH=.`; the launchers above run fine via `.venv/bin/python`.
-Full flags in [operations](docs/operations.md).
+Run them from the project folder as `.venv/bin/python scripts/<name>.py`
+(Windows: `.venv\Scripts\python scripts\<name>.py`); they find the project's
+packages on their own, so `PYTHONPATH=.` in the examples is optional.
+`scripts/` holds what you and the jobs run; `research/` holds the backtests
+behind [validation](docs/validation.md). [Code layout](docs/layout.md) maps
+the rest. Full flags in [operations](docs/operations.md).
 
 ## Recording what you buy
 
@@ -78,7 +82,7 @@ and import it. Name anything bought purely to trade with `--trade` so it is
 rotated on rank:
 
 ```bash
-PYTHONPATH=. .venv/bin/python import_kite_holdings.py --trade CPPLUS SANSERA
+PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py --trade CPPLUS SANSERA
 ```
 
 - Quantities and average prices come from Kite; your `bucket`, `notes` and
@@ -100,7 +104,7 @@ the new positions.
 
 ## Momentum history
 
-`record_momentum.py` saves the month's picks -- every stock in the top 15 on
+`scripts/record_momentum.py` saves the month's picks -- every stock in the top 15 on
 either lookback, with ranks, scores, the price on the day and the NIFTY 500
 level -- to `history/momentum_picks.xlsx`, one tab per month named like
 `Oct 2026`. Each new month is a new tab at the end. It records once per month
@@ -137,9 +141,9 @@ tested on a train / holdout split. The list is setups to review, not a
 ranking to trust. Details in [swing trading](docs/swing.md).
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_swing.py                       # top 10, Nifty 200
-PYTHONPATH=. .venv/bin/python run_swing.py --universe nifty500 --all --capital 1000000
-PYTHONPATH=. .venv/bin/python run_swing.py --backtest            # refresh the Backtest sub-tab
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py                       # top 10, Nifty 200
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --universe nifty500 --all --capital 1000000
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --backtest            # refresh the Backtest sub-tab
 ```
 
 ## Quarterly results
@@ -157,17 +161,17 @@ date the company reports.
 
 The verdict compares a company with **its own trend, not analyst estimates**,
 which no free source carries. It feeds no ranking.
-`run_results_backtest.py` tests whether it predicts anything once the
+`research/run_results_backtest.py` tests whether it predicts anything once the
 reaction is known; the tab's backtest section shows the answer. Details in
 [quarterly results](docs/results.md).
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_results.py                  # score what's new, report
-PYTHONPATH=. .venv/bin/python run_results.py --symbols TCS INFY
-PYTHONPATH=. .venv/bin/python run_results_backtest.py         # does the verdict predict drift?
+PYTHONPATH=. .venv/bin/python scripts/run_results.py                  # score what's new, report
+PYTHONPATH=. .venv/bin/python scripts/run_results.py --symbols TCS INFY
+PYTHONPATH=. .venv/bin/python research/run_results_backtest.py         # does the verdict predict drift?
 ```
 
-The swing daily job runs `run_results.py` after its price refresh.
+The swing daily job runs `scripts/run_results.py` after its price refresh.
 
 **What the backtest found** (3,226 filings, 2021-26): strong cards beat the
 index by 2% on the reaction day, so the scorecard measures what the market
@@ -193,14 +197,14 @@ lagged by 2.6% a quarter, with milder drawdowns. Seventeen quarters is one
 market regime. Details in [GARP & QARP](docs/picker.md).
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_picker.py --refresh     # new filings for the Nifty 200
-PYTHONPATH=. .venv/bin/python run_picker.py               # today's two shortlists
-PYTHONPATH=. .venv/bin/python run_picker.py --backtest
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --refresh     # new filings for the Nifty 200
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py               # today's two shortlists
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --backtest
 ```
 
 ## Mutual funds
 
-The **Mutual funds** page (and `run_mf.py`) judges any mutual fund against its
+The **Mutual funds** page (and `scripts/run_mf.py`) judges any mutual fund against its
 SEBI category and gives **EXIT / TRIM / ADD / WATCH / HOLD**, with reasons.
 It uses month-end NAVs of Direct Growth plans from AMFI's free files, and
 funds that later closed or merged are included.
@@ -224,10 +228,10 @@ its share of your whole MF portfolio, summing to 100:
   gains warning on a sell.
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_mf.py --refresh                 # NAV history: ~25 min once, then quick
-PYTHONPATH=. .venv/bin/python run_mf.py                           # verdicts for your book
-PYTHONPATH=. .venv/bin/python run_mf.py "ppfas flexi" "hdfc flexi cap" --compare
-PYTHONPATH=. .venv/bin/python run_mf.py --excel                   # reports/mf/MF_Evaluation.xlsx
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --refresh                 # NAV history: ~25 min once, then quick
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py                           # verdicts for your book
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py "ppfas flexi" "hdfc flexi cap" --compare
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --excel                   # reports/mf/MF_Evaluation.xlsx
 ```
 
 **What to expect.** It's good at organising your book and weak at predicting
@@ -281,7 +285,7 @@ appended to:
 | `history/swing/members.csv` | index member, when the list changes | the universe as it stood -- a point-in-time universe for future backtests |
 | `history/swing_picks.xlsx` | top-10 pick | **a report, rebuilt from the CSVs on every save**: each pick played forward -- *pending*, *not triggered*, *open* or *closed* with its result in R and % after costs -- plus a Summary sheet |
 
-- A price date and universe already recorded are kept; `record_swing.py
+- A price date and universe already recorded are kept; `scripts/record_swing.py
   --force` replaces that one scan. Earlier scans are never touched.
 - Outcomes are not stored: they are replayed from prices with **each scan's
   own settings**, so editing `scoring.yaml` later does not re-score old picks.
@@ -290,10 +294,10 @@ appended to:
 - About 10 MB of CSV a year for both universes.
 
 ```bash
-PYTHONPATH=. .venv/bin/python record_swing.py                    # record today's Nifty 200 scan
-PYTHONPATH=. .venv/bin/python record_swing.py --universe nifty500
-PYTHONPATH=. .venv/bin/python record_swing.py --update           # rebuild the workbook only
-PYTHONPATH=. .venv/bin/python run_swing.py --recorded            # replay the recorded scans
+PYTHONPATH=. .venv/bin/python scripts/record_swing.py                    # record today's Nifty 200 scan
+PYTHONPATH=. .venv/bin/python scripts/record_swing.py --universe nifty500
+PYTHONPATH=. .venv/bin/python scripts/record_swing.py --update           # rebuild the workbook only
+PYTHONPATH=. .venv/bin/python scripts/run_swing.py --recorded            # replay the recorded scans
 ```
 
 **Commit `history/swing/` yourself** now and then (the daily job never
@@ -301,24 +305,24 @@ touches git). Until it is on GitHub, the record exists only on this Mac.
 
 ## Scheduled jobs
 
-Five jobs, defined once in `jobs.py` and installed with each system's own
+Five jobs, defined once in `ops/jobs.py` and installed with each system's own
 scheduler: launchd on macOS, cron on Linux, Task Scheduler on Windows. Install
 them yourself, or let `setup_project.py` ask. Each changes what the computer
 does on its own; none touches git or your broker.
 
 | Job | When | Runs | Feeds |
 |---|---|---|---|
-| **daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up prices, record the swing scans and Today's ranges, date stops and targets in the watch list, score new results | Today, Stocks, Swing, Quarterly results |
-| **weekly** | Saturday 09:30 | `run_weekly.py`: full-market history, fundamentals, F&O history and validation, momentum and F&O records, range calibration, a report in `reports/` | Market, Momentum, Analyze, F&O, Today |
-| **monthly** | 5th, 10:00 | `run_mf.py --refresh`: month-end fund NAVs | Mutual funds, Compare funds |
-| **quarterly** | 15 Feb/May/Aug/Nov, 10:00 | `run_picker.py --refresh`: Nifty 200 filings | GARP / QARP |
-| fno-intraday *(optional)* | Weekdays 09:30–15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent on macOS | F&O |
+| **daily** | Weekdays 19:30 | `scripts/run_swing_daily.py`: catch up prices, record the swing scans and Today's ranges, date stops and targets in the watch list, score new results | Today, Stocks, Swing, Quarterly results |
+| **weekly** | Saturday 09:30 | `scripts/run_weekly.py`: full-market history, fundamentals, F&O history and validation, momentum and F&O records, range calibration, a report in `reports/` | Market, Momentum, Analyze, F&O, Today |
+| **monthly** | 5th, 10:00 | `scripts/run_mf.py --refresh`: month-end fund NAVs | Mutual funds, Compare funds |
+| **quarterly** | 15 Feb/May/Aug/Nov, 10:00 | `scripts/run_picker.py --refresh`: Nifty 200 filings | GARP / QARP |
+| fno-intraday *(optional)* | Weekdays 09:30–15:30, half-hourly | `scripts/snapshot_fno.py`, plus a keep-awake agent on macOS | F&O |
 
 ```bash
-PYTHONPATH=. .venv/bin/python install_schedule.py --list                    # what each does
-PYTHONPATH=. .venv/bin/python install_schedule.py --install recommended     # daily, weekly, monthly, quarterly
-PYTHONPATH=. .venv/bin/python install_schedule.py --status
-PYTHONPATH=. .venv/bin/python install_schedule.py --remove daily            # or: --remove all
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --list                    # what each does
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended     # daily, weekly, monthly, quarterly
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --status
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily            # or: --remove all
 ```
 
 - **Missed runs.** macOS and Windows run a job missed while the computer was
@@ -357,7 +361,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --remove daily            # or
 | [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the survivorship-free backtest (a weak edge) |
 | [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |
 | [**Code layout**](docs/layout.md) | Where things live |
-| [ROADMAP](ROADMAP.md) | What is built, and what is still wrong with it |
+| [ROADMAP](docs/ROADMAP.md) | What is built, and what is still wrong with it |
 
 ## The idea in one table
 

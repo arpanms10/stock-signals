@@ -9,13 +9,13 @@ The Saturday job, and the failure modes it guards against. All five jobs
 ---
 
 ```bash
-.venv/bin/python install_schedule.py --install weekly --portfolio 2000000
-.venv/bin/python install_schedule.py --status
-.venv/bin/python install_schedule.py --remove weekly
+.venv/bin/python scripts/install_schedule.py --install weekly --portfolio 2000000
+.venv/bin/python scripts/install_schedule.py --status
+.venv/bin/python scripts/install_schedule.py --remove weekly
 ```
 
 Installs a job (launchd on macOS, cron on Linux, Task Scheduler on Windows;
-see `jobs.py`) that runs `run_weekly.py`: refresh prices, market
+see `ops/jobs.py`) that runs `scripts/run_weekly.py`: refresh prices, market
 data and fundamentals, then the advisor, writing a dated report to `reports/`.
 Everything runs locally; nothing goes to a server.
 

@@ -25,11 +25,11 @@ scales the number of positions down rather than going to cash.
 
 The original plan assumed a hand-typed sheet. NSE's XBRL filings turned out to
 carry quarterly results, shareholding history and promoter pledge — so
-`fetch_fundamentals.py` populates it automatically, with Yahoo filling the
+`scripts/fetch_fundamentals.py` populates it automatically, with Yahoo filling the
 ratios NSE does not publish. Quality score covers growth, profitability,
 balance sheet, cash quality and governance.
 
-`fundamentals.py`, `data/sources/nse_fundamentals.py`
+`scoring/fundamentals.py`, `data/sources/nse_fundamentals.py`
 
 ### DONE · Lender rubric
 
@@ -81,13 +81,13 @@ that no longer trade. The universe is rebuilt at every rebalance from stocks
 actually trading and liquid on that date. ETFs and DVRs excluded by ISIN and
 listed in `config/etfs.csv` with reasons.
 
-`data/bhavcopy.py`, `instruments.py`
+`data/bhavcopy.py`, `data/instruments.py`
 
 ### DONE · Dashboard
 
 Top-bar menus: Today, Portfolio, Ideas, Market, Research, and Data and jobs.
 Each page states how far its signals held up in a backtest. Localhost only
-([dashboard](docs/dashboard.md)).
+([dashboard](dashboard.md)).
 
 `ui/`
 
@@ -99,16 +99,16 @@ the RSI trim and the entry cooldown — all shown to hurt or add nothing.
 
 ### DONE · Scheduling, freshness and the results calendar
 
-launchd jobs: Saturday (`run_weekly.py`), weekday evenings after the close
-(`run_swing_daily.py`), and half-hourly F&O snapshots in market hours
-(`install_schedule.py`). The data chip and a warning line on every page say
+launchd jobs: Saturday (`scripts/run_weekly.py`), weekday evenings after the close
+(`scripts/run_swing_daily.py`), and half-hourly F&O snapshots in market hours
+(`scripts/install_schedule.py`). The data chip and a warning line on every page say
 when a source is behind; Data and jobs runs whatever is stale. Results dates
 for everything you follow are on Today and Quarterly results.
 
 ### DONE · Forward records
 
 Every recommendation that can be scored later is written down before the
-outcome is known, append-only: the advisor's verdicts (`decision_log.py`),
+outcome is known, append-only: the advisor's verdicts (`book/decision_log.py`),
 monthly momentum picks, every swing scan, the monthly F&O ranges, and the
 daily Today ranges for every F&O underlying (`history/`).
 
@@ -116,7 +116,7 @@ daily Today ranges for every F&O underlying (`history/`).
 
 Today gathers every decision from every page, plus next-session and
 five-session ranges for Nifty and core holdings with their measured hit rate
-([ranges](docs/ranges.md)). Analyze a stock adds a sector checklist: the
+([ranges](ranges.md)). Analyze a stock adds a sector checklist: the
 long-term metrics that matter for that sector, and what to check by hand.
 
 ### DONE · Tested and shown with their verdicts
@@ -124,7 +124,7 @@ long-term metrics that matter for that sector, and what to check by hand.
 Swing setups, the F&O read, the quarterly results verdict, GARP / QARP and the
 mutual fund states were each built, backtested and either shown calibrated or
 kept as reading aids. 52-week high and low volatility failed a pre-registered
-rule and were not built further. See [validation](docs/validation.md).
+rule and were not built further. See [validation](validation.md).
 
 ### NOT BUILT · Telegram
 
@@ -155,7 +155,7 @@ return than they saved.
 *Corrected 2026-10-11:* earlier figures (11.4%, and everything before it)
 ran on raw prices that read every split, bonus and demerger in a held stock
 as a loss, and a ticker change or a spell in the trade-for-trade series as
-a forced sale. See [data](docs/data.md) and [validation](docs/validation.md).
+a forced sale. See [data](data.md) and [validation](validation.md).
 The live ranking was never affected.
 
 Removing survivorship bias, measured on the old history, cost 14 points of
@@ -184,7 +184,7 @@ the part most people cannot sit through.
 untouched universe) cut volatility from 25% to 20% but cost about 6 points of
 CAGR for 2.6 points off the average worst fall, with no better Sharpe. Trailing
 stops: tight ones cut the fall and cost 3-9 points a year. Neither adopted
-([validation](docs/validation.md)). Still open: something that reacts faster
+([validation](validation.md)). Still open: something that reacts faster
 than a monthly, 60-day volatility estimate.
 
 **Validation constraint:** the 2023–26 holdout is spent for momentum and the
@@ -231,7 +231,7 @@ year-to-date realised-gains figure for the exemption.
   is shown (`strategy/advisor.py`).
 - **The largest risk produced no action.** The sector cap trims every bucket,
   core included, as sizing with no view on the business.
-- **Nothing recorded what happened.** `decision_log.py`, plus the forward
+- **Nothing recorded what happened.** `book/decision_log.py`, plus the forward
   records above.
 - **Data went stale silently.** Scheduled jobs, the data chip, and a warning
   line on every page.

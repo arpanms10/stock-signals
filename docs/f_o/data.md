@@ -48,7 +48,7 @@ The underlying list and lot sizes are cached in `data/cache/` for a week.
 ## History: the F&O bhavcopy
 
 `data/fo_bhavcopy.py` → `data/fo_history.db` (git-ignored; rebuild with
-`run_fno_backtest.py --ingest`).
+`scripts/run_fno_backtest.py --ingest`).
 
 The live chain is a snapshot with no history, so the validation needs another
 source. NSE's daily F&O bhavcopy (UDiFF format) has every contract's

@@ -131,10 +131,10 @@ Console → Portfolio → Holdings → Download; Kite: Holdings → Download), p
 the file in the `config` folder, and run:
 
 ```bash
-.venv/bin/python import_kite_holdings.py
+.venv/bin/python scripts/import_kite_holdings.py
 ```
 
-On Windows: `.venv\Scripts\python import_kite_holdings.py`.
+On Windows: `.venv\Scripts\python scripts\import_kite_holdings.py`.
 
 **Your data stays on your computer.** These files are listed in
 `.gitignore`, so they're never uploaded, even if you share or publish your
@@ -185,9 +185,9 @@ only fetch what's missing, so a run after a holiday is quick. Manage them
 with:
 
 ```bash
-.venv/bin/python install_schedule.py --status
-.venv/bin/python install_schedule.py --install recommended
-.venv/bin/python install_schedule.py --remove all
+.venv/bin/python scripts/install_schedule.py --status
+.venv/bin/python scripts/install_schedule.py --install recommended
+.venv/bin/python scripts/install_schedule.py --remove all
 ```
 
 If you'd rather not schedule anything, use the **Data and jobs** page (the

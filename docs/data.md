@@ -53,7 +53,7 @@ before this fix ran on the holey history.
 
 ### The backtest's market history was not continuous (found 2026-10-10)
 
-`market.db` (the full-market bhavcopy behind `run_pit_momentum.py`) held
+`market.db` (the full-market bhavcopy behind `research/run_pit_momentum.py`) held
 raw EQ-series closes and nothing else, and the backtest read them as they
 were. Five gaps, each turning something that happened to a holding into a
 loss that never happened:
@@ -82,8 +82,8 @@ about 1% a year; the NIFTY 500 benchmark is a price index too), rights
 issues, and the spun-off company in a demerger.
 
 The live ranking was not affected: it reads split-adjusted prices from
-`signals.db`. Every `run_pit_momentum.py` figure before 2026-10-10 was.
-`run_market_ingest.py` now keeps all four tables current.
+`signals.db`. Every `research/run_pit_momentum.py` figure before 2026-10-10 was.
+`scripts/run_market_ingest.py` now keeps all four tables current.
 
 A fifth trap was self-inflicted and worth recording: **OBV is a cumulative sum
 from an arbitrary origin**, so its percent change is not well defined -- near a
@@ -114,7 +114,7 @@ Warnings appear at the top of the advisor and as a banner in the dashboard.
 # Refresh price data
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_backfill.py --years 10
+PYTHONPATH=. .venv/bin/python scripts/run_backfill.py --years 10
 ```
 
 Incremental and safe to re-run. With no arguments it refreshes your

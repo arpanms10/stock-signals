@@ -23,7 +23,7 @@ matches what they'll read.
 - **Their portfolio stays out of this chat.** Never ask them to paste holdings,
   quantities or prices. They fill `config/holdings.xlsx` and
   `config/mf_holdings.xlsx` themselves, or import a broker file with
-  `import_kite_holdings.py`. Don't open or print those files' contents. If
+  `scripts/import_kite_holdings.py`. Don't open or print those files' contents. If
   you need to know whether they're filled, `setup_project.py --check` gives
   row counts only.
 - **No investment advice.** The tool is decision support. If they ask "should
@@ -49,7 +49,7 @@ matches what they'll read.
    `python3 setup_project.py --help` names the choices. Recommend the
    starter set unless they want F&O or GARP / QARP straight away.
 
-4. **Choose the jobs.** Explain each one (`python3 install_schedule.py --list`
+4. **Choose the jobs.** Explain each one (`python3 scripts/install_schedule.py --list`
    prints them in plain words): when it runs, what it fetches, which pages
    need it. Recommend daily, weekly, monthly and quarterly. fno-intraday is
    only for people who read the F&O page. "None for now" is a fine answer.
@@ -71,8 +71,8 @@ matches what they'll read.
 6. **Their files.** Explain the three workbooks in `config/` and their *How to
    fill* sheets. Offer the broker-import route for holdings: download from
    Zerodha Console or Kite into `config/`, then run
-   `.venv/bin/python import_kite_holdings.py`
-   (Windows: `.venv\Scripts\python import_kite_holdings.py`).
+   `.venv/bin/python scripts/import_kite_holdings.py`
+   (Windows: `.venv\Scripts\python scripts\import_kite_holdings.py`).
 
 7. **Open the dashboard.** `.venv/bin/python run_ui.py` (Windows:
    `.venv\Scripts\python run_ui.py`), then `http://localhost:8501`. Give them
@@ -95,7 +95,7 @@ causes:
 - **"The market data isn't loaded yet" on a page.** The market download hasn't
   run or finished: `python3 setup_project.py --data market-recent`.
 - **A job didn't run.** The computer was off or asleep; check
-  `install_schedule.py --status` and `reports/<job>.log`.
+  `scripts/install_schedule.py --status` and `reports/<job>.log`.
 
 If something is genuinely broken in the project, say so plainly. Suggest they
 open a GitHub issue with the `--check` output, and nothing from `config/`.

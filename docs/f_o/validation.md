@@ -19,9 +19,9 @@ among stocks on the same day, high PCR leaned up; for indices, a steep put
 skew was followed more often by a rise.
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno_backtest.py --ingest         # incremental; the Saturday job runs it
-PYTHONPATH=. .venv/bin/python run_fno_backtest.py --ingest-old     # 2019-2023 index history, once (~1 hour)
-PYTHONPATH=. .venv/bin/python run_fno_backtest.py
+PYTHONPATH=. .venv/bin/python scripts/run_fno_backtest.py --ingest         # incremental; the Saturday job runs it
+PYTHONPATH=. .venv/bin/python scripts/run_fno_backtest.py --ingest-old     # 2019-2023 index history, once (~1 hour)
+PYTHONPATH=. .venv/bin/python scripts/run_fno_backtest.py
 ```
 
 Run on 2026-10-08. Every table: `reports/fno/validation_<date>.md`; one row
@@ -271,7 +271,7 @@ period, not a rule. Not used.
 ## What this does and does not show
 
 - **End of day only.** Today's change-in-OI PCR and anything intraday is
-  untested here. The half-hourly snapshots (`install_schedule.py
+  untested here. The half-hourly snapshots (`scripts/install_schedule.py
   --fno-intraday`) build the history for that.
 - **Stocks only from 2024.** That's 33 monthly cycles, most of them in a
   falling market. Indices go back to 2019.

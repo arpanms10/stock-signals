@@ -9,7 +9,7 @@ category, see [mutual fund evaluation](mf_evaluation.md).
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_mf_ppfas.py
+PYTHONPATH=. .venv/bin/python scripts/run_mf_ppfas.py
 ```
 
 Run it once a month, after about the 10th; PPFAS publishes 7-10 days after

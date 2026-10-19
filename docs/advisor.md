@@ -7,7 +7,7 @@ Verdicts on your own book: what to buy, trim or exit, funded and taxed.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_advisor.py --total-capital 2000000 --cash 50000
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py --total-capital 2000000 --cash 50000
 ```
 
 A verdict per holding with its reasoning, stop, targets and quantity.
@@ -50,8 +50,8 @@ Every run records its verdicts -- and, separately, the top-ranked names you do
 **not** own, which is what the ranking is actually asserting.
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_advisor.py            # logs automatically
-PYTHONPATH=. .venv/bin/python run_advisor.py --no-log   # skip
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py            # logs automatically
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py --no-log   # skip
 ```
 
 Advice is scored once it is 21 days old -- judging a call made three days ago

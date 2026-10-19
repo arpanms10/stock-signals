@@ -9,10 +9,10 @@ the price on the day, and backtested the same way.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_picker.py --refresh        # read new filings (minutes; first run over an hour)
-PYTHONPATH=. .venv/bin/python run_picker.py                  # today's picks
-PYTHONPATH=. .venv/bin/python run_picker.py --as-of 2025-06-05
-PYTHONPATH=. .venv/bin/python run_picker.py --backtest       # -> config/picker_calibration.json
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --refresh        # read new filings (minutes; first run over an hour)
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py                  # today's picks
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --as-of 2025-06-05
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --backtest       # -> config/picker_calibration.json
 ```
 
 The dashboard's **GARP / QARP** page shows both lists, everything scored,
@@ -106,17 +106,17 @@ What is **not** point in time:
 ## Data
 
 `data/results/universe_quarters.csv` holds 24 quarters per stock, shared with
-`run_results_backtest.py`. Raw filings are cached gzipped in
+`research/run_results_backtest.py`. Raw filings are cached gzipped in
 `data/cache/filings/`, so a refresh reads only new quarters and a new field
 re-reads the cache rather than NSE.
 
 ## Does it work?
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_picker.py --backtest                   # largest 150 on each date (default)
-PYTHONPATH=. .venv/bin/python run_picker.py --backtest --top-by-mcap 0   # all of today's index
-PYTHONPATH=. .venv/bin/python run_pit_universe.py --fetch                # point-in-time universe (once)
-PYTHONPATH=. .venv/bin/python run_picker.py --backtest --universe pit    # the 200 largest on each date
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --backtest                   # largest 150 on each date (default)
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --backtest --top-by-mcap 0   # all of today's index
+PYTHONPATH=. .venv/bin/python research/run_pit_universe.py --fetch                # point-in-time universe (once)
+PYTHONPATH=. .venv/bin/python scripts/run_picker.py --backtest --universe pit    # the 200 largest on each date
 ```
 
 Rebalance after each results season closes (20 Feb, 5 Jun, 20 Aug, 20 Nov),
@@ -144,7 +144,7 @@ The point-in-time rows (re-tested 2026-10-18) drop today's index entirely.
 On each date the universe is the 200 largest NSE companies by market cap
 from the full-market bhavcopy -- delisted, merged and since-demoted ones
 included -- with filings fetched for all of them (386 names over the window,
-192 of them not in today's Nifty 200). Built by `run_pit_universe.py`,
+192 of them not in today's Nifty 200). Built by `research/run_pit_universe.py`,
 described in `results/pit_universe.py`. 173-197 members are scored on each
 date (the rest lack eight quarters of filings or a price). Two limits:
 market cap is total, not free float, so companies with a large promoter

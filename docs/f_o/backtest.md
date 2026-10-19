@@ -8,11 +8,11 @@ after costs, and the trade log to check it against.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --action buy --side PE --strike moves:-1
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --compare
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --action sell --side CE --strike moves:+1 \
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --action buy --side PE --strike moves:-1
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --compare
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --action sell --side CE --strike moves:+1 \
     --universe stocks --sessions 5 --excel
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --universe NIFTY --cycle weekly --sessions 2
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --universe NIFTY --cycle weekly --sessions 2
 ```
 
 The "Check an option" panel answers "what are this contract's odds?". This
@@ -169,16 +169,16 @@ what to trade.
 The same reporting now runs on the existing backtests:
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_backtest.py --export
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --export
+PYTHONPATH=. .venv/bin/python research/run_backtest.py --export
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --export
 ```
 
-- **`run_backtest.py`** (the signal engine) prints the trade statistics
+- **`research/run_backtest.py`** (the signal engine) prints the trade statistics
   above, equity drawdown stats and a monthly return table. It first checks
   a sample of fills: entry and exit on real trading sessions, each filled
   at that session's open ± slippage. `--export` writes the trade log
   (Excel and CSV), and splits by symbol and by exit rule.
-- **`run_pit_momentum.py`** (the rotation strategy) has no discrete trades.
+- **`research/run_pit_momentum.py`** (the rotation strategy) has no discrete trades.
   Its record is the equity curve, the monthly return table, strategy vs
   benchmark by year, and the holdings at every rebalance, all in the
   `--export` workbook.

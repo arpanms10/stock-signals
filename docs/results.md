@@ -9,16 +9,16 @@ verdict predicts anything.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_results.py                  # score what's new, report
-PYTHONPATH=. .venv/bin/python run_results.py --days 14        # look further back
-PYTHONPATH=. .venv/bin/python run_results.py --symbols TCS INFY
-PYTHONPATH=. .venv/bin/python run_results.py --no-fetch       # report from what's on file
-PYTHONPATH=. .venv/bin/python run_results_backtest.py         # does the verdict predict drift?
+PYTHONPATH=. .venv/bin/python scripts/run_results.py                  # score what's new, report
+PYTHONPATH=. .venv/bin/python scripts/run_results.py --days 14        # look further back
+PYTHONPATH=. .venv/bin/python scripts/run_results.py --symbols TCS INFY
+PYTHONPATH=. .venv/bin/python scripts/run_results.py --no-fetch       # report from what's on file
+PYTHONPATH=. .venv/bin/python research/run_results_backtest.py         # does the verdict predict drift?
 ```
 
 The dashboard's **Quarterly results** page shows the same, with a filter by why each
 stock is followed, one stock's last eight quarters, and who reports next.
-**Check for new results** (on the page and on Data and jobs) runs `run_results.py`.
+**Check for new results** (on the page and on Data and jobs) runs `scripts/run_results.py`.
 The Holdings, Momentum and Swing tables get a **Results** column:
 `Q2 strong · 16 Oct` once this quarter is filed, `reports 21 Oct` before.
 
@@ -137,9 +137,9 @@ and the `.gitignore` keeps holdings out of the repo.
 ## Does the verdict predict anything?
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_results_backtest.py               # fetch + report
-PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only
-PYTHONPATH=. .venv/bin/python run_results_backtest.py --report-only --universe pit   # survivorship-free
+PYTHONPATH=. .venv/bin/python research/run_results_backtest.py               # fetch + report
+PYTHONPATH=. .venv/bin/python research/run_results_backtest.py --report-only
+PYTHONPATH=. .venv/bin/python research/run_results_backtest.py --report-only --universe pit   # survivorship-free
 ```
 
 Every Nifty 200 filing for 24 quarters is scored as it would have been on
@@ -167,7 +167,7 @@ is today's Nifty 200 -- survivors -- which is why only the spreads are read.)
 **Re-tested 2026-10-18 on a survivorship-free universe:** each quarter's
 filings come from the 200 largest NSE companies at that quarter end, by
 market cap from the full-market bhavcopy, delisted and merged ones included
-(`run_pit_universe.py`; see [GARP & QARP](picker.md#does-it-work) for how
+(`research/run_pit_universe.py`; see [GARP & QARP](picker.md#does-it-work) for how
 it is built and its limits). 3,553 filings, 334 stocks, 27 quarters (Mar
 2020 to Sep 2026); 753 of the filings are from companies not in today's
 Nifty 200.
@@ -224,8 +224,8 @@ it survives costs is the next section.
 ## Does the drift survive costs as a rule?
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_drift_backtest.py               # 500 random draws, ~5 min
-PYTHONPATH=. .venv/bin/python run_drift_backtest.py --ohlc-only   # drop close-only filings
+PYTHONPATH=. .venv/bin/python research/run_drift_backtest.py               # 500 random draws, ~5 min
+PYTHONPATH=. .venv/bin/python research/run_drift_backtest.py --ohlc-only   # drop close-only filings
 ```
 
 **Tested 2026-10-18 on the survivorship-free events above. It does not

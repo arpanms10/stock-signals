@@ -10,15 +10,15 @@ One command answers the four questions in the order they matter -- what the
 market is doing, what needs attention in your book, what to own, what to change:
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_guide.py --universe nifty200 \
+PYTHONPATH=. .venv/bin/python scripts/run_guide.py --universe nifty200 \
     --capital 1000000 --total-capital 3000000 --rebalance
 ```
 
 ## Cross-sectional momentum (the strategy change)
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_momentum.py --universe nifty200 --shuffle 5
-PYTHONPATH=. .venv/bin/python run_momentum.py --universe nifty200 \
+PYTHONPATH=. .venv/bin/python scripts/run_momentum.py --universe nifty200 --shuffle 5
+PYTHONPATH=. .venv/bin/python scripts/run_momentum.py --universe nifty200 \
     --exclude-universe nifty50            # out-of-sample run
 ```
 
@@ -43,8 +43,8 @@ fewer stocks in RISK-OFF was tested and dropped.
 ## Fundamentals: NSE primary, Yahoo for the gaps
 
 ```bash
-PYTHONPATH=. .venv/bin/python fetch_fundamentals.py            # all symbols
-PYTHONPATH=. .venv/bin/python fetch_fundamentals.py --yahoo-only  # fast, no pledge
+PYTHONPATH=. .venv/bin/python scripts/fetch_fundamentals.py            # all symbols
+PYTHONPATH=. .venv/bin/python scripts/fetch_fundamentals.py --yahoo-only  # fast, no pledge
 ```
 
 jugaad-data does **not** cover fundamentals -- prices, bhavcopy, indices and
