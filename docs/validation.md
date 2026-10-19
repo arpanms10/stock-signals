@@ -125,6 +125,52 @@ found after looking. Nothing ranks on the reaction. Full write-up in
 [quarterly results](results.md#does-the-drift-survive-costs-as-a-rule).
 
 
+## 52-week high and low volatility (2026-10-19)
+
+`run_factor_backtest.py`. Two factors with strong published evidence, run
+through the momentum engine: the point-in-time top 200 by liquidity, rebuilt
+monthly, delisted names included, 15 names equal-weighted, costs included. No
+200-DMA gate. The pass rule is in the script's docstring and was committed
+(b1a0db2) before the first run.
+
+Train, 2018-07 to 2022-12:
+
+| | CAGR | Sharpe | Max drawdown | Turnover / rebalance | Cost drag / yr |
+|---|---|---|---|---|---|
+| 52-week high | 12.6% | 0.68 | −36.2% | 108% | 2.1% |
+| Low volatility | 10.3% | 0.70 | −25.3% | 13% | 0.3% |
+| Momentum (as configured) | 25.7% | 1.09 | −36.9% | 51% | 1.4% |
+| NIFTY 500 | 12.5% | 0.72 | −38.3% | | |
+| Random picks, 5 seeds | 4.7% (sd 5.0) | | | | |
+
+**Neither passed.**
+
+- **52-week high** beat random picks by 7.9 points, but beat the index by
+  only 0.2. The rule needed +2.0 points over the index after costs. Most of
+  its gain over random picks is just being in rising stocks, which momentum
+  already does twice as well.
+- **Low volatility** did what the theory says about risk: its drawdown was
+  13 points shallower than the index's. But it didn't pay for it. Its Sharpe
+  was slightly below the index (0.70 against the 0.92 needed) and CAGR 2.2
+  points lower. In this sample a Nifty 500 fund gives a similar ride for
+  less effort.
+
+The 2023– holdout was **not run**, so it is still unseen for both factors.
+
+Two observations that are not part of the rule:
+
+- **Ties churn the 52-week-high ranking.** In a rising market many stocks
+  sit at exactly 1.00 (a new high), so their order is arbitrary. That's why
+  turnover reached 108% a rebalance against momentum's 51%. A
+  tie-broken variant would be a new hypothesis and needs its own test.
+- **The 201–500 liquidity ranks** (2018–2026, holdout years included, printed
+  as a robustness read) were far stronger: 52-week high made 27.9% a year after
+  6.9% cost drag, and momentum 34.1%. Those numbers have now been seen,
+  so that universe is no longer a clean test for either idea.
+
+Verdict: no new page. Momentum remains the only ranking in this framework that
+has beaten the index after costs on a survivorship-free universe.
+
 ## Momentum on a continuous price history (2026-10-11)
 
 > **Supersedes every momentum figure below this section.** Those were run on

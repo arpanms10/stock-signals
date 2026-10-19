@@ -44,6 +44,7 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_advisor.py` | Verdicts on your book, as text |
 | `run_momentum.py` | Rank the universe |
 | `run_pit_momentum.py` | Survivorship-free backtest |
+| `run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
 | `run_weekly.py` | Refresh everything, then report |
 | `install_schedule.py` | Install / check / remove the scheduled jobs (weekly, `--swing-daily`, `--fno-intraday`) |
 | `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
