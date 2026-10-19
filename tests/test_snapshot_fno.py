@@ -53,8 +53,8 @@ def test_keep_awake_until_close():
 
 
 def test_awake_agent_runs_weekday_mornings():
-    import install_schedule as i
-    p = i.build_fno_awake()
+    import jobs
+    p = jobs.awake_plist()
     assert p["StartCalendarInterval"] == [{"Weekday": d, "Hour": 9, "Minute": 20}
                                          for d in range(1, 6)]
 

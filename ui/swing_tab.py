@@ -94,7 +94,7 @@ def _forward() -> None:
     if not record_swing.HISTORY.exists():
         st.caption("Nothing recorded yet. Use **Save top 10 to Excel** after a "
                    "scan, or install the daily job "
-                   "(`install_schedule.py --swing-daily`).")
+                   "(`install_schedule.py --install daily`).")
         return
     try:
         p = pd.read_excel(record_swing.HISTORY, sheet_name="Picks")
