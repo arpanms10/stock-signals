@@ -390,18 +390,39 @@ def remove(name: str) -> bool:
     return False
 
 
-def installed(name: str) -> bool:
+def _job_root(name: str) -> Path | None:
+    """The project folder an installed job runs in, or None if not installed."""
     osn = os_name()
     if osn == "macos":
-        return ((LAUNCH_AGENTS / f"{label(name)}.plist").exists()
-                or name in legacy_plists())
+        for p in (LAUNCH_AGENTS / f"{label(name)}.plist", legacy_plists().get(name)):
+            if p is not None and p.exists():
+                try:
+                    return Path(plistlib.loads(p.read_bytes()).get("WorkingDirectory", ""))
+                except Exception:
+                    return Path("?")
+        return None
     if osn == "linux":
-        return f"{CRON_MARK}{name}" in _crontab_read()
+        for line in _crontab_read().splitlines():
+            if line.rstrip().endswith(f"{CRON_MARK}{name}") and " cd " in line:
+                return Path(line.split(" cd ", 1)[1].split(" && ", 1)[0].strip("'"))
+        return None
     if osn == "windows":
         r = subprocess.run(["schtasks", "/Query", "/TN", _task_name(name)],
                            capture_output=True, text=True)
-        return r.returncode == 0
-    return False
+        return ROOT if r.returncode == 0 else None
+    return None
+
+
+def installed(name: str, root: Path = ROOT) -> bool:
+    """Installed for this copy of the project."""
+    r = _job_root(name)
+    return r is not None and r.resolve() == root.resolve()
+
+
+def installed_elsewhere(name: str, root: Path = ROOT) -> Path | None:
+    """The other folder a job with this name runs in, if any."""
+    r = _job_root(name)
+    return r if r is not None and r.resolve() != root.resolve() else None
 
 
 def manual_instructions(job: Job, root: Path = ROOT) -> str:

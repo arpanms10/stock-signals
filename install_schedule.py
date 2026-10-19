@@ -44,8 +44,10 @@ def show_list() -> None:
 def show_status() -> None:
     state = ROOT / "data" / "last_weekly_run.txt"
     for j in jobs.JOBS.values():
-        print(f"{j.name:13} {'installed' if jobs.installed(j.name) else 'not installed'}"
-              f"   ({j.when.describe()})")
+        other = jobs.installed_elsewhere(j.name, ROOT)
+        where = ("installed" if jobs.installed(j.name, ROOT) else
+                 f"runs another copy: {other}" if other else "not installed")
+        print(f"{j.name:13} {where}   ({j.when.describe()})")
     if state.exists():
         print("\nlast weekly run:\n  " + state.read_text().strip().replace("\n", "\n  "))
     print(f"\nLogs: {ROOT / 'reports'}")
@@ -86,7 +88,7 @@ def main(argv=None) -> int:
     legacy = "daily" if a.swing_daily else "fno-intraday" if a.fno_intraday else None
     if a.status:
         if legacy:
-            print(f"{legacy}: {'installed' if jobs.installed(legacy) else 'not installed'}")
+            print(f"{legacy}: {'installed' if jobs.installed(legacy, ROOT) else 'not installed'}")
         else:
             show_status()
         return 0
