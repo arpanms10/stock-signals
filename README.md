@@ -2,7 +2,7 @@
 
 **A portfolio advisor for NSE equities.** It reads Indian company filings, ranks
 a survivorship-free universe, and tells you what to do with what you already
-own — including when the honest answer is that it found nothing.
+own.
 
 > **New here? → [Getting started](GETTING_STARTED.md)**: install, set up and
 > open the dashboard in plain steps, no coding needed. Unfamiliar words are in
@@ -47,7 +47,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended 
 | `scripts/run_advisor.py` | Verdicts on your book, as text |
 | `scripts/run_momentum.py` | Rank the universe |
 | `research/run_pit_momentum.py` | Survivorship-free backtest |
-| `research/run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
+| `research/run_factor_backtest.py` | 52-week high and low volatility factors on the same backtest engine |
 | `scripts/run_weekly.py` | Refresh everything, then report |
 | `scripts/install_schedule.py` | Scheduled jobs on macOS, Linux or Windows: `--list`, `--status`, `--install`, `--remove` |
 | `scripts/import_kite_holdings.py` | Broker holdings download → `config/holdings.xlsx` (or `.csv`) |
@@ -109,12 +109,10 @@ either lookback, with ranks, scores, the price on the day and the NIFTY 500
 level -- to `history/momentum_picks.xlsx`, one tab per month named like
 `Oct 2026`. Each new month is a new tab at the end. It records once per month
 (the first run of the month is kept; `--force` replaces that tab), and the
-Saturday job runs it. Started October 2026.
+Saturday job runs it.
 
-The point is to measure later how the picks actually did against the backtest,
-from the prices on the day they were suggested -- recomputing old months with
-today's code would measure today's code instead. The file is meant for git;
-what you held is deliberately not in it.
+This lets you check later how the picks did from the prices on the day they
+were suggested. What you hold is not in the file.
 
 ## Swing trading
 
@@ -131,14 +129,11 @@ sized so a stop-out loses 0.75% of capital.
    it is not suggested. Pick a stock under the list for its trade plan.
 3. **Save top 10 to Excel** (next to Scan, greyed out until a scan has
    picks) records the scan -- see below.
-4. **Methodology** and **Backtest** sub-tabs explain the rules and show how
-   they have done.
+4. **Methodology** and **Backtest** sub-tabs explain the rules and let you
+   test them on past prices.
 
-**Read the backtest before using the list.** From 2018 to 2026 the setups
-beat plain uptrend stocks by only about 0.04R a trade, and the score did not
-pick better trades than random order -- nor did any alternative ranking
-tested on a train / holdout split. The list is setups to review, not a
-ranking to trust. Details in [swing trading](docs/swing.md).
+Treat the list as setups to review, not a ranking to follow blindly. Details
+in [swing trading](docs/swing.md).
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/run_swing.py                       # top 10, Nifty 200
@@ -161,8 +156,8 @@ date the company reports.
 
 The verdict compares a company with **its own trend, not analyst estimates**,
 which no free source carries. It feeds no ranking.
-`research/run_results_backtest.py` tests whether it predicts anything once the
-reaction is known; the tab's backtest section shows the answer. Details in
+`research/run_results_backtest.py` tests the verdict against later price
+moves. Details in
 [quarterly results](docs/results.md).
 
 ```bash
@@ -173,13 +168,6 @@ PYTHONPATH=. .venv/bin/python research/run_results_backtest.py         # does th
 
 The swing daily job runs `scripts/run_results.py` after its price refresh.
 
-**What the backtest found** (3,226 filings, 2021-26): strong cards beat the
-index by 2% on the reaction day, so the scorecard measures what the market
-cares about -- but once that reaction is known, the verdict adds little
-(t = 1.6 at 60 sessions). The reaction itself keeps going: stocks that
-rallied on their results beat those that sold off by 3.6% over the next 60
-sessions (t = 2.6).
-
 ## GARP & QARP picker
 
 The **GARP / QARP** page ranks the Nifty 200 two ways, on fundamentals taken
@@ -188,13 +176,8 @@ reasonable price) looks for core profit growing at least 15% a year, lastingly,
 at a PEG of 1.5 or less. **QARP** (quality at a reasonable price) looks for the
 top 40% on quality -- ROE, ROCE, cash conversion, margins and their stability,
 debt -- at a P/E that isn't near its own three-year high. The same code
-produces today's picks and every backtest rebalance.
-
-**Read the backtest first.** From 2022 to 2026, GARP beat the equal-weight
-universe by 2.3% a quarter (t = 2.0) once hindsight about index membership is
-partly stripped out, and that edge shrinks further the harder the check. QARP
-lagged by 2.6% a quarter, with milder drawdowns. Seventeen quarters is one
-market regime. Details in [GARP & QARP](docs/picker.md).
+produces today's picks and every backtest rebalance (`--backtest`). Details
+in [GARP & QARP](docs/picker.md).
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/run_picker.py --refresh     # new filings for the Nifty 200
@@ -234,19 +217,13 @@ PYTHONPATH=. .venv/bin/python scripts/run_mf.py "ppfas flexi" "hdfc flexi cap" -
 PYTHONPATH=. .venv/bin/python scripts/run_mf.py --excel                   # reports/mf/MF_Evaluation.xlsx
 ```
 
-**What to expect.** It's good at organising your book and weak at predicting
-which fund will do best. A survivorship-free backtest (531 funds since 2018)
-found past category rank barely predicts the next year. Funds marked WEAK beat
-their category median 44% of the time from 2022, and 50% in 2018-21. Funds
-marked STRONG did no better than chance.
-
-| Verdict | Worth |
+| Verdict | Meaning |
 |---|---|
-| TRIM for size, category cap or near-twin funds | Act on it: it's arithmetic on your own book, not a forecast |
-| EXIT | A prompt to compare with the alternatives it lists. The category's index fund is the low-regret switch. Mind exit load and tax first |
-| WATCH | Look again in 3-6 months; good funds have bad years |
-| ADD | No better than average at predicting the next year; sizing matters more than the pick |
-| HOLD | Usually the right answer: switching costs tax and exit load |
+| TRIM | Too large for its size or category cap, or overlaps a near-twin fund: arithmetic on your own book |
+| EXIT | Compare with the alternatives it lists; the category's index fund is a simple switch. Mind exit load and tax first |
+| WATCH | Look again in 3-6 months |
+| ADD | Room to add within your caps |
+| HOLD | No action; switching costs tax and exit load |
 
 Run it once a quarter. Debt, index and thematic funds aren't ranked, but they
 still count towards your caps. Caps and thresholds are in
@@ -300,8 +277,8 @@ PYTHONPATH=. .venv/bin/python scripts/record_swing.py --update           # rebui
 PYTHONPATH=. .venv/bin/python scripts/run_swing.py --recorded            # replay the recorded scans
 ```
 
-**Commit `history/swing/` yourself** now and then (the daily job never
-touches git). Until it is on GitHub, the record exists only on this Mac.
+Back up `history/swing/` yourself now and then (the daily job never touches
+git); otherwise the record exists only on your computer.
 
 ## Scheduled jobs
 
@@ -348,20 +325,19 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
 | [**Dashboard**](docs/dashboard.md) | Two sections, badges, the two target frames |
 | [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |
-| [**Validation**](docs/validation.md) | What the backtests found, including what failed |
+| [**Validation**](docs/validation.md) | How the backtests work and how to run them |
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes; all jobs in [Scheduled jobs](#scheduled-jobs) |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
 | [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |
-| [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the reaction, and whether the verdict predicts drift |
+| [**Quarterly results**](docs/results.md) | Scorecards from NSE filings, the price reaction, and the backtest |
 | [**Analyze**](docs/analyze.md) | Fundamental and Technical Analysts for any one stock, by ticker, name or ISIN |
-| [**Expected ranges**](docs/ranges.md) | Today's next-session and 5-session ranges for Nifty and core holdings, how often they held, the forward log |
+| [**Expected ranges**](docs/ranges.md) | Today's next-session and 5-session ranges for Nifty and core holdings, and the forward log |
 | [**Swing trading**](docs/swing.md) | Setups, trade plan, backtest, alternative rankings, the forward record |
-| [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range -- and [whether it works](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
-| [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the survivorship-free backtest (a weak edge) |
+| [**F&O analysis**](docs/f_o/README.md) | PCR, OI walls, expected range; [validation](docs/f_o/validation.md); [option rule backtest](docs/f_o/backtest.md) |
+| [**Mutual fund evaluation**](docs/mf_evaluation.md) | Any fund against its category, verdicts for your MF book, and the backtest |
 | [**Mutual funds**](docs/mutual_funds.md) | PPFAS Flexi Cap: monthly portfolio changes, read as manager decisions |
 | [**Code layout**](docs/layout.md) | Where things live |
-| [ROADMAP](docs/ROADMAP.md) | What is built, and what is still wrong with it |
 
 ## The idea in one table
 
@@ -378,52 +354,10 @@ profits on their winners. Holdings are **core** (a decade or more, never sold
 on rank) or **satellite** (one to ten years, not a trade: red flags and sizing
 apply, and falling out of the ranking only prompts a review; the default).
 Anything bought purely to trade is marked **trade** in `config/holdings.xlsx`,
-and only that rotates on rank. An old `legacy` value is read as satellite.
+and only that rotates on rank.
 
-## Results
-
-| | 9-year CAGR, avg of 4 start dates |
-|---|---|
-| Momentum rotation, 9-1 (main) | **23.0%** (20.0 - 24.4) |
-| Momentum rotation, 12-1 (alongside) | 20.2% |
-| NIFTY 500 index | 10.2% |
-| Random-pick control | 9.3% |
-| v1 signal rules *(retired)* | 1.3% |
-
-After realistic Indian costs -- STT, stamp duty, exchange fees, GST, slippage
--- but **before tax** (most gains are short-term). Momentum beat all 10
-random controls drawn from the same universe by about 15 points (4.9
-standard deviations), held up in both halves of the period, and returned
-28% on liquidity ranks 201-500, a universe none of its settings were tuned
-on. **The fall is the weak point: -36% to -42%, against the index's -38%.**
-Neither a trailing stop nor volatility targeting fixed it; both cost more
-return than they saved.
-
-*Corrected 2026-10-11:* earlier figures (11.4%, and everything before it)
-ran on raw prices that read every split, bonus and demerger in a held stock
-as a loss, and a ticker change or a spell in the trade-for-trade series as
-a forced sale. See [data](docs/data.md) and [validation](docs/validation.md).
-The live ranking was never affected.
-
-Removing survivorship bias, measured on the old history, cost 14 points of
-apparent return (30.8% → 16.9%) and dropped the random control from 17.2% to
-5.0% -- the bias measured directly.
-
-**Honest split: roughly 70% of this framework's value is monitoring and
-discipline; perhaps 30% is momentum alpha.** Two ideas that sounded good and
-failed their out-of-sample tests are recorded in
-[validation](docs/validation.md) rather than quietly dropped.
-
-## Scale
-
-```
-3.84M   daily price rows          175   tests, one per bug found
-3,638   symbols, delisted included  489   ETFs excluded, with reasons
-2,607   trading days                  0   orders it can place
-```
-
-Everything runs locally. Free public data throughout: no API key, no
-subscription, no broker credentials.
+Everything runs locally on free public data: no API key, no subscription, no
+broker credentials.
 
 ## Disclaimer and licence
 
