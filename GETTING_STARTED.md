@@ -134,7 +134,7 @@ or `.xlsx`, put the file in the `config` folder, and run:
 
 On Windows: `.venv\Scripts\python scripts\import_holdings.py`. If your
 broker's column names aren't recognised, see
-[recording what you own](README.md#recording-what-you-own) for how to adjust
+[recording what you own](docs/holdings.md) for how to adjust
 the file.
 
 **Your data stays on your computer.** These files are listed in

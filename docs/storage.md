@@ -39,7 +39,7 @@ read while a job writes.
 
 | File | Contents |
 |---|---|
-| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](../README.md#recording-what-you-own)) |
+| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](holdings.md)) |
 | `mf_holdings.xlsx` | Your mutual funds, as a percentage of your fund portfolio. No rupee amounts |
 | `watching.xlsx` | Stocks you're keeping an eye on. The app adds to it when you press *Watch* |
 
