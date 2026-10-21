@@ -11,6 +11,9 @@ config/holdings.csv.bak
 config/*.xlsx
 config/*.xls
 config/holdings*.csv
+# The watch list: what you are watching is yours too (config/*.xlsx above
+# already covers watching.xlsx).
+config/watching.csv
 !config/holdings.example.csv
 # Your MF book as percentages (run_mf.py).
 config/mf_holdings.csv
@@ -88,4 +91,6 @@ config/mf_calibration.json
 # --- Local tool files --------------------------------------------------
 # Claude Code session files: preview server config, PR description drafts,
 # worktree bookkeeping. Machine-local, never part of the project.
-.claude/
+.claude/*
+# ...except the project skills, which are part of the project (/setup).
+!.claude/skills/

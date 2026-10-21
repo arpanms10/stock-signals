@@ -27,8 +27,30 @@ def universe_size() -> int:
 
 
 def snapshot():
-    """The full stock picture for the current universe size (slow; cached)."""
-    return _load(universe_size())
+    """The full stock picture for the current universe size (slow; cached).
+
+    On a new install with no market data yet there is no picture to build:
+    the page says so, points at the downloads, and stops -- instead of
+    showing a traceback to someone who has just installed the app."""
+    from data.bhavcopy import InstrumentMapMissing
+    try:
+        return _load(universe_size())
+    except InstrumentMapMissing:
+        no_market_data()
+        st.stop()
+
+
+def no_market_data() -> None:
+    with st.container(border=True):
+        st.markdown("#### The market data isn't loaded yet")
+        st.markdown(
+            "This page ranks the whole NSE market, so it needs the full-market "
+            "history first. Download it once -- about 15-25 minutes for the last "
+            "two years, an hour or more for ten:\n\n"
+            "```\npython3 setup_project.py --data market-recent\n```\n\n"
+            "or press **Update full-market data** on the *Data and jobs* page (the "
+            "data chip at the top right). Mutual funds, Compare funds and Analyze "
+            "a stock work without it.")
 
 
 def clear() -> None:

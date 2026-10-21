@@ -19,7 +19,7 @@ import datetime as dt
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-WATCHING_PATH = Path(__file__).parent / "config" / "watching.csv"
+WATCHING_PATH = Path(__file__).parent / "config" / "watching.csv"   # or .xlsx (userfiles.py)
 
 COLUMNS = ["symbol", "added_on", "baseline_date", "baseline_price",
            "stop", "t1", "t2", "stopped_on", "t1_hit_on", "t2_hit_on",
@@ -63,12 +63,17 @@ class Watched:
     stopped_on: str = ""
 
 
-def load(path: Path | str = WATCHING_PATH) -> list[Watched]:
-    path = Path(path)
-    if not path.exists():
-        return []
-    with path.open(encoding="utf-8-sig") as fh:
-        rows = list(csv.DictReader(l for l in fh if not l.lstrip().startswith("#")))
+def _path(path) -> Path:
+    """config/watching.xlsx if you keep a workbook, else watching.csv."""
+    if path:
+        return Path(path)
+    import userfiles as uf
+    return uf.path_for("watching")
+
+
+def load(path: Path | str | None = None) -> list[Watched]:
+    import userfiles as uf
+    _, rows = uf.read(_path(path))
     out = []
     for r in rows:
         sym = (r.get("symbol") or "").strip().upper()
@@ -95,8 +100,13 @@ def load(path: Path | str = WATCHING_PATH) -> list[Watched]:
     return out
 
 
-def save(rows: list[Watched], path: Path | str = WATCHING_PATH) -> None:
-    path = Path(path)
+def save(rows: list[Watched], path: Path | str | None = None) -> None:
+    path = _path(path)
+    if path.suffix.lower() == ".xlsx":
+        import userfiles as uf
+        uf.write(path, uf.WATCHING, [asdict(r) for r in sorted(rows, key=lambda x: x.symbol)],
+                 COLUMNS)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as fh:
         fh.write(HELP)
@@ -106,7 +116,7 @@ def save(rows: list[Watched], path: Path | str = WATCHING_PATH) -> None:
             w.writerow(asdict(r))
 
 
-def symbols(path: Path | str = WATCHING_PATH) -> list[str]:
+def symbols(path: Path | str | None = None) -> list[str]:
     return [w.symbol for w in load(path)]
 
 
@@ -155,7 +165,7 @@ def add(symbol: str, source: str = "manual", conviction: str = "watch",
         targets: tuple[float, float] | None = None,
         stop: float | None = None,
         use_log: bool = True,
-        path: Path | str = WATCHING_PATH) -> tuple[bool, str]:
+        path: Path | str | None = None) -> tuple[bool, str]:
     """Start watching a symbol, inheriting its baseline from the log if known.
 
     The decision log records momentum calls. A swing pick is a different call,
@@ -192,7 +202,7 @@ def add(symbol: str, source: str = "manual", conviction: str = "watch",
     return True, f"{symbol} added. {note}"
 
 
-def remove(symbol: str, path: Path | str = WATCHING_PATH) -> tuple[bool, str]:
+def remove(symbol: str, path: Path | str | None = None) -> tuple[bool, str]:
     symbol = symbol.strip().upper()
     rows = load(path)
     kept = [r for r in rows if r.symbol != symbol]
@@ -203,7 +213,7 @@ def remove(symbol: str, path: Path | str = WATCHING_PATH) -> tuple[bool, str]:
 
 
 def fill_missing_baselines(prices: dict[str, float],
-                           path: Path | str = WATCHING_PATH) -> int:
+                           path: Path | str | None = None) -> int:
     """Give any entry without a baseline today's price, once."""
     rows = load(path)
     n = 0
@@ -217,7 +227,7 @@ def fill_missing_baselines(prices: dict[str, float],
     return n
 
 
-def fill_missing_plans(path: Path | str = WATCHING_PATH) -> int:
+def fill_missing_plans(path: Path | str | None = None) -> int:
     """Give any entry with a baseline but no stop (or no targets) one, once.
 
     An entry that already has targets gets the stop those targets were
@@ -267,7 +277,7 @@ def _walk(r: Watched, bars) -> tuple[str, str, str]:
     return stopped, t1d, t2d
 
 
-def check_outcomes(bars: dict, path: Path | str = WATCHING_PATH) -> list[str]:
+def check_outcomes(bars: dict, path: Path | str | None = None) -> list[str]:
     """Record stops and targets reached since each entry's baseline.
 
     `bars` maps symbol -> rows of (iso date, high, low) in date order, or a
@@ -294,7 +304,7 @@ def check_outcomes(bars: dict, path: Path | str = WATCHING_PATH) -> list[str]:
     return news
 
 
-def update_from_store(con=None, path: Path | str = WATCHING_PATH) -> list[str]:
+def update_from_store(con=None, path: Path | str | None = None) -> list[str]:
     """Fill missing stops, then check every entry against the prices on file.
 
     Run after each price refresh (run_swing_daily.py), on every dashboard
@@ -311,7 +321,7 @@ def update_from_store(con=None, path: Path | str = WATCHING_PATH) -> list[str]:
     return check_outcomes(bars, path)
 
 
-def report(prices: dict[str, float], path: Path | str = WATCHING_PATH) -> list[dict]:
+def report(prices: dict[str, float], path: Path | str | None = None) -> list[dict]:
     """Each watched name against the price it was flagged at."""
     out = []
     today = dt.date.today()

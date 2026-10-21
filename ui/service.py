@@ -130,7 +130,9 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
 
     bench = store.load_index(con, cfg["signals"]["regime_index"])
     detail = rm.regime_note(bench, cfg)
-    regime = "RISK-ON" if "RISK-ON" in detail else "RISK-OFF"
+    # No index history yet (a new install) is "unknown", not risk-off.
+    regime = ("RISK-ON" if "RISK-ON" in detail else
+              "RISK-OFF" if "RISK-OFF" in detail else "Unknown")
 
     # ---------------------------------------------------------- holdings
     prices, values, tradeable, uncovered = {}, {}, {}, []

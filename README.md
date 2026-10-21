@@ -4,8 +4,9 @@
 a survivorship-free universe, and tells you what to do with what you already
 own — including when the honest answer is that it found nothing.
 
-> **[→ Feature overview](https://claude.ai/code/artifact/3e4ddd96-ba4b-4d97-9220-34ef68255dc0)** —
-> a visual walkthrough. *(Private link.)*
+> **New here? → [Getting started](GETTING_STARTED.md)**: install, set up and
+> open the dashboard in plain steps, no coding needed. Unfamiliar words are in
+> the [glossary](docs/glossary.md).
 
 **Read-only with respect to your broker.** It never places, modifies or cancels
 an order — GTT included. It computes and explains; you decide and click.
@@ -16,29 +17,31 @@ Decision support, not investment advice.
 ## Quick start
 
 ```bash
-uv venv && uv pip install -r requirements.txt
-
-PYTHONPATH=. .venv/bin/python import_kite_holdings.py   # Kite .csv/.xlsx dropped in config/
-
-PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10   # ~70 min, once
-PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty500 --years 10
-PYTHONPATH=. .venv/bin/python fetch_fundamentals.py
-
-PYTHONPATH=. .venv/bin/python run_ui.py                            # dashboard on :8501
+python3 setup_project.py            # guided: environment, databases, your files, data, jobs
+.venv/bin/python run_ui.py          # dashboard on http://localhost:8501
 ```
 
-Optional — jobs that run on this machine by themselves (details, checking and
-removing them in [Scheduled jobs](#scheduled-jobs)):
+The setup asks before each step, creates `.venv` itself, never overwrites a
+file you already have, and can be re-run to resume a download.
+`python3 setup_project.py --check` reports what is set up, missing or stale.
+On Windows use `py setup_project.py` and `.venv\Scripts\python run_ui.py`.
+[Getting started](GETTING_STARTED.md) walks through it.
+
+By hand, if you prefer:
 
 ```bash
-PYTHONPATH=. .venv/bin/python install_schedule.py --day saturday --portfolio 2000000   # weekly report
-PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                        # swing record, weekdays 19:30
+uv venv && uv pip install -r requirements.txt
+PYTHONPATH=. .venv/bin/python run_market_ingest.py --years 10      # ~70 min, once
+PYTHONPATH=. .venv/bin/python run_backfill.py --universe nifty500 --years 10
+PYTHONPATH=. .venv/bin/python fetch_fundamentals.py
+PYTHONPATH=. .venv/bin/python install_schedule.py --install recommended   # optional
 ```
 
 ## Commands
 
 | | |
 |---|---|
+| `setup_project.py` | Guided setup on a new computer; `--check` for status ([getting started](GETTING_STARTED.md)) |
 | `run_ui.py` | Dashboard, localhost only: Today, Portfolio, Ideas, Market and Research menus ([dashboard](docs/dashboard.md)) |
 | `record_ranges.py` / `run_range_backtest.py` | Today's expected ranges: forward log and calibration ([ranges](docs/ranges.md)) |
 | `run_advisor.py` | Verdicts on your book, as text |
@@ -46,8 +49,8 @@ PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily                 
 | `run_pit_momentum.py` | Survivorship-free backtest |
 | `run_factor_backtest.py` | 52-week high and low volatility on the same engine, pre-registered rule; neither passed ([validation](docs/validation.md)) |
 | `run_weekly.py` | Refresh everything, then report |
-| `install_schedule.py` | Install / check / remove the scheduled jobs (weekly, `--swing-daily`, `--fno-intraday`) |
-| `import_kite_holdings.py` | Kite holdings download → `config/holdings.csv` |
+| `install_schedule.py` | Scheduled jobs on macOS, Linux or Windows: `--list`, `--status`, `--install`, `--remove` |
+| `import_kite_holdings.py` | Broker holdings download → `config/holdings.xlsx` (or `.csv`) |
 | `set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
 | `record_momentum.py` | Save this month's momentum picks to `history/` |
 | `run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
@@ -80,14 +83,14 @@ PYTHONPATH=. .venv/bin/python import_kite_holdings.py --trade CPPLUS SANSERA
 
 - Quantities and average prices come from Kite; your `bucket`, `notes` and
   `purchase_date` are kept for every stock you still hold. The old file is
-  backed up to `config/holdings.csv.bak`.
+  backed up to `config/holdings.xlsx.bak` (or `.csv.bak`).
 - **A new holding imported without `--trade` has a blank bucket, and blank is
   not trade** -- the framework only ever suggests core or satellite. The
   importer lists new holdings and reminds you.
 - `--trade` overrides any existing bucket, and warns about any symbol that
   is not in the Kite file.
 - Optionally add `purchase_date` (YYYY-MM-DD) to the new rows in
-  `config/holdings.csv`: Kite does not export it, and the trailing stop is
+  `config/holdings.xlsx`: Kite does not export it, and the trailing stop is
   measured from it. It is kept on later imports.
 - A stock has one bucket. Buying more of a core holding keeps the whole
   position core.
@@ -202,9 +205,10 @@ SEBI category and gives **EXIT / TRIM / ADD / WATCH / HOLD**, with reasons.
 It uses month-end NAVs of Direct Growth plans from AMFI's free files, and
 funds that later closed or merged are included.
 
-**Your book, no amounts.** Put `config/mf_holdings.csv` **or**
-`config/mf_holdings.xlsx` in config/; both are git-ignored, so keep only one.
-List each fund and its share of your whole MF portfolio, summing to 100:
+**Your book, no amounts.** Fill in `config/mf_holdings.xlsx`, which
+`setup_project.py` creates with a *How to fill* sheet (a `.csv` with the same
+columns also works; keep only one). Both are git-ignored. List each fund and
+its share of your whole MF portfolio, summing to 100:
 
 | fund | pct | held_over_1y |
 |---|---|---|
@@ -297,52 +301,46 @@ touches git). Until it is on GitHub, the record exists only on this Mac.
 
 ## Scheduled jobs
 
-Jobs are macOS launchd agents in `~/Library/LaunchAgents`. Install them
-yourself -- each changes what this machine does on its own. None of them
-touches git or your broker.
+Five jobs, defined once in `jobs.py` and installed with each system's own
+scheduler: launchd on macOS, cron on Linux, Task Scheduler on Windows. Install
+them yourself, or let `setup_project.py` ask. Each changes what the computer
+does on its own; none touches git or your broker.
 
-| Job | When | Runs | Install | Check | Remove |
-|---|---|---|---|---|---|
-| Weekly report | Saturday 09:30 | `run_weekly.py`: refresh everything, advisor report, momentum and F&O records | `install_schedule.py --day saturday` | `install_schedule.py --status` | `install_schedule.py --remove` |
-| **Swing daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up Nifty 500 prices, record the Nifty 200 and 500 scans, rebuild `swing_picks.xlsx`, date any stop or target reached in `config/watching.csv`, score new quarterly results, record Today's ranges | `install_schedule.py --swing-daily` | `install_schedule.py --swing-daily --status` | `install_schedule.py --swing-daily --remove` |
-| F&O intraday | Weekdays 09:30-15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent | `install_schedule.py --fno-intraday` | `install_schedule.py --fno-intraday --status` | `install_schedule.py --fno-intraday --remove` |
-
-All commands run as `PYTHONPATH=. .venv/bin/python install_schedule.py ...`.
-
-**Swing daily job, in detail:**
-
-- **Time:** 19:30 on weekdays, after NSE's end-of-day files are out. Change
-  it with `--hour` / `--minute`, e.g. `--swing-daily --hour 20 --minute 15`
-  (re-running the install replaces the old schedule).
-- **Asleep or off:** launchd runs a missed job when the Mac next wakes. That
-  is harmless whenever it lands: the job records the latest price date once.
-- **Holidays and repeats:** no new price date means nothing new is written.
-  Weekends are skipped outright.
-- **Which universes:** `swing.record_universes` in `config/scoring.yaml`
-  (default Nifty 200 and Nifty 500).
-- **Logs:** `reports/swing_daily.log` (each step's output, appended per run),
-  plus `reports/swing_daily.out.log` / `.err.log` from launchd. A failure also
-  raises a macOS notification.
-- **Run it by hand:** `PYTHONPATH=. .venv/bin/python run_swing_daily.py`
-  (`--skip-refresh` to record on the prices already on file).
-
-**Removing the swing job:**
+| Job | When | Runs | Feeds |
+|---|---|---|---|
+| **daily** | Weekdays 19:30 | `run_swing_daily.py`: catch up prices, record the swing scans and Today's ranges, date stops and targets in the watch list, score new results | Today, Stocks, Swing, Quarterly results |
+| **weekly** | Saturday 09:30 | `run_weekly.py`: full-market history, fundamentals, F&O history and validation, momentum and F&O records, range calibration, a report in `reports/` | Market, Momentum, Analyze, F&O, Today |
+| **monthly** | 5th, 10:00 | `run_mf.py --refresh`: month-end fund NAVs | Mutual funds, Compare funds |
+| **quarterly** | 15 Feb/May/Aug/Nov, 10:00 | `run_picker.py --refresh`: Nifty 200 filings | GARP / QARP |
+| fno-intraday *(optional)* | Weekdays 09:30–15:30, half-hourly | `snapshot_fno.py`, plus a keep-awake agent on macOS | F&O |
 
 ```bash
-PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily --remove
-PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily --status   # "not installed"
+PYTHONPATH=. .venv/bin/python install_schedule.py --list                    # what each does
+PYTHONPATH=. .venv/bin/python install_schedule.py --install recommended     # daily, weekly, monthly, quarterly
+PYTHONPATH=. .venv/bin/python install_schedule.py --status
+PYTHONPATH=. .venv/bin/python install_schedule.py --remove daily            # or: --remove all
 ```
 
-This unloads the agent and deletes
-`~/Library/LaunchAgents/com.arpanmuk.stock-signals.swing-daily.plist`.
-Nothing else is removed: the record in `history/swing/`, the workbook and the
-logs stay. Delete those by hand only if you want the history gone too -- it
-cannot be rebuilt.
+- **Missed runs.** macOS and Windows run a job missed while the computer was
+  off or asleep when it wakes. Linux cron skips it, and the next run catches
+  up. Every job fetches only what is missing, so a late or repeated run is
+  harmless.
+- **Logs.** Each job writes `reports/<job>.log`. The weekly job also writes a
+  dated report, and a failure raises a notification on macOS.
+- **Options.** `--portfolio 2000000` gives the weekly report your total
+  capital. `swing.record_universes` in `config/scoring.yaml` picks the
+  universes the daily job records.
+- **Removing a job** leaves its records (`history/`), workbooks and logs in
+  place. Delete those by hand only if you want the history gone; it can't be
+  rebuilt.
 
 ## Documentation
 
 | | |
 |---|---|
+| [**Getting started**](GETTING_STARTED.md) | Install, set up and open the dashboard, in plain steps |
+| [**Glossary**](docs/glossary.md) | Every term the dashboard uses, in plain language |
+| [**Troubleshooting**](docs/troubleshooting.md) | NSE not answering, stale data, jobs, errors |
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
 | [**Dashboard**](docs/dashboard.md) | Two sections, badges, the two target frames |
 | [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |
@@ -375,7 +373,7 @@ Conflating trim and exit is how people average down into failures and take
 profits on their winners. Holdings are **core** (a decade or more, never sold
 on rank) or **satellite** (one to ten years, not a trade: red flags and sizing
 apply, and falling out of the ranking only prompts a review; the default).
-Anything bought purely to trade is marked **trade** in `config/holdings.csv`,
+Anything bought purely to trade is marked **trade** in `config/holdings.xlsx`,
 and only that rotates on rank. An old `legacy` value is read as satellite.
 
 ## Results
@@ -422,3 +420,13 @@ failed their out-of-sample tests are recorded in
 
 Everything runs locally. Free public data throughout: no API key, no
 subscription, no broker credentials.
+
+## Disclaimer and licence
+
+Decision support, not investment advice. Nothing here is a recommendation to
+buy or sell any security. The author is not a SEBI-registered investment
+adviser. Backtests describe the past; they don't promise the future. Check
+anything you act on, and decide for yourself.
+
+[MIT licence](LICENSE): use, change and share it freely, keeping the copyright
+notice.

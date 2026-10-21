@@ -25,7 +25,7 @@ PYTHONPATH=. .venv/bin/python run_swing_daily.py               # refresh + recor
 PYTHONPATH=. .venv/bin/python record_swing.py                  # record one scan now
 PYTHONPATH=. .venv/bin/python record_swing.py --update         # rebuild the workbook only
 PYTHONPATH=. .venv/bin/python run_swing.py --recorded          # replay the recorded scans
-PYTHONPATH=. .venv/bin/python install_schedule.py --swing-daily   # weekdays 19:30
+PYTHONPATH=. .venv/bin/python install_schedule.py --install daily   # weekdays 19:30
 ```
 
 What the tab suggested on a day can't be rebuilt later, because the code,
@@ -55,7 +55,7 @@ and a Summary sheet. Edits made in Excel are overwritten. The Swing tab's
 the workbook. The Backtest view shows the forward record above the
 historical backtest.
 
-**Keeping it gap-free.** `install_schedule.py --swing-daily` runs
+**Keeping it gap-free.** `install_schedule.py --install daily` runs
 `run_swing_daily.py` every weekday at 19:30. It catches Nifty 500 prices up
 and records each universe. A missed run (Mac asleep) fires on wake, and a
 holiday or second run writes nothing new. The job never touches git: commit
