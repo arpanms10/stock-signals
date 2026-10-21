@@ -78,8 +78,10 @@ the rest. Full flags in [operations](docs/operations.md).
 
 The app reads your stock holdings from `config/holdings.xlsx` (or
 `config/holdings.csv`; keep only one). `setup_project.py` creates the workbook
-with a *How to fill* sheet. Every broker's holdings download looks a little
-different, so bring yours into this shape:
+with a *How to fill* sheet. It stays on your computer and is never committed
+to git; [data storage](docs/storage.md) lists every file the app keeps and
+what to back up. Every broker's holdings download looks a little different,
+so bring yours into this shape:
 
 | Column | Required | What goes in it |
 |---|---|---|
