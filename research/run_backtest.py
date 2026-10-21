@@ -7,7 +7,7 @@ import argparse
 from book import watchlist as wl
 from backtest import engine as bt
 from backtest.costs import CostModel
-from data import quality, store
+from data import store
 from scoring import pipeline, timing
 
 
@@ -74,13 +74,8 @@ def main() -> None:
     symbols = [x.upper() for x in args.symbols] if args.symbols else wl.all_symbols()
     bench = store.load_index(con, cfg["signals"]["regime_index"])
 
-    cuts = quality.report(con, symbols)
-
     frames = {}
-    for s in symbols:
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if f.empty:
-            continue
+    for s, f in pipeline.scored_frames(con, symbols, cfg).items():
         if args.start:
             f = f[f["date"] >= __import__("datetime").date.fromisoformat(args.start)]
         if args.end:

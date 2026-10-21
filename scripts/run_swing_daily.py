@@ -33,7 +33,7 @@ import argparse
 import datetime as dt
 import sys
 
-from scripts.run_weekly import ROOT, REPORTS, notify, step
+from scripts.run_weekly import REPORTS, notify, step
 
 
 def main(argv=None) -> int:

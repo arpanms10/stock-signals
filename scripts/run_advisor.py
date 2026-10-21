@@ -8,7 +8,6 @@ import sys as _sys; from pathlib import Path as _P; _sys.path.insert(0, str(_P(_
 import argparse
 import datetime as dt
 
-import numpy as np
 import pandas as pd
 
 from book import decision_log as dlog
@@ -17,7 +16,6 @@ from data import instruments as ins
 from book import portfolio as pf
 from data import bhavcopy as bc
 from data import freshness as fr
-from data import quality as dq
 from data import store
 from data.sources import universe as uni
 from scoring import pipeline, timing
@@ -70,12 +68,8 @@ def main() -> None:
     equities = bc.require_equity_symbols(mkt)
     excluded |= {h for h in holdings if h in bc.non_equity_symbols(mkt)}
     pool = bc.universe_on(mkt, today, top_n=args.universe_size)
-    frames, cuts = {}, dq.report(con, sorted(set(pool) | set(holdings)))
-    for s in set(pool) | set(holdings):
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if not f.empty:
-            frames[s] = f
-    panel = mom.build_panel(frames, cfg)
+    frames = pipeline.scored_frames(con, sorted(set(pool) | set(holdings)), cfg)
+    panel = mom.build_panel(frames, cfg, last_only=True)
     ranked = pd.DataFrame()
     if not panel.empty:
         ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities)
@@ -145,13 +139,6 @@ def main() -> None:
     print("\n  Set `bucket` in config/holdings.csv to override any of these.")
 
     # ------------------------------------------------------------ advice
-    sector_value: dict[str, float] = {}
-    for s, v in values.items():
-        sector_value[sectors.get(s, "Unknown")] = \
-            sector_value.get(sectors.get(s, "Unknown"), 0.0) + v
-    over_cap = {sec for sec, v in sector_value.items()
-                if book and 100 * v / book > cfg["risk"]["max_sector_pct"]}
-
     # Sector trims are planned across the whole book, after the exits and
     # sizing trims that happen anyway (advise_book runs two passes).
     inputs = {}
@@ -185,7 +172,7 @@ def main() -> None:
 
     print(f"  Sells raise about {cash['raised']:,.0f}"
           + (f" plus {cash['cash_available']:,.0f} cash on hand" if cash['cash_available'] else "")
-          + f"; adds are funded from that, best first.")
+          + "; adds are funded from that, best first.")
     if cash["deferred"]:
         print(f"  {len(cash['deferred'])} add(s) held back -- no cash left, or "
               f"their sector would go over its cap -- and listed as WATCH.")

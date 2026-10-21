@@ -6,7 +6,6 @@ deeply negative precisely when lending grows well; and ROE is flattered by
 leverage. The ordinary rubric does not merely miss these -- it inverts them.
 """
 import pandas as pd
-import pytest
 
 from scoring import fundamentals as fu
 

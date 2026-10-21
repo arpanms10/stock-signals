@@ -134,8 +134,7 @@ def buy_plan(price, stop, t1, t2, extra: str = "") -> str:
 
 def trend_note(row) -> str:
     """Plain-language read of where price sits against its moving averages."""
-    px, s20, s50, s200 = (row.get("price"), row.get("sma20"),
-                          row.get("sma50"), row.get("sma200"))
+    px, s50, s200 = row.get("price"), row.get("sma50"), row.get("sma200")
     parts = []
     if px and s50 and s50 == s50:
         parts.append(f"{'above' if px > s50 else 'below'} 50 DMA ({s50:,.0f})")

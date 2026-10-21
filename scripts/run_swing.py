@@ -19,7 +19,6 @@ import argparse
 import datetime as dt
 import json
 
-import pandas as pd
 
 from records import swing_report as sr
 from backtest import swing_backtest as sb

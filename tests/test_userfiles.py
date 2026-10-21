@@ -1,6 +1,5 @@
 """Workbook or CSV: the files you fill in read and write the same either way."""
 import openpyxl
-import pytest
 
 from book import portfolio as pf
 from book import userfiles as uf

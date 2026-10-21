@@ -154,7 +154,6 @@ def test_split_on_a_loss_is_still_zero_tax(cfg):
 
 def test_only_one_column_given_infers_the_other():
     """A statement that lists only long-term quantity still tells us the split."""
-    import csv
     from book import portfolio as pf
     import tempfile
     from pathlib import Path

@@ -18,7 +18,6 @@ Two things this gets that Yahoo cannot:
 from __future__ import annotations
 
 import datetime as dt
-import re
 import xml.etree.ElementTree as ET
 
 from . import nse_client as nse

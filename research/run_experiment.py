@@ -16,7 +16,7 @@ import datetime as dt
 from book import watchlist as wl
 from backtest import engine as bt
 from backtest.costs import CostModel
-from data import quality, store
+from data import store
 from scoring import pipeline, timing
 
 TRAIN = (dt.date(2016, 9, 1), dt.date(2022, 12, 31))
@@ -61,12 +61,8 @@ VARIANTS: dict[str, dict] = {
 
 
 def build_frames(con, cfg, symbols, window):
-    cuts = quality.report(con, symbols)
     frames = {}
-    for s in symbols:
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if f.empty:
-            continue
+    for s, f in pipeline.scored_frames(con, symbols, cfg).items():
         f = f[(f["date"] >= window[0]) & (f["date"] <= window[1])]
         if len(f) > 250:
             frames[s] = f.reset_index(drop=True)

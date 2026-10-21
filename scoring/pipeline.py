@@ -19,15 +19,17 @@ def benchmark_frame(con, index: str) -> pd.DataFrame:
 
 def scored_frame(con, symbol: str, cfg: dict | None = None,
                  bench: pd.DataFrame | None = None,
-                 usable_from: "dt.date | None" = None) -> pd.DataFrame:
+                 usable_from: "dt.date | None" = None,
+                 prices: pd.DataFrame | None = None) -> pd.DataFrame:
     """Adjusted prices + indicators + the five buckets + timing_score.
 
     `usable_from` drops history before an unexplained price gap (see
     data.quality). Indicators are computed on what remains, so a symbol with a
     missing split contributes clean bars rather than confident nonsense.
+    `prices` is the adjusted history if the caller already loaded it.
     """
     cfg = cfg or timing.load_config()
-    df = store.load_prices(con, symbol, adjusted=True)
+    df = store.load_prices(con, symbol, adjusted=True) if prices is None else prices
     if df.empty:
         return df
     if usable_from is not None:
@@ -43,6 +45,26 @@ def scored_frame(con, symbol: str, cfg: dict | None = None,
         df["bench_close"] = df["bench_close"].ffill()
     df = core.compute_all(df)
     return timing.compute(df, cfg)
+
+
+def scored_frames(con, symbols, cfg: dict | None = None) -> dict[str, pd.DataFrame]:
+    """`scored_frame` for many symbols, with the data-quality cut applied.
+
+    Each history is read once (shared by the quality check and the scoring) and
+    the benchmark once for the whole set. Symbols with no usable history are
+    left out. data.quality prints its truncation notes as it goes.
+    """
+    from data import quality
+    cfg = cfg or timing.load_config()
+    raw = {s: store.load_prices(con, s, adjusted=True) for s in symbols}
+    cuts = quality.report(con, list(raw), raw)
+    bench = benchmark_frame(con, cfg["signals"]["regime_index"])
+    frames = {}
+    for s in list(raw):
+        f = scored_frame(con, s, cfg, bench, cuts.get(s), raw.pop(s))
+        if not f.empty:
+            frames[s] = f
+    return frames
 
 
 def latest_scores(con, symbols: list[str], cfg: dict | None = None) -> pd.DataFrame:

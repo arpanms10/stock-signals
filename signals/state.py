@@ -7,7 +7,7 @@ each run would work only until the first time the process died mid-month.
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS positions (

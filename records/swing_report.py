@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from data import quality as dq
 from data import store
 from data.sources import universe as uni
 from scoring import pipeline, timing
@@ -50,14 +49,8 @@ def load_frames(con, cfg: dict, symbols: list[str], verbose: bool = False) -> di
     buf = io.StringIO()
     # data.quality prints every truncation; useful in a CLI, noise in the UI.
     with (contextlib.nullcontext() if verbose else contextlib.redirect_stdout(buf)):
-        cuts = dq.report(con, symbols)
-    bench = pipeline.benchmark_frame(con, cfg["signals"]["regime_index"])
-    frames = {}
-    for s in symbols:
-        f = pipeline.scored_frame(con, s, cfg, bench=bench, usable_from=cuts.get(s))
-        if not f.empty:
-            frames[s] = f.reset_index(drop=True)
-    return frames
+        frames = pipeline.scored_frames(con, symbols, cfg)
+    return {s: f.reset_index(drop=True) for s, f in frames.items()}
 
 
 def results_calendar(today: dt.date, days: int) -> dict[str, list[dt.date]] | None:

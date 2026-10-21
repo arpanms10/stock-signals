@@ -58,7 +58,7 @@ def one(con, rule, args, costs) -> dict:
           f"{t['symbol'].nunique()} underlyings, P&L in rupees per lot after costs")
     print(_fmt(st))
     if res.skipped:
-        print(f"  skipped: " + ", ".join(f"{k} {v}" for k, v in res.skipped.items()))
+        print("  skipped: " + ", ".join(f"{k} {v}" for k, v in res.skipped.items()))
     if t["lot_estimated"].any():
         print(f"  {int(t['lot_estimated'].sum())} pre-2024 trades use an estimated lot size "
               "(rupee amounts approximate; % of premium is exact)")

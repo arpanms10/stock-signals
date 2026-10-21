@@ -31,7 +31,6 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ui import components as c   # noqa: E402
 from ui import shell, state       # noqa: E402
 
 st.set_page_config(page_title="Stock Signals", page_icon="📈", layout="wide")

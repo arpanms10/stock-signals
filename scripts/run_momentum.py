@@ -6,23 +6,18 @@ import argparse
 import datetime as dt
 
 import numpy as np
-import pandas as pd
 
 from book import watchlist as wl
 from backtest import portfolio_engine as pe
 from backtest.costs import CostModel
-from data import quality, store
+from data import store
 from data.sources import universe as uni
 from scoring import pipeline, timing
 
 
 def load_frames(con, cfg, symbols, start=None, end=None):
-    cuts = quality.report(con, symbols)
     frames = {}
-    for s in symbols:
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if f.empty:
-            continue
+    for s, f in pipeline.scored_frames(con, symbols, cfg).items():
         if start:
             f = f[f["date"] >= start]
         if end:

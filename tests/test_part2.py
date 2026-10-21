@@ -180,7 +180,6 @@ def test_trim_is_scored_as_sizing_not_a_directional_call(tmp_path):
 # ------------------------------------------------------------- freshness
 
 def test_freshness_flags_stale_data(tmp_path):
-    import pandas as pd
     from data import bhavcopy as bc
     from data import freshness as fr
 
@@ -196,7 +195,6 @@ def test_freshness_flags_stale_data(tmp_path):
 
 def test_freshness_accepts_yesterdays_close(tmp_path):
     """Monday reading Friday's close is current; staleness counts sessions."""
-    import pandas as pd
     from data import bhavcopy as bc
     from data import freshness as fr
 
@@ -211,7 +209,6 @@ def test_freshness_accepts_yesterdays_close(tmp_path):
 
 def test_universe_floor_excludes_penny_stocks(tmp_path):
     """Risk-adjusted momentum ranks a pumped penny stock above real businesses."""
-    import pandas as pd
     from data import bhavcopy as bc
 
     con = bc.connect(tmp_path / "m.db")
@@ -284,7 +281,6 @@ def test_watching_inherits_baseline_from_the_decision_log(tmp_path, monkeypatch)
 
 
 def test_watching_falls_back_to_today_when_unlogged(tmp_path, monkeypatch):
-    from book import decision_log as dl
     from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
@@ -518,7 +514,6 @@ def test_t2_closes_the_entry(tmp_path, monkeypatch):
 
 def test_missing_days_are_caught_up(tmp_path, monkeypatch):
     """A job that missed a week still finds the day the stop was hit."""
-    import pandas as pd
     wg, path = _watched(tmp_path, monkeypatch)
     df = pd.DataFrame({"date": [dt.date(2026, 9, d) for d in range(2, 12)],
                        "high": [101] * 10, "low": [95] * 4 + [88] + [95] * 5})

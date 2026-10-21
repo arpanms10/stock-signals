@@ -17,7 +17,6 @@ import streamlit as st
 from picker import engine as pe
 from picker import score as ps
 from results import store
-from ui import components as c
 
 CALIBRATION = Path(__file__).resolve().parents[1] / "config" / "picker_calibration.json"
 

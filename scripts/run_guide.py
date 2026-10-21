@@ -23,7 +23,7 @@ from scoring import fundamentals as fu
 from book import portfolio as pf
 from book import watchlist as wl
 from data import bhavcopy as bc
-from data import quality, store
+from data import store
 from data.sources import universe as uni
 from scoring import pipeline, timing
 from strategy import allocation as al
@@ -40,12 +40,7 @@ def section(title: str) -> str:
 
 def build(con, cfg, symbols, holdings) -> dict:
     """Everything the guide needs, computed once."""
-    cuts = quality.report(con, symbols)
-    frames = {}
-    for s in symbols:
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if not f.empty:
-            frames[s] = f
+    frames = pipeline.scored_frames(con, symbols, cfg)
     # Holdings must always be evaluated, even if they left the watchlist.
     for s in holdings:
         if s not in frames:

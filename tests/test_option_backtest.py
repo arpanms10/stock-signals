@@ -1,7 +1,6 @@
 """Option rule backtest and its reconciliation, on a tiny synthetic history."""
 import datetime as dt
 
-import numpy as np
 import pandas as pd
 import pytest
 

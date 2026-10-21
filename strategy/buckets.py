@@ -26,7 +26,6 @@ sell anything, and the momentum edge disappears.
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 BUCKETS = ("core", "satellite", "trade")
 ALIASES = {"legacy": "satellite"}

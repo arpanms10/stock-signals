@@ -1,7 +1,6 @@
 """Validation helpers on synthetic observations."""
 import numpy as np
 import pandas as pd
-import pytest
 
 from scripts import run_fno_backtest as bt
 

@@ -29,7 +29,6 @@ from book import portfolio as pf              # noqa: E402
 from book import watching as wg               # noqa: E402
 from data import bhavcopy as bc     # noqa: E402
 from data import freshness as fr    # noqa: E402
-from data import quality as dq      # noqa: E402
 from data import store              # noqa: E402
 from data.sources import universe as uni  # noqa: E402
 from scoring import pipeline, timing      # noqa: E402
@@ -97,15 +96,9 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     excluded |= {h for h in holdings if h in bc.non_equity_symbols(mkt)}
     pool = bc.universe_on(mkt, as_of, top_n=universe_size) if days else []
     allsyms = sorted(set(pool) | set(holdings))
-    cuts = dq.report(con, allsyms) if allsyms else {}
+    frames = pipeline.scored_frames(con, allsyms, cfg)
 
-    frames = {}
-    for s in allsyms:
-        f = pipeline.scored_frame(con, s, cfg, usable_from=cuts.get(s))
-        if not f.empty:
-            frames[s] = f
-
-    panel = mom.build_panel(frames, cfg)
+    panel = mom.build_panel(frames, cfg, last_only=True)
     ranked = mom.rank_on(panel, max(panel["date"]), cfg, eligible=equities) \
         if not panel.empty \
         else pd.DataFrame()
@@ -117,7 +110,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     alt = pd.DataFrame()
     if len(lbs) > 1 and not ranked.empty:
         c = mom.with_lookback(cfg, lbs[1])
-        p = mom.build_panel(frames, c)
+        p = mom.build_panel(frames, c, last_only=True)
         alt = mom.rank_on(p, max(p["date"]), c, eligible=equities) \
             if not p.empty else pd.DataFrame()
         alt_rank_of = dict(zip(alt.get("symbol", []), alt.get("rank", [])))
@@ -300,7 +293,7 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     for sym in wg.symbols():
         f = frames.get(sym)
         if f is None:
-            f = pipeline.scored_frame(con, sym, cfg, usable_from=cuts.get(sym))
+            f = pipeline.scored_frames(con, [sym], cfg).get(sym)
         if f is not None and not f.empty:
             watch_prices[sym] = float(f["close"].iloc[-1])
     wg.fill_missing_baselines(watch_prices)
