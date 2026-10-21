@@ -12,10 +12,10 @@ Where everything lives and why the seams sit where they do.
 setup_project.py   start here: guided setup on a new computer
 run_ui.py          open the dashboard
 scripts/           everything you or the scheduled jobs run: refreshes, records, reports
-research/          backtests and experiments behind docs/validation.md
+research/          backtests and experiments (see docs/validation.md)
 config/            settings, and the files you fill in (holdings, MF book, watch list)
 data/ history/     downloaded data (not in git) / forward records (in git)
-docs/              how each part works, and what the tests found
+docs/              how each part works
 tests/             the test suite (pytest)
 
 book/              your book: holdings, watch lists, the files you fill in, decision log
@@ -119,7 +119,3 @@ run_ui.py                  launch the dashboard
 
 `signals/engine.py` is deliberately pure -- the backtest runs the same functions
 as the nightly job, so the backtest stays evidence about what you actually run.
-
----
-
-See also: [ROADMAP](ROADMAP.md) for what is built and what is still wrong.

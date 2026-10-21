@@ -32,16 +32,11 @@ sector and stop the moment it is compliant, and no single holding gives up more
 than half its value for a sector reason -- beyond that a sizing fix has become
 an exit in disguise.
 
-An earlier version only trimmed satellites, and separately the legacy
-rank-verdict returned before the sector check ever ran. Between them, the
-largest risk the framework could identify produced no action at all.
-
 ## Tax on the whole plan
 
 Per-holding figures apply the rate flat, which overstates tax. The **annual
 LTCG exemption belongs to the year, not to any one sale**, so it is applied
-across the plan once every sell is known. On a plan realising Rs 65,087 of
-long-term gains, that took the estimate from Rs 8,136 to zero.
+across the plan once every sell is known.
 
 
 # Decision log

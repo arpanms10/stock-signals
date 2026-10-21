@@ -21,10 +21,8 @@ watchlist.
 A renamed company still resolves by its old ticker, because the ISIN doesn't
 change. For example, `ZOMATO` opens `ETERNAL`.
 
-**Both analysts describe the stock; neither predicts its price.** The swing
-score did not rank stocks in the backtest ([swing](swing.md)). The F&O signals
-had no edge either ([validation](f_o/validation.md)). Nothing here has been
-tested as a predictor. What the analysts are good for is the checklist: is the
+**Both analysts describe the stock; neither predicts its price.** What the
+analysts are good for is the checklist: is the
 business sound, is anything about to go wrong, are you buying into an uptrend
 or a falling knife, and where would the stop go.
 

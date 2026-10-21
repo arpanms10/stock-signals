@@ -64,7 +64,7 @@ warning is printed.
 
 Arbitrage positions carry no price risk and are treated as cash, never as
 stock picks. A stock moving from the arbitrage book into the core portfolio
-(TCS in Nov 2025, DLF in Aug 2026) is labelled as such.
+is labelled as such.
 
 ## Limits
 

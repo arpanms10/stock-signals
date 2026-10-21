@@ -20,8 +20,8 @@ PYTHONPATH=. .venv/bin/python scripts/run_daily.py --no-fetch --portfolio 100000
 `config/watchlist.csv` — plain CSV, opens in Excel or Numbers. Edit it, save,
 and the next run picks it up; nothing to restart.
 
-Currently seeded with the NIFTY 50 as a **development universe, not a
-recommendation**. Setting `active` to `no` retires a stock without deleting the
+Seeded with the NIFTY 50 as a starting universe, **not a recommendation**.
+Setting `active` to `no` retires a stock without deleting the
 row, so the backtest still sees it — deleting rows would erase past losers and
 flatter every result.
 
