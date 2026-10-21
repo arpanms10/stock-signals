@@ -1,24 +1,27 @@
-"""Turn a Kite holdings download into config/holdings.xlsx (or .csv).
+"""Turn a broker's holdings download into config/holdings.xlsx (or .csv).
 
-Drop the file Kite gives you into config/ and run this. Both exports work:
+Drop the .csv or .xlsx your broker gives you into config/ and run this. The
+header row is found wherever it sits, so a client-details preamble is skipped,
+and columns are matched by common names (book/portfolio.py COLUMN_ALIASES):
+Symbol / Instrument / Scrip, Qty. / Quantity / Shares, Avg. cost / Average
+Price / Buy Avg, Long Term Qty / Short Term Qty. For example:
 
-    Kite web   Holdings -> Download   .csv   Instrument, Qty., Avg. cost, ...
-    Console    Portfolio -> Holdings  .xlsx  a client-details preamble, then
-                                             Symbol, Quantity Available,
-                                             Quantity Long Term, Average Price
+    Zerodha Kite      .csv   Instrument, Qty., Avg. cost, ...
+    Zerodha Console   .xlsx  a preamble, then Symbol, Quantity Available,
+                             Quantity Long Term, Average Price
 
-The header row is found wherever it sits, so the Console preamble and its
-Mutual Funds sheet are skipped rather than misread. Bonds, REITs, InvITs and
+A file whose headers match none of these names is reported, not guessed at:
+rename its headers, or fill config/holdings.xlsx by hand. Bonds, REITs, InvITs and
 ETFs are left out, and listed, because the framework ranks equities only.
 
 An existing holdings file is not thrown away: it is copied to holdings.*.bak,
 and the bucket, notes and purchase_date you set by hand are carried over for
-every symbol you still hold. Kite knows your quantities; only you know why you
+every symbol you still hold. Your broker knows your quantities; only you know why you
 own something.
 
-    PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py            # newest Kite file in config/
-    PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py path/to/holdings.xlsx
-    PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py --trade CPPLUS SANSERA
+    PYTHONPATH=. .venv/bin/python scripts/import_holdings.py            # newest broker file in config/
+    PYTHONPATH=. .venv/bin/python scripts/import_holdings.py path/to/holdings.xlsx
+    PYTHONPATH=. .venv/bin/python scripts/import_holdings.py --trade CPPLUS SANSERA
 """
 from __future__ import annotations
 import sys as _sys; from pathlib import Path as _P; _sys.path.insert(0, str(_P(__file__).resolve().parents[1]))  # run from anywhere
@@ -142,7 +145,7 @@ def _text(row: list, idx: int | None) -> str:
 
 
 def convert(grid: list[list]) -> tuple[list[dict], list[tuple[str, str]]]:
-    """Rows of a Kite export -> (holdings.csv rows, skipped (symbol, reason)).
+    """Rows of a broker export -> (holdings.csv rows, skipped (symbol, reason)).
 
     Both empty if no header row is found.
     """
@@ -201,7 +204,7 @@ def read_grid(path: Path) -> list[list]:
         import openpyxl
     except ImportError:
         sys.exit("Reading .xlsx needs openpyxl:  uv pip install openpyxl\n"
-                 "Or download the CSV from Kite instead.")
+                 "Or save the broker file as .csv instead.")
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     # Console's workbook has Equity and Mutual Funds sheets; only Equity counts.
     names = [n for n in wb.sheetnames if n.strip().lower() == "equity"] or wb.sheetnames
@@ -281,7 +284,7 @@ def write_holdings(rows: list[dict], path: Path) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("source", nargs="?", type=Path,
-                    help="Kite export (.csv or .xlsx); default: newest in config/")
+                    help="broker holdings file (.csv or .xlsx); default: newest in config/")
     ap.add_argument("--out", type=Path, default=None,
                     help="default: config/holdings.xlsx if you have one, else .csv")
     ap.add_argument("--trade", nargs="+", metavar="SYMBOL", default=[],
@@ -291,7 +294,7 @@ def main() -> None:
 
     src = args.source or find_export()
     if not src or not src.exists():
-        sys.exit("No Kite holdings file found. Put the .csv or .xlsx from Kite "
+        sys.exit("No broker holdings file found. Put the .csv or .xlsx from your broker "
                  "into config/ and run again.")
     rows, skipped = convert(read_grid(src))
     if not rows and not skipped:
@@ -334,7 +337,7 @@ def main() -> None:
     if marked:
         print(f"  marked trade: {', '.join(marked)}")
     if missing:
-        print(f"  !! not in this Kite file, so not marked: {', '.join(missing)}")
+        print(f"  !! not in this broker file, so not marked: {', '.join(missing)}")
     if skipped:
         print(f"  skipped {len(skipped)} non-equity holding(s) -- not in holdings.csv:")
         for sym, why in skipped:

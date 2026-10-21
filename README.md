@@ -50,7 +50,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended 
 | `research/run_factor_backtest.py` | 52-week high and low volatility factors on the same backtest engine |
 | `scripts/run_weekly.py` | Refresh everything, then report |
 | `scripts/install_schedule.py` | Scheduled jobs on macOS, Linux or Windows: `--list`, `--status`, `--install`, `--remove` |
-| `scripts/import_kite_holdings.py` | Any broker's holdings download → `config/holdings.xlsx` (or `.csv`); see [recording what you own](#recording-what-you-own) |
+| `scripts/import_holdings.py` | Any broker's holdings download → `config/holdings.xlsx` (or `.csv`); see [recording what you own](#recording-what-you-own) |
 | `scripts/set_buckets.py` | Pre-fill core / satellite (trade is only ever set by you) |
 | `scripts/record_momentum.py` | Save this month's momentum picks to `history/` |
 | `scripts/run_fno.py` | F&O: PCR, OI support/resistance, range to expiry (`--excel` for a workbook) |
@@ -110,9 +110,9 @@ appears twice.
 Put the downloaded `.xlsx` or `.csv` in `config/` and run:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py                     # newest broker file in config/
-PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py path/to/file.xlsx
-PYTHONPATH=. .venv/bin/python scripts/import_kite_holdings.py --trade CPPLUS SANSERA   # also mark these as trade
+PYTHONPATH=. .venv/bin/python scripts/import_holdings.py                     # newest broker file in config/
+PYTHONPATH=. .venv/bin/python scripts/import_holdings.py path/to/file.xlsx
+PYTHONPATH=. .venv/bin/python scripts/import_holdings.py --trade CPPLUS SANSERA   # also mark these as trade
 ```
 
 If it says *no holdings table found*, the headers didn't match: rename them in

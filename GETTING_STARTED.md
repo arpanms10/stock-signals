@@ -125,15 +125,17 @@ column means and where to find it.
 | `mf_holdings.xlsx` | Your mutual funds, as **percentages** of your fund portfolio. No amounts | For the Mutual funds page |
 | `watching.xlsx` | Shares you want to keep an eye on | Optional: the app adds to it when you press *Watch* |
 
-**Shortcut for holdings:** download your holdings from your broker (Zerodha:
-Console → Portfolio → Holdings → Download; Kite: Holdings → Download), put
-the file in the `config` folder, and run:
+**Shortcut for holdings:** download your holdings from your broker as `.csv`
+or `.xlsx`, put the file in the `config` folder, and run:
 
 ```bash
-.venv/bin/python scripts/import_kite_holdings.py
+.venv/bin/python scripts/import_holdings.py
 ```
 
-On Windows: `.venv\Scripts\python scripts\import_kite_holdings.py`.
+On Windows: `.venv\Scripts\python scripts\import_holdings.py`. If your
+broker's column names aren't recognised, see
+[recording what you own](README.md#recording-what-you-own) for how to adjust
+the file.
 
 **Your data stays on your computer.** These files are listed in
 `.gitignore`, so they're never uploaded, even if you share or publish your

@@ -49,7 +49,7 @@ ops/jobs.py                the scheduled jobs, for launchd, cron and Task Schedu
 scripts/install_schedule.py   --list / --status / --install / --remove for those jobs
 scoring/fundamentals.py    quality score, incl. the lender rubric
 data/instruments.py        equity vs fund vs DVR classification
-scripts/import_kite_holdings.py   Kite .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
+scripts/import_holdings.py broker .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
                            --trade SYMBOL... marks positions bought to trade
 scripts/set_buckets.py     pre-fill the core/satellite column
 scripts/record_momentum.py monthly momentum picks -> history/momentum_picks.xlsx

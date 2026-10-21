@@ -13,7 +13,7 @@ dependencies = [
     # unattended. Pinned to a minor floor because its NSE scraping breaks when
     # NSE changes its site.
     "jugaad-data>=0.35",
-    # Reads the Console .xlsx holdings statement (import_kite_holdings.py).
+    # Reads the Console .xlsx holdings statement (import_holdings.py).
     "openpyxl>=3.1",
     # Yahoo fallback in fetch_fundamentals.py: ROE, ROCE, debt/equity, P/E, CFO.
     "yfinance>=1.7",

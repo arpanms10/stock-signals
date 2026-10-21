@@ -23,7 +23,7 @@ matches what they'll read.
 - **Their portfolio stays out of this chat.** Never ask them to paste holdings,
   quantities or prices. They fill `config/holdings.xlsx` and
   `config/mf_holdings.xlsx` themselves, or import a broker file with
-  `scripts/import_kite_holdings.py`. Don't open or print those files' contents. If
+  `scripts/import_holdings.py`. Don't open or print those files' contents. If
   you need to know whether they're filled, `setup_project.py --check` gives
   row counts only.
 - **No investment advice.** The tool is decision support. If they ask "should
@@ -69,10 +69,10 @@ matches what they'll read.
    tell them roughly how long it will be. Report when it finishes; don't poll.
 
 6. **Their files.** Explain the three workbooks in `config/` and their *How to
-   fill* sheets. Offer the broker-import route for holdings: download from
-   Zerodha Console or Kite into `config/`, then run
-   `.venv/bin/python scripts/import_kite_holdings.py`
-   (Windows: `.venv\Scripts\python scripts\import_kite_holdings.py`).
+   fill* sheets. Offer the broker-import route for holdings: download the
+   holdings file from their broker into `config/`, then run
+   `.venv/bin/python scripts/import_holdings.py`
+   (Windows: `.venv\Scripts\python scripts\import_holdings.py`).
 
 7. **Open the dashboard.** `.venv/bin/python run_ui.py` (Windows:
    `.venv\Scripts\python run_ui.py`), then `http://localhost:8501`. Give them

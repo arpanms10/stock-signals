@@ -243,7 +243,7 @@ def templates(ui: UI, config: Path | None = None) -> list[Path]:
            "They stay on this computer: config/ files with your positions are in\n"
            ".gitignore and are never uploaded, even if you share the project.\n"
            "Shortcut for holdings: download them from your broker and run\n"
-           "  scripts/import_kite_holdings.py   (it fills config/holdings.xlsx for you).")
+           "  scripts/import_holdings.py   (it fills config/holdings.xlsx for you).")
     return made
 
 
@@ -455,7 +455,7 @@ def check(ui: UI) -> list[str]:
         (ui.ok if n else ui.warn)(f"{p.relative_to(ROOT)}: {n} row(s)"
                                   + ("" if n else " -- fill it in when you are ready"))
         if not n and spec.stem == "holdings":
-            nxt.append("Fill in config/holdings.xlsx, or run scripts/import_kite_holdings.py "
+            nxt.append("Fill in config/holdings.xlsx, or run scripts/import_holdings.py "
                        "on a broker download")
     for w in uf.conflicts():
         ui.warn(w)

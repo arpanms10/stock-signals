@@ -53,7 +53,7 @@ def main() -> None:
     holdings = {h["tradingsymbol"]: h for h in pf.load_holdings()}
     if not holdings:
         print("No holdings found. Fill in config/holdings.xlsx (or .csv), or run "
-              "import_kite_holdings.py on a broker download.")
+              "import_holdings.py on a broker download.")
         return
 
     excluded = ins.load_excluded()

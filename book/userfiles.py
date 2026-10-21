@@ -57,8 +57,8 @@ HOLDINGS = Spec(
     "holdings", "Holdings", "Your share holdings",
     ["One row per stock you own. Fill this sheet, save, and the dashboard's Stocks "
      "page and Today page use it on their next load.",
-     "Easiest route: download your holdings from your broker (Zerodha Console, "
-     "Kite, Groww ...) and run  scripts/import_kite_holdings.py  -- it fills this file "
+     "Easiest route: download your holdings from your broker (any broker's "
+     ".csv or .xlsx) and run  scripts/import_holdings.py  -- it fills this file "
      "for you. Otherwise type the rows in by hand.",
      "Only symbol and quantity are required. Everything else makes the advice "
      "better."],
