@@ -2,7 +2,7 @@
 
 Rule-based, from free data only -- NSE filings first, Yahoo for the ratios NSE
 does not publish -- and scored by the same Quality rubric the rest of the
-framework uses (fundamentals.py), so a stock reads the same here as it does on
+framework uses (scoring/fundamentals.py), so a stock reads the same here as it does on
 the Market tab.
 
 It describes; it does not predict. The Quality Score has not been shown to
@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 from analysis import sector as sec
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +91,7 @@ def fetch(symbol: str, refresh: bool = False, now: dt.datetime | None = None) ->
         except Exception:
             pass
 
-    import fetch_fundamentals as ff
+    from scripts import fetch_fundamentals as ff
     from data.sources import nse_fundamentals as nsef
 
     info: dict = {}

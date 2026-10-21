@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 from scoring import timing
 from strategy import combined
 

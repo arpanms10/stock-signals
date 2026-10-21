@@ -24,9 +24,9 @@ def test_sessions_since_without_calendar_counts_weekdays(monkeypatch):
 
 
 def test_default_symbols_union_and_sources(tmp_path, monkeypatch):
-    import portfolio
-    import run_backfill as rb
-    import watchlist as wl
+    from book import portfolio
+    from scripts import run_backfill as rb
+    from book import watchlist as wl
     con = store.connect(tmp_path / "s.db")
     con.execute("INSERT INTO prices (symbol, date, close) VALUES ('TRACKED', '2026-10-01', 1)")
     monkeypatch.setattr(wl, "all_symbols", lambda: ["WATCHED"])
@@ -38,9 +38,9 @@ def test_default_symbols_union_and_sources(tmp_path, monkeypatch):
 
 
 def test_nothing_to_refresh_is_an_error(tmp_path, monkeypatch):
-    import portfolio
-    import run_backfill as rb
-    import watchlist as wl
+    from book import portfolio
+    from scripts import run_backfill as rb
+    from book import watchlist as wl
     real_connect = store.connect
     empty = real_connect(tmp_path / "e.db")          # no prices table rows
     monkeypatch.setattr(wl, "all_symbols", lambda: [])

@@ -265,7 +265,7 @@ def test_revised_filing_replaces_the_original(tmp_path):
 
 # --- backtest helpers -------------------------------------------------------
 
-import run_results_backtest as bt  # noqa: E402
+from research import run_results_backtest as bt  # noqa: E402
 
 
 def test_forward_returns_from_the_reaction_close():

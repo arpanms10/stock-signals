@@ -29,8 +29,10 @@ def load_config(path: Path | str = CONFIG_PATH) -> dict:
 def linmap(value, lo: float, hi: float):
     """Map value from [lo, hi] onto 0-100, clipped. Handles lo > hi (inverted)."""
     if isinstance(value, pd.Series):
-        out = 100 * (value - lo) / (hi - lo)
-        return out.clip(0, 100)
+        # numpy, not pandas arithmetic: this runs ~15 times per symbol per
+        # scoring pass, and pandas' per-operation overhead dominated.
+        v = value.to_numpy(dtype=float, na_value=np.nan)
+        return pd.Series(np.clip(100 * (v - lo) / (hi - lo), 0, 100), index=value.index)
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return np.nan
     return float(np.clip(100 * (value - lo) / (hi - lo), 0, 100))
@@ -43,16 +45,16 @@ def _blend(parts: dict[str, pd.Series], weights: dict[str, float]) -> pd.Series:
     would drag the score down and manufacture false 'weak' readings, so absent
     components are dropped and the remaining weights renormalised.
     """
-    num = None
-    den = None
+    index = next(iter(parts.values())).index
+    num = np.zeros(len(index))
+    den = np.zeros(len(index))
     for key, series in parts.items():
-        w = weights[key]
-        valid = series.notna()
-        contrib = series.fillna(0.0) * w * valid
-        weight = pd.Series(w, index=series.index) * valid
-        num = contrib if num is None else num + contrib
-        den = weight if den is None else den + weight
-    return (num / den.replace(0, np.nan))
+        v = series.to_numpy(dtype=float, na_value=np.nan)
+        valid = ~np.isnan(v)
+        num += np.where(valid, v, 0.0) * weights[key]
+        den += valid * weights[key]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return pd.Series(np.where(den == 0, np.nan, num / den), index=index)
 
 
 def trend_bucket(df: pd.DataFrame, cfg: dict) -> pd.Series:
@@ -113,15 +115,18 @@ def volatility_bucket(df: pd.DataFrame, cfg: dict) -> pd.Series:
 def compute(df: pd.DataFrame, cfg: dict | None = None) -> pd.DataFrame:
     """Attach the five buckets and the blended timing_score to an indicator frame."""
     cfg = cfg or load_config()
-    out = df.copy()
-    out["trend"] = trend_bucket(out, cfg)
-    out["momentum"] = momentum_bucket(out, cfg)
-    out["relative_strength"] = relative_strength_bucket(out, cfg)
-    out["volume_score"] = volume_bucket(out, cfg)
-    out["volatility"] = volatility_bucket(out, cfg)
-    parts = {b: out["volume_score" if b == "volume" else b] for b in BUCKETS}
-    out["timing_score"] = _blend(parts, cfg["weights"])
-    return out
+    new = {
+        "trend": trend_bucket(df, cfg),
+        "momentum": momentum_bucket(df, cfg),
+        "relative_strength": relative_strength_bucket(df, cfg),
+        "volume_score": volume_bucket(df, cfg),
+        "volatility": volatility_bucket(df, cfg),
+    }
+    parts = {b: new["volume_score" if b == "volume" else b] for b in BUCKETS}
+    new["timing_score"] = _blend(parts, cfg["weights"])
+    # Joined once rather than inserted column by column (see core.compute_all).
+    return pd.concat([df.drop(columns=[k for k in new if k in df.columns]),
+                      pd.DataFrame(new, index=df.index)], axis=1)
 
 
 def explain(row: pd.Series, cfg: dict | None = None) -> str:

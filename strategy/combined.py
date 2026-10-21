@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 from strategy import momentum as mom
 
 

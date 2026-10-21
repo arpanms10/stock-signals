@@ -27,9 +27,9 @@ The underlying list and lot sizes are cached in `data/cache/` for a week.
    `/api/option-chain-indices` answers 404, which is at least loud.
    `/api/option-chain-equities` answers **200 with an empty `{}`**, so a
    parser reads a valid response with no strikes and reports a stock with no
-   open interest. Found 2026-10-08. Everything here uses `option-chain-v3`, and
+   open interest. Everything here uses `option-chain-v3`, and
    an empty chain raises an error instead of being treated as "no OI".
-2. **Cookies come from the option-chain page itself.** The homepage now answers
+2. **Cookies come from the option-chain page itself.** The homepage answers
    403 to a scripted client; the JSON endpoints work once
    `https://www.nseindia.com/option-chain` has been fetched. `nse_derivatives`
    does that before every call.
@@ -48,7 +48,7 @@ The underlying list and lot sizes are cached in `data/cache/` for a week.
 ## History: the F&O bhavcopy
 
 `data/fo_bhavcopy.py` → `data/fo_history.db` (git-ignored; rebuild with
-`run_fno_backtest.py --ingest`).
+`scripts/run_fno_backtest.py --ingest`).
 
 The live chain is a snapshot with no history, so the validation needs another
 source. NSE's daily F&O bhavcopy (UDiFF format) has every contract's
@@ -70,15 +70,11 @@ To keep the history small, full chains are only stored on certain days:
 
 1. **The UDiFF file starts in January 2024.** Earlier dates return 404. The
    older `foDDMMMYYYYbhav.csv` goes back years but has no underlying price,
-   and the local databases have no NIFTY 50 or BANK NIFTY closes to fill it
-   in. So the index sample is about 33 monthly expiries per index. See
-   [validation](validation.md).
+   so pre-2024 history is indices only (see 11 below).
 2. **OI is in shares here.** The live API reports contracts, so the bhavcopy
    figures are divided by the lot size. A stored chain then reads the same as
-   a live one: NIFTY's 22,000 put wall held about 74k contracts in both on
-   7–8 October 2026.
-3. **Prices are not adjusted.** RELIANCE closed at 3,130 in June 2024, before
-   its 1:1 bonus. A split or bonus inside an expiry cycle moves spot and
+   a live one.
+3. **Prices are not adjusted.** A split or bonus inside an expiry cycle moves spot and
    strikes together, and looks like a crash. The validation drops a cycle if
    the lot size changed during it or spot moved more than 2× either way. It
    never tries to guess an adjustment factor.
@@ -94,18 +90,14 @@ To keep the history small, full chains are only stored on certain days:
 6. **Sessions count exchange holidays** (see 7 below), so an offset day is
    the same number of trading sessions before expiry in every cycle.
 
-## Added in the second round
-
-7. **Sessions count NSE's holidays now.** `/api/holiday-master?type=trading`
-   gives the F&O holidays per year, cached. Counting weekdays alone said
-   "13 sessions" to 27-Oct-2026, when Diwali (20-Oct) made it 12. The
-   historical ingest uses the same calendar, so offset days line up.
+7. **Sessions count NSE's holidays.** `/api/holiday-master?type=trading`
+   gives the F&O holidays per year, cached. Counting weekdays alone would
+   overcount sessions in a holiday week. The historical ingest uses the same calendar, so offset days line up.
 8. **The bhavcopy has no IV, so IV is backed out of closing prices.** A
    vectorised Black-Scholes bisection at the two skew wings, and the
    straddle formula for ATM. To keep live and history comparable, the live
    view computes the same straddle IV and skew from quotes, instead of
-   using NSE's IV column. Live NIFTY straddle IV (13.0%) sits close to NSE's
-   ATM IV (13.3%).
+   using NSE's IV column; the two sit close together.
 9. **There is no underlying high/low in the F&O file.** For stocks it's
    estimated as the near-month future's high/low minus that day's closing
    basis. Basis changes little within a day, but this is an estimate. For
@@ -114,8 +106,7 @@ To keep the history small, full chains are only stored on certain days:
 10. **Results dates come from free text.** NSE's board-meeting endpoint
     gives a purpose and a description. Most results meetings are filed as a
     generic "Board Meeting Intimation" whose description mentions financial
-    results, so the match is on either field. It finds about 25,000 meetings
-    for 2024–26, peaking in the four results seasons. Only *announced*
+    results, so the match is on either field. Only *announced*
     meetings are known; a company that hasn't announced yet looks like it
     has no results before expiry.
 11. **Pre-2024 history is indices only, with OI in shares.** The old format
@@ -124,12 +115,10 @@ To keep the history small, full chains are only stored on certain days:
     so shares versus contracts doesn't change the result. Absolute OI isn't
     comparable across the 2024 boundary.
 
-12. **A failed download is not "no data".** The F&O ingest had the same
-    flaw as the equity one (see [data](../data.md)). A failed request now
-    comes back as `None` and is retried on the next run. A 404 is recorded
-    as an empty day only once it is a week old. The one empty trading day in
-    the F&O history, 2021-03-30, was re-checked: NSE's archive has no file
-    for it, so it's a real gap, not a failed download.
+12. **A failed download is not "no data".** As with the equity ingest (see
+    [data](../data.md)), a failed request comes back as `None` and is
+    retried on the next run. A 404 is recorded as an empty day only once it
+    is a week old. A few days are missing from NSE's own archive.
 
 ---
 

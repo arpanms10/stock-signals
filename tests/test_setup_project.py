@@ -1,10 +1,8 @@
 """setup_project.py: the dataset menu, and the steps that only touch files."""
-from pathlib import Path
 
 import pytest
 
 import setup_project as sp
-import userfiles as uf
 
 
 def test_every_dataset_runs_scripts_that_exist():

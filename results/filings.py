@@ -23,7 +23,7 @@ import hashlib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 from data.sources import nse_client as nse
 from data.sources import nse_fundamentals as nsef
 

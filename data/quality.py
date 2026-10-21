@@ -22,9 +22,12 @@ from data import store
 MAX_UNEXPLAINED_JUMP_PCT = 35.0
 
 
-def suspect_bars(con, symbol: str) -> list[tuple[dt.date, float]]:
-    """Day-over-day moves too large to be real, not explained by a known action."""
-    df = store.load_prices(con, symbol, adjusted=True)
+def suspect_bars(con, symbol: str,
+                 prices: pd.DataFrame | None = None) -> list[tuple[dt.date, float]]:
+    """Day-over-day moves too large to be real, not explained by a known action.
+
+    `prices` is the adjusted history if the caller already loaded it."""
+    df = store.load_prices(con, symbol, adjusted=True) if prices is None else prices
     if len(df) < 2:
         return []
     ex_dates = {a.ex_date for a in store.load_actions(con, symbol)}
@@ -38,9 +41,10 @@ def suspect_bars(con, symbol: str) -> list[tuple[dt.date, float]]:
     return out
 
 
-def usable_from(con, symbol: str) -> tuple[dt.date | None, list[str]]:
+def usable_from(con, symbol: str,
+                prices: pd.DataFrame | None = None) -> tuple[dt.date | None, list[str]]:
     """Earliest date whose history can be trusted, plus human-readable notes."""
-    flags = suspect_bars(con, symbol)
+    flags = suspect_bars(con, symbol, prices)
     if not flags:
         return None, []
     last_date, last_pct = max(flags, key=lambda f: f[0])
@@ -49,11 +53,13 @@ def usable_from(con, symbol: str) -> tuple[dt.date | None, list[str]]:
     return last_date, notes
 
 
-def report(con, symbols: list[str]) -> dict[str, dt.date]:
+def report(con, symbols: list[str],
+           prices: dict[str, pd.DataFrame] | None = None) -> dict[str, dt.date]:
     """Truncation points for a whole universe, printed once so it is visible."""
     cuts, notes = {}, []
+    prices = prices or {}
     for s in symbols:
-        cut, n = usable_from(con, s)
+        cut, n = usable_from(con, s, prices.get(s))
         if cut:
             cuts[s] = cut
             notes.extend(n)

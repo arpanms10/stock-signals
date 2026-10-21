@@ -8,7 +8,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 from scoring import timing
 from strategy import advisor as adv
 from strategy import tax as tx
@@ -139,7 +139,7 @@ def test_exemption_is_shared_across_the_plan_not_per_holding(cfg):
 # ------------------------------------------------------------- decision log
 
 def test_decision_log_records_and_scores(tmp_path):
-    import decision_log as dl
+    from book import decision_log as dl
     con = dl.connect(tmp_path / "log.db")
     old = dt.date.today() - dt.timedelta(days=40)
     dl.record(con, [
@@ -156,7 +156,7 @@ def test_decision_log_records_and_scores(tmp_path):
 
 def test_recent_advice_is_not_scored(tmp_path):
     """Judging a call made three days ago measures noise, not the rule."""
-    import decision_log as dl
+    from book import decision_log as dl
     con = dl.connect(tmp_path / "log.db")
     dl.record(con, [{"symbol": "A", "action": "ADD", "price": 100.0,
                      "reasons": []}], dt.date.today())
@@ -166,7 +166,7 @@ def test_recent_advice_is_not_scored(tmp_path):
 def test_trim_is_scored_as_sizing_not_a_directional_call(tmp_path):
     """A trim is a sizing decision. Averaging it into a hit rate would report
     a rising market as a failure of judgement."""
-    import decision_log as dl
+    from book import decision_log as dl
     con = dl.connect(tmp_path / "log.db")
     old = dt.date.today() - dt.timedelta(days=40)
     dl.record(con, [{"symbol": "T", "action": "TRIM", "price": 100.0, "reasons": []},
@@ -180,7 +180,6 @@ def test_trim_is_scored_as_sizing_not_a_directional_call(tmp_path):
 # ------------------------------------------------------------- freshness
 
 def test_freshness_flags_stale_data(tmp_path):
-    import pandas as pd
     from data import bhavcopy as bc
     from data import freshness as fr
 
@@ -196,7 +195,6 @@ def test_freshness_flags_stale_data(tmp_path):
 
 def test_freshness_accepts_yesterdays_close(tmp_path):
     """Monday reading Friday's close is current; staleness counts sessions."""
-    import pandas as pd
     from data import bhavcopy as bc
     from data import freshness as fr
 
@@ -211,7 +209,6 @@ def test_freshness_accepts_yesterdays_close(tmp_path):
 
 def test_universe_floor_excludes_penny_stocks(tmp_path):
     """Risk-adjusted momentum ranks a pumped penny stock above real businesses."""
-    import pandas as pd
     from data import bhavcopy as bc
 
     con = bc.connect(tmp_path / "m.db")
@@ -265,8 +262,8 @@ def test_watching_inherits_baseline_from_the_decision_log(tmp_path, monkeypatch)
     """A stock added a fortnight after it was flagged must still be measured
     from the call. Resetting the baseline to the day you noticed flatters every
     late addition."""
-    import decision_log as dl
-    import watching as wg
+    from book import decision_log as dl
+    from book import watching as wg
 
     logdb = tmp_path / "log.db"
     con = dl.connect(logdb)
@@ -284,8 +281,7 @@ def test_watching_inherits_baseline_from_the_decision_log(tmp_path, monkeypatch)
 
 
 def test_watching_falls_back_to_today_when_unlogged(tmp_path, monkeypatch):
-    import decision_log as dl
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
     wg.add("NEWCO", price=500.0, path=path)
@@ -295,7 +291,7 @@ def test_watching_falls_back_to_today_when_unlogged(tmp_path, monkeypatch):
 
 
 def test_watching_rejects_duplicates(tmp_path, monkeypatch):
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
     wg.add("A", price=10.0, path=path)
@@ -306,7 +302,7 @@ def test_watching_rejects_duplicates(tmp_path, monkeypatch):
 
 
 def test_watching_report_measures_from_the_baseline(tmp_path, monkeypatch):
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
     wg.add("UP", price=100.0, path=path)
@@ -321,7 +317,7 @@ def test_watching_report_measures_from_the_baseline(tmp_path, monkeypatch):
 def test_watching_swing_pick_keeps_its_own_baseline_and_targets(tmp_path, monkeypatch):
     """A swing pick is measured from the scan that made it, with the plan's
     targets -- not from an older momentum call in the decision log."""
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: ("2026-01-02", 50.0))
     path = tmp_path / "w.csv"
     ok, _ = wg.add("SW", source="swing", price=200.0, stop=190.0,
@@ -337,7 +333,7 @@ def test_watching_swing_pick_keeps_its_own_baseline_and_targets(tmp_path, monkey
 
 
 def test_missing_baseline_is_filled_once(tmp_path, monkeypatch):
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
     wg.add("X", path=path)                       # no price available
@@ -352,8 +348,8 @@ def test_baseline_uses_the_price_session_not_the_run_date(tmp_path, monkeypatch)
     """A weekend run quotes Friday's close. Dating that price to the Sunday
     implies a session that never traded, which is exactly the kind of quiet
     imprecision that becomes confusing months later."""
-    import decision_log as dl
-    import watching as wg
+    from book import decision_log as dl
+    from book import watching as wg
 
     logdb = tmp_path / "log.db"
     con = dl.connect(logdb)
@@ -373,8 +369,8 @@ def test_baseline_uses_the_price_session_not_the_run_date(tmp_path, monkeypatch)
 def test_price_date_falls_back_to_run_date_for_old_rows(tmp_path, monkeypatch):
     """Rows written before the column existed have no price date; they must
     still resolve rather than returning null."""
-    import decision_log as dl
-    import watching as wg
+    from book import decision_log as dl
+    from book import watching as wg
 
     logdb = tmp_path / "log.db"
     con = dl.connect(logdb)
@@ -391,7 +387,7 @@ def test_decision_log_migrates_an_existing_database(tmp_path):
     """price_date was added after the first release; CREATE TABLE IF NOT EXISTS
     would leave an older database without it."""
     import sqlite3
-    import decision_log as dl
+    from book import decision_log as dl
 
     db = tmp_path / "old.db"
     con = sqlite3.connect(db)
@@ -444,7 +440,7 @@ def test_sessions_between_skips_weekends():
 
 def _watched(tmp_path, monkeypatch, **kw):
     """One entry at a baseline of 100 on 1 Sep, stop 90, T1 115, T2 130."""
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_baseline_from_log", lambda s: None)
     path = tmp_path / "w.csv"
     wg.add("X", price=100.0, stop=90.0, targets=(115.0, 130.0), path=path, **kw)
@@ -518,7 +514,6 @@ def test_t2_closes_the_entry(tmp_path, monkeypatch):
 
 def test_missing_days_are_caught_up(tmp_path, monkeypatch):
     """A job that missed a week still finds the day the stop was hit."""
-    import pandas as pd
     wg, path = _watched(tmp_path, monkeypatch)
     df = pd.DataFrame({"date": [dt.date(2026, 9, d) for d in range(2, 12)],
                        "high": [101] * 10, "low": [95] * 4 + [88] + [95] * 5})
@@ -529,7 +524,7 @@ def test_missing_days_are_caught_up(tmp_path, monkeypatch):
 def test_missing_stop_is_derived_from_the_entrys_own_targets(tmp_path, monkeypatch):
     """Entries from before the stop column: T1 sits t1_r x R above the
     baseline, so the stop those targets were measured from is recoverable."""
-    import watching as wg
+    from book import watching as wg
     monkeypatch.setattr(wg, "_t1_r", lambda: 1.5)
     path = tmp_path / "w.csv"
     wg.save([wg.Watched("OLD", "2026-09-07", "2026-09-04", 100.0, 115.0, 130.0),
@@ -544,7 +539,7 @@ def test_missing_stop_is_derived_from_the_entrys_own_targets(tmp_path, monkeypat
 
 
 def test_files_without_the_stop_columns_still_load(tmp_path):
-    import watching as wg
+    from book import watching as wg
     path = tmp_path / "w.csv"
     path.write_text("symbol,added_on,baseline_date,baseline_price,t1,t2,"
                     "t1_hit_on,t2_hit_on,source,conviction,notes\n"

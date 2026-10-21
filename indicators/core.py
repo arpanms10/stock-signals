@@ -137,8 +137,10 @@ def up_down_volume_ratio(close: pd.Series, volume: pd.Series, n: int = 20) -> pd
 
 def compute_all(df: pd.DataFrame) -> pd.DataFrame:
     """Attach every indicator the scoring layer needs to an OHLCV frame."""
-    out = df.copy()
-    c, h, l, v = out["close"], out["high"], out["low"], out["volume"]
+    c, h, l, v = df["close"], df["high"], df["low"], df["volume"]
+    # Collected in a dict and joined once: inserting ~25 columns one by one
+    # copies the frame's blocks on every insert.
+    out: dict[str, pd.Series] = {}
 
     out["sma20"] = sma(c, 20)
     out["sma50"] = sma(c, 50)
@@ -151,7 +153,7 @@ def compute_all(df: pd.DataFrame) -> pd.DataFrame:
     out["roc60"] = roc(c, 60)
 
     out["atr14"] = atr(h, l, c, 14)
-    out["atr_pct"] = atr_pct(h, l, c, 14)
+    out["atr_pct"] = 100 * out["atr14"] / c            # == atr_pct(), without a second ATR
     out["bb_width"] = bandwidth(c, 20)
 
     adx_v, plus_di, minus_di = adx(h, l, c, 14)
@@ -165,4 +167,5 @@ def compute_all(df: pd.DataFrame) -> pd.DataFrame:
 
     out["high_52w"] = rolling_high(c, 250)
     out["low_52w"] = rolling_low(c, 250)
-    return out
+    return pd.concat([df.drop(columns=[k for k in out if k in df.columns]),
+                      pd.DataFrame(out, index=df.index)], axis=1)

@@ -31,7 +31,6 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ui import components as c   # noqa: E402
 from ui import shell, state       # noqa: E402
 
 st.set_page_config(page_title="Stock Signals", page_icon="📈", layout="wide")
@@ -70,7 +69,7 @@ def _results():
 
 
 def _picker():
-    import portfolio as pf
+    from book import portfolio as pf
     from ui import picker_tab
     fresh = {f["kind"]: f for f in state.freshness()}
     as_of = fresh.get("market", {}).get("latest")
@@ -93,8 +92,8 @@ def _fno():
 def _analyze():
     from ui import analyze_tab
     st.subheader("Analyze a stock")
-    c.evidence("info", "Both analysts describe the stock as it is today; neither "
-                       "forecasts its price.")
+    st.caption("Both analysts describe the stock as it is today; neither "
+               "forecasts its price.")
     analyze_tab.render()
 
 

@@ -7,16 +7,12 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ui import components as c
 from ui import state
 
 
 def render() -> None:
     snap = state.snapshot()
     state.page_title("Momentum", f"Data through {snap.as_of} · market {snap.regime}")
-    c.evidence("tested", "Beat random picks from the same universe by about 3 standard "
-                         "deviations in the backtest, but the index by only about 2 points "
-                         "a year, with deeper falls. Details below.")
     with st.expander("Ranking settings"):
         state.ranking_settings()
     lbs = getattr(snap, "lookbacks", None) or []
@@ -43,8 +39,7 @@ def render() -> None:
         m3.metric(f"{b}M only", f"{int((t['status'] == f'{b}M only').sum())}")
         m4.metric("Market regime", snap.regime,
                   help="Shown for context only. Neither the advice nor the "
-                       "backtest changes in RISK-OFF: holding fewer names then "
-                       "did not reduce drawdowns when tested.")
+                       "backtest changes in RISK-OFF.")
 
         f1, f2 = st.columns([3, 2])
         pick = f1.segmented_control(
@@ -99,20 +94,9 @@ def render() -> None:
         st.caption("Scores are only comparable within one column: a 9M and a "
                    "12M score measure different windows.")
 
-        with st.expander("How did each approach do in the backtest?"):
+        with st.expander("How has each approach done?"):
             st.markdown(
-                "Tested 2026-10-04 on NSE equities, top 200 by liquidity, "
-                "top 15, monthly rebalance, full costs, Dec 2017 – Oct 2026. "
-                "CAGR % across four start dates (the rebalance day alone "
-                "moves it):\n\n"
-                "| | CAGR range | average | worst fall |\n|---|---|---|---|\n"
-                "| 9-month (main) | 10.9 – 15.9 | 12.5 | −39 to −43% |\n"
-                "| 12-month | 11.6 – 13.4 | 12.5 | −43 to −45% |\n"
-                "| Both only (~11 names) | 10.0 – 12.1 | 11.1 | −46 to −47% |\n"
-                "| NIFTY 500 | ≈ 10.4 | | −37% |\n\n"
-                "The two lookbacks tie: neither is proven better, which is "
-                "why both are shown. Holding only the *Both* names did worse "
-                "than either list. Momentum beat random picks from the same "
-                "universe by about 3 standard deviations on both lookbacks, "
-                "but beats the index by only about 2 points a year, with "
-                "deeper falls. Details in `docs/validation.md`.")
+                "Run the backtest on your own data to see: "
+                "`PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py` "
+                "(add `--shuffle 10` for random-pick controls). "
+                "How to read the output is in `docs/validation.md`.")

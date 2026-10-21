@@ -11,7 +11,7 @@ import datetime as dt
 
 import pandas as pd
 
-from signals.state import Position, Signal
+from signals.state import Position
 
 # ---------------------------------------------------------------- regime
 

@@ -274,7 +274,7 @@ def require_equity_symbols(con) -> set[str]:
     if not eq:
         raise InstrumentMapMissing(
             "instrument map (symbol -> ISIN) is empty, so ETFs cannot be told "
-            "from stocks. Run: PYTHONPATH=. .venv/bin/python run_market_ingest.py")
+            "from stocks. Run: PYTHONPATH=. .venv/bin/python scripts/run_market_ingest.py")
     return eq
 
 

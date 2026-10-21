@@ -8,11 +8,11 @@ for each, with the reasons and the numbers behind them.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_mf.py --refresh                  # first run ~25 min, then seconds a month
-PYTHONPATH=. .venv/bin/python run_mf.py                            # your book
-PYTHONPATH=. .venv/bin/python run_mf.py "parag parikh flexi cap" "hdfc flexi cap" --compare
-PYTHONPATH=. .venv/bin/python run_mf.py --excel                    # reports/mf/MF_Evaluation.xlsx
-PYTHONPATH=. .venv/bin/python run_mf.py --backtest                 # ~1.5 min
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --refresh                  # first run ~25 min, then seconds a month
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py                            # your book
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py "parag parikh flexi cap" "hdfc flexi cap" --compare
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --excel                    # reports/mf/MF_Evaluation.xlsx
+PYTHONPATH=. .venv/bin/python scripts/run_mf.py --backtest                 # ~1.5 min
 ```
 
 Also on the dashboard: Portfolio › **Mutual funds** for your book, Research › **Compare funds** for any funds.
@@ -108,40 +108,21 @@ Debt funds are not ranked on purpose. Their returns mostly reflect the duration
 and credit risk they take, so ranking by return rewards whoever took the most
 risk, until the year it goes wrong.
 
-## Does it work? Mostly no
+## Backtest
 
-`run_mf.py --backtest` gave every fund in a judged category a state at every
-month-end from June 2018, using only NAVs up to that month and the same rules
-as the live view. It then looked at the fund's **rank in its category over the
-following 12 and 36 months**. Funds that later merged or closed stay in,
-carried at the category median. That matters because the worst funds are the
-ones that get merged away. 531 funds, 91 since closed. The thresholds were set
-before the first run and have not been changed.
+`scripts/run_mf.py --backtest` gives every fund in a judged category a state
+at every month-end from June 2018, using only NAVs up to that month and the
+same rules as the live view. It then looks at the fund's **rank in its
+category over the following 12 and 36 months** (0.50 = the state told you
+nothing), split into a train and a holdout period. Funds that later merged or
+closed stay in, carried at the category median. That matters because the
+worst funds are the ones that get merged away. The result is written to
+`config/mf_calibration.json` and shown next to every verdict.
 
-Next 12 months, rank in category (0.50 = the state told you nothing):
-
-| | WEAK | SLIPPING | OK | STRONG | STRONG − WEAK |
-|---|---|---|---|---|---|
-| 2018-06 to 2021-12 (train) | 0.50 | 0.46 | 0.51 | 0.49 | 0.00 (t 0.1) |
-| 2022-01 on (holdout) | 0.46 (t −2.1) | 0.47 | 0.49 | 0.52 | 0.06 (t 1.7) |
-
-- **In the first period the states predicted nothing.** STRONG and WEAK
-  funds ranked the same afterwards.
-- **In the holdout, WEAK funds went on to lag slightly**: they beat the median
-  44% of the time instead of 50%. STRONG funds' edge is not distinguishable
-  from noise.
-- **Over 36 months the sign flips between halves.** STRONG funds lagged
-  after 2018-21 and led after 2022. Each half holds only one or two independent
-  36-month periods, so no t-statistic is given.
-
-This is the same result as published research on Indian and US funds: past
-category rank says little about the next few years. It is also the same
-pattern as this project's swing, results and picker tests. The engine ships
-**calibrated**: the backtest line is printed next to every verdict. Read EXIT
-as "this fund has earned a look at the alternatives", not as a forecast that
-it will keep lagging. The robust parts of a verdict are the ones that don't
-rely on prediction: costs (an index fund is the cheapest way to own the
-category), concentration and near-duplicates.
+Read EXIT as "this fund has earned a look at the alternatives", not as a
+forecast. The parts of a verdict that don't rely on prediction are costs (an
+index fund is the cheapest way to own the category), concentration and
+near-duplicates.
 
 **Known limits.**
 - The category is the latest label, not the one at the time (AMFI keeps no
@@ -160,6 +141,6 @@ category), concentration and near-duplicates.
 | `mf/metrics.py` | Peer-relative measures at a month; forward outcome for the backtest |
 | `mf/verdict.py` | State and action |
 | `mf/holdings.py` | `config/mf_holdings.csv` |
-| `mf/engine.py`, `run_mf.py`, `ui/mf_tab.py` | Glue, CLI, dashboard |
-| `mf/backtest.py` | The test above; writes `config/mf_calibration.json` |
+| `mf/engine.py`, `scripts/run_mf.py`, `ui/mf_tab.py` | Glue, CLI, dashboard |
+| `mf/backtest.py` | The backtest; writes `config/mf_calibration.json` |
 | `tests/test_mf_engine.py` | Parsing, lookup, metrics and verdicts |

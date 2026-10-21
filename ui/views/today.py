@@ -6,8 +6,8 @@ only this page. Each row opens the page it came from.
 
 The one addition is Expected ranges: NIFTY and the core holdings, spot +/-
 one standard deviation for the next session and the next five, with how
-often such a band has held (strategy/ranges.py, run_range_backtest.py). A
-size of move, not a direction -- no directional read here has tested well.
+often such a band has held (strategy/ranges.py, scripts/run_range_backtest.py). A
+size of move, not a direction.
 """
 from __future__ import annotations
 
@@ -98,10 +98,10 @@ def _results_due(today: dt.date) -> list[tuple[dt.date, str]]:
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _range_rows(symbols: tuple[str, ...]) -> list[dict]:
-    import ranges_store as rs
+    from records import ranges_store as rs
     from data import fo_bhavcopy as fb
     from data import store
-    from record_ranges import load_calibration
+    from scripts.record_ranges import load_calibration
     try:
         from data.sources.nse_derivatives import trading_holidays
         y = dt.date.today().year
@@ -125,7 +125,7 @@ def _range_rows(symbols: tuple[str, ...]) -> list[dict]:
 @st.cache_data(ttl=900, show_spinner=False)
 def _range_log() -> dict:
     """Forward-log hit rates: {(group, horizon): (hit %, n, first day)}."""
-    import ranges_store as rs
+    from records import ranges_store as rs
     from data import fo_bhavcopy as fb
     con = fb.connect()
     try:
@@ -156,11 +156,10 @@ def _ranges(snap, pages: dict, today: dt.date) -> None:
     rows = _range_rows(tuple([RANGE_INDEX] + [h["symbol"] for h in core]))
     with st.container(border=True):
         st.markdown("#### Expected ranges")
-        st.markdown(":green-badge[Evidence: tested] &nbsp; " + c.muted(
+        st.markdown(c.muted(
             "How far each could move, not which way: the close ± one standard "
-            "deviation, from the options market's implied volatility. On F&O history "
-            "since 2019 the next close landed inside about 3 times in 4. "
-            "No directional forecast here has beaten chance in this framework's tests."))
+            "deviation, from the options market's implied volatility. *Held before* "
+            "is how often such a band held in the F&O history on file."))
         if not rows:
             st.caption("No F&O history on file yet -- run *Record Today ranges* on "
                        "Data and jobs.")
@@ -200,8 +199,9 @@ def _ranges(snap, pages: dict, today: dt.date) -> None:
                     f"Close {_day(first['price_date'])}"),
                 "Next session": st.column_config.TextColumn(
                     f"{_day(first['end_1'])}",
-                    help="Where the next close should land about 3 times in 4: the "
-                         "close ± one standard deviation of a day's move."),
+                    help="The close ± one standard deviation of a day's move. A normal "
+                         "distribution would put the next close inside about 68% of "
+                         "the time."),
                 "±1": st.column_config.NumberColumn("±", format="%.1f%%"),
                 "Next 5 sessions": st.column_config.TextColumn(
                     f"By {_day(first['end_5'])}",
@@ -215,9 +215,9 @@ def _ranges(snap, pages: dict, today: dt.date) -> None:
                          "run_range_backtest.py on NSE F&O history. A normal "
                          "distribution would give 68%."),
                 "Note": st.column_config.TextColumn(
-                    "Note", help="Results inside the window: the band has held less "
-                                 "often (the Held before figure already allows for "
-                                 "it). Expiry week: the near contract's IV is "
+                    "Note", help="Results inside the window: the Held before figure "
+                                 "is taken from past bands with results inside "
+                                 "too. Expiry week: the near contract's IV is "
                                  "distorted, so next month's is used."),
             })
         log = _range_log()

@@ -1,7 +1,7 @@
 """Data in, picks out -- today, or on any past date.
 
 The universe's quarterly lines live in data/results/universe_quarters.csv
-(shared with run_results_backtest.py). `refresh()` adds new filings to it;
+(shared with research/run_results_backtest.py). `refresh()` adds new filings to it;
 the raw filings are cached, so only new quarters touch NSE.
 """
 from __future__ import annotations

@@ -173,7 +173,7 @@ def test_high_quality_but_volatile_is_not_core():
 
 def _cfg_and_quality(score, flags=()):
     from scoring import timing
-    import fundamentals as fu
+    from scoring import fundamentals as fu
     return timing.load_config(), fu.Quality("X", score, {}, list(flags))
 
 
@@ -323,7 +323,6 @@ def test_add_targets_are_computed_from_todays_price_not_old_cost():
     than you buy'. ICICIBANK did exactly this: avg 1217, price 1423,
     targets 1283 and 1349.
     """
-    import datetime as dt
     from scoring import timing
     from strategy import risk_monitor as rm
 

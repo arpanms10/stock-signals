@@ -201,7 +201,7 @@ def folders_and_databases(ui: UI) -> None:
     for f in FOLDERS:
         (ROOT / f).mkdir(parents=True, exist_ok=True)
     ui.ok("folders: " + ", ".join(FOLDERS))
-    import decision_log
+    from book import decision_log
     from data import bhavcopy as bc
     from data import fo_bhavcopy as fb
     from data import store
@@ -225,7 +225,7 @@ def folders_and_databases(ui: UI) -> None:
 
 def templates(ui: UI, config: Path | None = None) -> list[Path]:
     ui.head(4, "Files you fill in")
-    import userfiles as uf
+    from book import userfiles as uf
     config = config or ROOT / "config"
     made = []
     for spec in uf.SPECS.values():
@@ -243,7 +243,7 @@ def templates(ui: UI, config: Path | None = None) -> list[Path]:
            "They stay on this computer: config/ files with your positions are in\n"
            ".gitignore and are never uploaded, even if you share the project.\n"
            "Shortcut for holdings: download them from your broker and run\n"
-           "  import_kite_holdings.py   (it fills config/holdings.xlsx for you).")
+           "  scripts/import_holdings.py   (it fills config/holdings.xlsx for you).")
     return made
 
 
@@ -265,46 +265,46 @@ DATASETS = [
             "Every NSE share on every trading day since 2016, including companies "
             "that later delisted. Ranks the market and powers every backtest.",
             "Stocks, Today, Momentum, Market overview, Swing", "60-90",
-            [["run_market_ingest.py", "--years", "10"]]),
+            [["scripts/run_market_ingest.py", "--years", "10"]]),
     Dataset("market-recent", "Full-market history, last 2 years (quick start)",
             "The same, but only two years: enough for the live pages. Run 'market' "
             "later to extend it to 10 years for the backtests.",
             "Stocks, Today, Momentum, Market overview", "15-25",
-            [["run_market_ingest.py", "--years", "2"]], starter=True),
+            [["scripts/run_market_ingest.py", "--years", "2"]], starter=True),
     Dataset("prices", "Share prices for the Nifty 500, your holdings and the index",
             "Daily prices behind the trade plans, stops and the market regime.",
             "Stocks, Today, Swing, Analyze", "10-20",
-            [["run_backfill.py", "--universe", "nifty500", "--years", "10"],
-             ["run_backfill.py", "--years", "10"]], starter=True),
+            [["scripts/run_backfill.py", "--universe", "nifty500", "--years", "10"],
+             ["scripts/run_backfill.py", "--years", "10"]], starter=True),
     Dataset("fundamentals", "Company fundamentals for what you follow",
             "Quarterly results, ratios and promoter holding from NSE filings and "
             "Yahoo, for the quality scores.",
             "Stocks, Analyze, GARP / QARP", "5-20",
-            [["fetch_fundamentals.py"]], starter=True),
+            [["scripts/fetch_fundamentals.py"]], starter=True),
     Dataset("mf", "Mutual fund NAVs",
             "Month-end NAVs of every direct-growth fund, to compare each fund "
             "with its category.", "Mutual funds, Compare funds", "about 25",
-            [["run_mf.py", "--refresh", "--no-holdings"]], starter=True),
+            [["scripts/run_mf.py", "--refresh", "--no-holdings"]], starter=True),
     Dataset("fno", "Futures and options history (2024 onwards)",
             "Daily option prices for Nifty and ~200 stocks; behind Today's expected "
             "ranges and the F&O page. Then measures how often the ranges held.",
             "Today, F&O", "20-40",
-            [["run_fno_backtest.py", "--ingest"], ["run_range_backtest.py"]]),
+            [["scripts/run_fno_backtest.py", "--ingest"], ["scripts/run_range_backtest.py"]]),
     Dataset("fno-old", "Index option history 2019-2023 (optional)",
             "Older index-option history, for a longer validation of the F&O ranges.",
             "F&O (validation only)", "about 60",
-            [["run_fno_backtest.py", "--ingest-old"]]),
+            [["scripts/run_fno_backtest.py", "--ingest-old"]]),
     Dataset("results", "Quarterly results for what you follow",
             "Scores new results filings for your holdings and watch list.",
-            "Quarterly results, Today", "2-10", [["run_results.py"]]),
+            "Quarterly results, Today", "2-10", [["scripts/run_results.py"]]),
     Dataset("picker", "Nifty 200 filings for GARP / QARP",
             "Six years of quarterly filings for the Nifty 200.",
-            "GARP / QARP", "20-40", [["run_picker.py", "--refresh"]]),
+            "GARP / QARP", "20-40", [["scripts/run_picker.py", "--refresh"]]),
     Dataset("evidence", "Backtests behind the evidence lines",
             "Re-runs the swing and mutual fund backtests so each page can say how "
             "well its signals held up. Needs the market and fund data first.",
             "Swing, Mutual funds", "5-15",
-            [["run_swing.py", "--backtest"], ["run_mf.py", "--backtest"]]),
+            [["scripts/run_swing.py", "--backtest"], ["scripts/run_mf.py", "--backtest"]]),
 ]
 BY_KEY = {d.key: d for d in DATASETS}
 ORDER = [d.key for d in DATASETS]
@@ -377,7 +377,7 @@ def download(ui: UI, choice: str | None) -> dict[str, str]:
 
 def schedule(ui: UI, choice: str | None) -> list[str]:
     ui.head(6, "Jobs that keep the data fresh")
-    import jobs
+    from ops import jobs
     osn = jobs.os_name()
     ui.say("These run on their own and only fetch what is missing. They run while\n"
            "this computer is on; a run missed while it was off happens at the next\n"
@@ -390,7 +390,7 @@ def schedule(ui: UI, choice: str | None) -> list[str]:
         choice = ui.choose("\nInstall which jobs?",
                            [("recommended", "daily, weekly, monthly and quarterly"),
                             ("pick", "choose one by one"),
-                            ("none", "none for now (install later with install_schedule.py)")],
+                            ("none", "none for now (install later with scripts/install_schedule.py)")],
                            "recommended")
     if choice == "none":
         return []
@@ -415,8 +415,8 @@ def schedule(ui: UI, choice: str | None) -> list[str]:
             ui.warn(f"{n}: could not install ({exc}). Run it yourself:\n"
                     + jobs.manual_instructions(job))
     if done:
-        ui.say(f"\nCheck them: python install_schedule.py --status\n"
-               f"Remove one: python install_schedule.py --remove <name>\n"
+        ui.say(f"\nCheck them: python scripts/install_schedule.py --status\n"
+               f"Remove one: python scripts/install_schedule.py --remove <name>\n"
                f"Logs go to {ROOT / 'reports'}")
     return done
 
@@ -444,7 +444,7 @@ def check(ui: UI) -> list[str]:
         ui.warn("packages: not installed -- run setup_project.py")
         return ["Run python3 setup_project.py"]
     ui.ok("packages installed")
-    import userfiles as uf
+    from book import userfiles as uf
     for spec in uf.SPECS.values():
         p = uf.find(spec.stem)
         if p is None:
@@ -455,7 +455,7 @@ def check(ui: UI) -> list[str]:
         (ui.ok if n else ui.warn)(f"{p.relative_to(ROOT)}: {n} row(s)"
                                   + ("" if n else " -- fill it in when you are ready"))
         if not n and spec.stem == "holdings":
-            nxt.append("Fill in config/holdings.xlsx, or run import_kite_holdings.py "
+            nxt.append("Fill in config/holdings.xlsx, or run scripts/import_holdings.py "
                        "on a broker download")
     for w in uf.conflicts():
         ui.warn(w)
@@ -478,10 +478,17 @@ def check(ui: UI) -> list[str]:
     (ui.ok if fund.exists() else ui.warn)(
         "Fundamentals  " + ("on file" if fund.exists()
                             else "none yet -- python3 setup_project.py --data fundamentals"))
-    import jobs
+    from ops import jobs
     on = [n for n in jobs.JOBS if jobs.installed(n, ROOT)]
     (ui.ok if on else ui.warn)("Scheduled jobs: " + (", ".join(on) if on else
-                                                     "none -- python install_schedule.py --list"))
+                                                     "none -- python scripts/install_schedule.py --list"))
+    broken = [n for n in on if jobs.needs_reinstall(n)]
+    if broken:
+        ui.warn("these jobs point at a script that has moved and will fail: "
+                + ", ".join(broken) + " -- reinstall them: "
+                "python3 scripts/install_schedule.py --install " + " ".join(broken))
+        nxt.append("Reinstall moved jobs: python3 scripts/install_schedule.py --install "
+                   + " ".join(broken))
     for n in jobs.JOBS:
         other = jobs.installed_elsewhere(n, ROOT)
         if other:

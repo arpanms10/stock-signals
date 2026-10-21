@@ -16,7 +16,6 @@ seconds per year of history) and stored like any other.
 """
 from __future__ import annotations
 
-import datetime as dt
 from dataclasses import dataclass, field
 
 import numpy as np

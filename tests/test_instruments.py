@@ -3,7 +3,7 @@ import datetime as dt
 
 import pytest
 
-import instruments as ins
+from data import instruments as ins
 from data import bhavcopy as bc
 
 

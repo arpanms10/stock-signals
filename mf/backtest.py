@@ -1,4 +1,4 @@
-"""Did the fund state predict how the fund did next? (run_mf.py --backtest)
+"""Did the fund state predict how the fund did next? (scripts/run_mf.py --backtest)
 
 At every month-end from mid-2018 (SEBI categories in force), every Direct
 Growth fund in a judged category is given its state with exactly the live
@@ -174,5 +174,5 @@ def calibration_line(cal: dict | None = None) -> str | None:
     return (f"Backtest, next 12 months (rank in category, 0.50 = no information): "
             f"holdout {cal['split']} on, WEAK {ho['WEAK']['mean_rank']:.2f} / STRONG "
             f"{ho['STRONG']['mean_rank']:.2f} (gap t {ho['STRONG-WEAK']['t']:.1f}); "
-            f"2018-2021, WEAK {tr['WEAK']['mean_rank']:.2f} / STRONG {tr['STRONG']['mean_rank']:.2f}. "
-            f"A weak, unstable edge: treat EXIT as 'look at alternatives', not a forecast.")
+            f"before {cal['split']}, WEAK {tr['WEAK']['mean_rank']:.2f} / STRONG "
+            f"{tr['STRONG']['mean_rank']:.2f}.")

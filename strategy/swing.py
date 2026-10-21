@@ -46,36 +46,37 @@ def features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """
     s = cfg["swing"]
     pb, bo = s["pullback"], s["breakout"]
-    out = df.copy()
-    c, h, l = out["close"], out["high"], out["low"]
-    atr = out["atr14"].replace(0, np.nan)
+    c, h, l = df["close"], df["high"], df["low"]
+    atr = df["atr14"].replace(0, np.nan)
+    # Collected in a dict and joined once (see indicators.core.compute_all).
+    out: dict[str, pd.Series] = {}
 
     out["ema_pb"] = core.ema(c, pb["ma"])
-    out["turnover_cr"] = (c * out["volume"]).rolling(20, min_periods=15).mean() / 1e7
-    out["sma50_vs_200"] = 100 * (out["sma50"] / out["sma200"] - 1)
+    out["turnover_cr"] = (c * df["volume"]).rolling(20, min_periods=15).mean() / 1e7
+    out["sma50_vs_200"] = 100 * (df["sma50"] / df["sma200"] - 1)
 
-    if "bench_close" in out:
-        b = out["bench_close"]
+    if "bench_close" in df:
+        b = df["bench_close"]
         ex3 = 100 * (c / c.shift(63) - 1) - 100 * (b / b.shift(63) - 1)
         ex6 = 100 * (c / c.shift(126) - 1) - 100 * (b / b.shift(126) - 1)
         out["rs_raw"] = 0.5 * ex3 + 0.5 * ex6
     else:
-        out["rs_raw"] = np.nan
+        out["rs_raw"] = pd.Series(np.nan, index=df.index)
 
-    out["uptrend"] = ((c > out["sma200"]) & (out["sma50"] > out["sma200"])
-                      & (out["sma200_slope"] > 0))
+    out["uptrend"] = ((c > df["sma200"]) & (df["sma50"] > df["sma200"])
+                      & (df["sma200_slope"] > 0))
     out["eligible"] = (out["uptrend"]
                        & (c >= s["min_price"])
                        & (out["turnover_cr"] >= s["min_turnover_cr"])
-                       & out["atr_pct"].between(*s["atr_pct"]))
+                       & df["atr_pct"].between(*s["atr_pct"]))
 
     # Pullback: the low came within touch_atr ATRs of the EMA recently, RSI
     # reset into its band, and today closed up, above the EMA. The close-up
     # condition is the turn -- buying the touch itself is catching a knife.
     near = (l - out["ema_pb"]) / atr
-    touched = near.rolling(pb["touch_bars"], min_periods=1).min() <= pb["touch_atr"]
     out["pb_touch_atr"] = near.rolling(pb["touch_bars"], min_periods=1).min()
-    out["setup_pullback"] = (touched & out["rsi14"].between(*pb["rsi"])
+    touched = out["pb_touch_atr"] <= pb["touch_atr"]
+    out["setup_pullback"] = (touched & df["rsi14"].between(*pb["rsi"])
                              & (c > c.shift(1)) & (c > out["ema_pb"]))
 
     # Breakout: close above the prior N-session high, on volume, out of a base
@@ -83,8 +84,8 @@ def features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     prior_high = h.shift(1).rolling(bo["lookback"], min_periods=bo["lookback"]).max()
     prior_low = l.shift(1).rolling(bo["lookback"], min_periods=bo["lookback"]).min()
     out["base_pct"] = 100 * (prior_high / prior_low - 1)
-    out["from_high_pct"] = 100 * (c / out["high_52w"] - 1)
-    out["setup_breakout"] = ((c > prior_high) & (out["vol_ratio"] >= bo["volume_mult"])
+    out["from_high_pct"] = 100 * (c / df["high_52w"] - 1)
+    out["setup_breakout"] = ((c > prior_high) & (df["vol_ratio"] >= bo["volume_mult"])
                              & (out["base_pct"] <= bo["max_base_pct"])
                              & (out["from_high_pct"] >= -bo["near_high_pct"]))
 
@@ -92,10 +93,9 @@ def features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     rng = (h - l).replace(0, np.nan)
     out["close_loc"] = ((c - l) / rng).fillna(0.5)
 
-    plan = trade_levels(out, cfg)
-    for k, v in plan.items():
-        out[k] = v
-    return out
+    out.update(trade_levels(df, cfg))
+    return pd.concat([df.drop(columns=[k for k in out if k in df.columns]),
+                      pd.DataFrame(out, index=df.index)], axis=1)
 
 
 def trade_levels(f: pd.DataFrame, cfg: dict) -> dict[str, pd.Series]:

@@ -16,9 +16,8 @@ and mutual funds. It runs on your own computer and does three things:
 - **Looks after what you already own.** For each holding it says
   *hold*, *add*, *trim* (it has grown too big) or *exit* (something is
   genuinely wrong, like rising promoter pledge), with the reason in words.
-- **Shows ideas, with how well they've worked.** Every idea comes with the
-  result of testing it on past data, including when the answer is "this
-  didn't beat the index".
+- **Shows ideas, each with a way to test it.** Every idea can be run on past
+  data, so you can judge it for yourself.
 - **Keeps the data fresh on its own** once you let it schedule a few jobs.
 
 What it **isn't**: a broker or a trading bot. It never places an order and
@@ -126,15 +125,17 @@ column means and where to find it.
 | `mf_holdings.xlsx` | Your mutual funds, as **percentages** of your fund portfolio. No amounts | For the Mutual funds page |
 | `watching.xlsx` | Shares you want to keep an eye on | Optional: the app adds to it when you press *Watch* |
 
-**Shortcut for holdings:** download your holdings from your broker (Zerodha:
-Console → Portfolio → Holdings → Download; Kite: Holdings → Download), put
-the file in the `config` folder, and run:
+**Shortcut for holdings:** download your holdings from your broker as `.csv`
+or `.xlsx`, put the file in the `config` folder, and run:
 
 ```bash
-.venv/bin/python import_kite_holdings.py
+.venv/bin/python scripts/import_holdings.py
 ```
 
-On Windows: `.venv\Scripts\python import_kite_holdings.py`.
+On Windows: `.venv\Scripts\python scripts\import_holdings.py`. If your
+broker's column names aren't recognised, see
+[recording what you own](README.md#recording-what-you-own) for how to adjust
+the file.
 
 **Your data stays on your computer.** These files are listed in
 `.gitignore`, so they're never uploaded, even if you share or publish your
@@ -158,14 +159,12 @@ from the internet. Close the terminal window (or press Ctrl+C) to stop it.
 | **Today** | | See everything that needs a decision, and how far Nifty and your core holdings might move |
 | Portfolio | **Stocks** | See each holding's verdict, its reason, a trade plan and the tax angle |
 | | **Mutual funds** | See how each of your funds compares with others in its category |
-| Ideas | **Momentum** | See the strongest shares, the one idea here that has beaten the index |
-| | Swing, Quarterly results, GARP / QARP | Read other ideas, each with its tested hit rate |
+| Ideas | **Momentum** | See the strongest shares, ranked by momentum |
+| | Swing, Quarterly results, GARP / QARP | Read other ideas, each with its own backtest |
 | Market | Market overview, F&O | Browse the whole market, or option-based ranges |
 | Research | **Analyze a stock** | Check any NSE share: fundamentals, a sector checklist, the chart |
 
-Every page opens with an **evidence line**: *tested*, *weak*, *no edge* or
-*experimental*. Read it before you read the verdicts. Unfamiliar words are
-explained in the [glossary](docs/glossary.md).
+Unfamiliar words are explained in the [glossary](docs/glossary.md).
 
 ## Keeping it fresh
 
@@ -185,9 +184,9 @@ only fetch what's missing, so a run after a holiday is quick. Manage them
 with:
 
 ```bash
-.venv/bin/python install_schedule.py --status
-.venv/bin/python install_schedule.py --install recommended
-.venv/bin/python install_schedule.py --remove all
+.venv/bin/python scripts/install_schedule.py --status
+.venv/bin/python scripts/install_schedule.py --install recommended
+.venv/bin/python scripts/install_schedule.py --remove all
 ```
 
 If you'd rather not schedule anything, use the **Data and jobs** page (the
@@ -211,4 +210,4 @@ with a button to refresh it.
   `/setup`. It walks you through the setup, explains each choice and helps
   when something fails.
 - The [README](README.md) and the [docs](docs/) folder go deeper into how
-  each part works and what the backtests found.
+  each part works.

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import record_swing as rs
-import swing_store as ss
+from scripts import record_swing as rs
+from records import swing_store as ss
 from scoring import timing
 from strategy import swing as sw
 

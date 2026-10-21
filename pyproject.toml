@@ -1,7 +1,7 @@
 [project]
 name = "stock-signals"
 version = "0.1.0"
-description = "Personal technical signal engine for NSE equities"
+description = "Portfolio advisor for NSE equities and Indian mutual funds"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2",
@@ -13,13 +13,15 @@ dependencies = [
     # unattended. Pinned to a minor floor because its NSE scraping breaks when
     # NSE changes its site.
     "jugaad-data>=0.35",
-    # Reads the Console .xlsx holdings statement (import_kite_holdings.py).
+    # Reads the Console .xlsx holdings statement (import_holdings.py).
     "openpyxl>=3.1",
     # Yahoo fallback in fetch_fundamentals.py: ROE, ROCE, debt/equity, P/E, CFO.
     "yfinance>=1.7",
     # Reads PPFAS's older .xls portfolio disclosures (run_mf_ppfas.py); the
     # newer .xlsx ones go through openpyxl.
     "xlrd>=2.0",
+    # The dashboard (run_ui.py).
+    "streamlit>=1.50",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +32,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["indicators", "scoring", "signals", "backtest", "data", "mf"]
+packages = ["analysis", "backtest", "book", "data", "indicators", "mf", "ops",
+            "picker", "records", "results", "scoring", "signals", "strategy", "ui"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

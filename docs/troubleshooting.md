@@ -71,7 +71,7 @@ port is busy, the terminal shows the address it used instead.
 
 ## Scheduled jobs
 
-**Did my jobs run?** `.venv/bin/python install_schedule.py --status` lists
+**Did my jobs run?** `.venv/bin/python scripts/install_schedule.py --status` lists
 them. Each job writes to `reports/<job>.log`, and the weekly job also writes
 a report in `reports/`.
 
@@ -85,7 +85,7 @@ Either way nothing is lost, because each run fetches whatever is missing.
 project. Installing it here moves it to this copy, so only one copy's data
 stays fresh.
 
-**Remove them all.** `.venv/bin/python install_schedule.py --remove all`.
+**Remove them all.** `.venv/bin/python scripts/install_schedule.py --remove all`.
 
 ## Updating
 

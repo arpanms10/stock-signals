@@ -25,7 +25,7 @@ DIR = Path(__file__).resolve().parents[1] / "data" / "results"
 CARDS = DIR / "scorecards.csv"
 QUARTERS = DIR / "quarters.csv"
 # The whole index universe's quarterly lines, for the backtests and the
-# GARP / QARP picker (run_results_backtest.py, run_picker.py).
+# GARP / QARP picker (research/run_results_backtest.py, scripts/run_picker.py).
 UNIVERSE = DIR / "universe_quarters.csv"
 KEY = ["symbol", "to_date"]
 

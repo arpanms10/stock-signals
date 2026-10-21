@@ -37,15 +37,15 @@ them.
 
 | Word | Means |
 |---|---|
-| **Momentum** | Shares that have risen most over the past 9 months (skipping the latest month) tend to keep rising for a while. The one idea here that has beaten the index after costs |
+| **Momentum** | Shares that have risen most over the past 9 months (skipping the latest month) tend to keep rising for a while |
 | **Rank** | Position in the momentum list: 1 is strongest |
 | **200 DMA** | The average closing price over the last 200 trading days. Above it, a share is in an uptrend |
 | **Market regime** | Risk-on when the Nifty 500 is above its 200 DMA, risk-off when below |
 | **Swing trade** | A trade held for days to a few weeks, on a pullback or a breakout |
 | **Pullback / breakout** | A dip within an uptrend / a move above a recent high |
 | **GARP / QARP** | Growth (or quality) at a reasonable price: companies growing well without an extreme valuation |
-| **Results drift** | Shares that jump on their results tend to keep drifting the same way for weeks |
-| **52-week high, low volatility** | Two other well-known ideas. Tested here; neither beat the index (see [validation](validation.md)) |
+| **Results drift** | The idea that shares which jump on their results keep drifting the same way for weeks |
+| **52-week high, low volatility** | Two other well-known factor ideas, available as backtests (see [validation](validation.md)) |
 
 ## Testing and evidence
 
@@ -59,7 +59,6 @@ them.
 | **Benchmark / index** | What you'd get by simply holding the Nifty 500. Every idea is measured against it |
 | **Random picks / control** | Shares chosen at random from the same list. An idea must beat these, not just the index |
 | **Train / holdout** | Tune on one period, then check once on a later period you didn't look at |
-| **Evidence line** | The line under each page title: *tested*, *weak*, *no edge* or *experimental* |
 | **Costs** | Brokerage, STT, stamp duty, exchange fees, GST and slippage. About 0.35% per round trip, and always included |
 
 ## Company figures

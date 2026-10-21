@@ -11,7 +11,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-import swing_report as sr
+from records import swing_report as sr
 from scoring import timing
 from ui import components as c
 
@@ -88,13 +88,13 @@ def _static(df: pd.DataFrame, fmt: dict[str, str]) -> None:
 
 def _forward() -> None:
     """The live record: what was actually suggested, and how it has gone."""
-    import record_swing
+    from scripts import record_swing
     st.markdown("**Forward record** (picks actually suggested, from "
                 "history/swing_picks.xlsx)")
     if not record_swing.HISTORY.exists():
         st.caption("Nothing recorded yet. Use **Save top 10 to Excel** after a "
                    "scan, or install the daily job "
-                   "(`install_schedule.py --install daily`).")
+                   "(`scripts/install_schedule.py --install daily`).")
         return
     try:
         p = pd.read_excel(record_swing.HISTORY, sheet_name="Picks")
@@ -105,8 +105,7 @@ def _forward() -> None:
     first, last = pd.to_datetime(p["price_date"]).min(), pd.to_datetime(p["price_date"]).max()
     st.caption(f"{p['price_date'].nunique()} scan dates, {first:%d-%b-%Y} to "
                f"{last:%d-%b-%Y}. Outcomes are replayed with each scan's own plan. "
-               "Only closed trades count as results; this is the evidence that "
-               "will confirm or overturn the backtest below.")
+               "Only closed trades count as results.")
     _static(s.rename(columns={"group": "", "trades": "Trades", "win_pct": "Win %",
                               "avg_r": "Avg R", "avg_ret_pct": "Avg %"}),
             {"Trades": "{:,.0f}", "Win %": "{:.1f}%", "Avg R": "{:+.3f}",
@@ -117,7 +116,7 @@ def _forward() -> None:
 def _backtest(cal: dict | None) -> None:
     _forward()
     if not cal:
-        st.info("No backtest on file yet. Run `run_swing.py --backtest`, or use "
+        st.info("No backtest on file yet. Run `scripts/run_swing.py --backtest`, or use "
                 "**Rerun swing backtest** in the sidebar.")
         return
     g = cal["groups"]
@@ -221,9 +220,6 @@ def render(on_watch=None) -> None:
     cfg = _cfg()
     s = cfg["swing"]
     st.subheader("Swing: setups to hold for days to a few weeks")
-    c.evidence("none", "The score did not rank setups in the backtest, so each setup "
-                       "comes with its measured hit rate rather than a promise. How it "
-                       "has done is below the list.")
     st.caption("Liquid stocks in an uptrend that show a pullback or a breakout "
                "today, scored, each with an entry, a stop and targets. How it "
                "works and how it has done are below the list.")
@@ -261,7 +257,7 @@ def render(on_watch=None) -> None:
                         "rebuilds history/swing_picks.xlsx: the top picks of every "
                         "recorded scan and how each has played out. Available "
                         "after a scan with at least one suggestion."):
-        import record_swing
+        from scripts import record_swing
         n, df = record_swing.record(v, cfg,
                                     bench_close=record_swing.benchmark_close(cfg, v.as_of))
         closed = int((df["outcome"] == "closed").sum())
@@ -437,7 +433,7 @@ def _list(v: sr.SwingView, cfg: dict, capital: float, show_all: bool,
                 f" · ATR {r['atr_pct']:.1f}% · volume {r['vol_ratio']:.1f}× average"
                 f"</div>", unsafe_allow_html=True)
 
-    import watching as wg
+    from book import watching as wg
     if r["symbol"] in set(wg.symbols()):
         st.caption(f"✓ {r['symbol']} is on your watch list.")
     elif st.button(f"Watch {r['symbol']}", key=f"swing_watch_{r['symbol']}",

@@ -26,7 +26,7 @@ Traps:
     either way -- but the numbers should not change meaning between sources.)
   * Prices are UNADJUSTED. A split or bonus inside a cycle moves both spot
     and strikes; the validation drops cycles whose spot moved implausibly
-    (see run_fno_backtest.py) rather than guessing a factor.
+    (see scripts/run_fno_backtest.py) rather than guessing a factor.
   * A close of an option that did not trade is a carried / theoretical
     price, so it becomes NaN, exactly as an untraded LTP does live.
   * Sessions are counted as weekdays; an exchange holiday can shift an

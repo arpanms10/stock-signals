@@ -1,586 +1,118 @@
-# Validation and results
+# Validation
 
-What the backtests actually found, including the results that do not flatter.
+How the backtests work, and how to run them yourself.
 
 [← back to the README](../README.md)
 
 ---
 
-Backtested over 49 NIFTY 50 names after realistic Indian costs (STT, stamp duty,
-exchange fees, GST, slippage -- about 0.35% per round trip). All figures below
-were produced *after* the OBV bug fix described in "Data notes"; earlier numbers
-computed with the buggy indicator are superseded.
+Every idea in this framework comes with a backtest you can run on your own
+data. Run them after a refresh, or after changing a setting in
+`config/scoring.yaml`, and judge the result yourself.
 
-## Baseline, full period 2016-2026
+## Principles every backtest follows
 
-| | 10-year CAGR |
+- **Costs included.** STT, stamp duty, exchange fees, GST and slippage --
+  about 0.35% per round trip. Returns are before tax.
+- **Survivorship-free where it matters.** Testing only on companies that still
+  exist today flatters every result. The momentum and factor backtests use a
+  point-in-time universe rebuilt from the full-market bhavcopy, delisted names
+  included. The GARP / QARP and results backtests offer `--universe pit` for
+  the same reason.
+- **Point in time.** Each rebalance only sees prices and filings published by
+  that date. The live code and the backtest call the same functions, so the
+  backtest is evidence about what you actually run.
+- **Controls, not just the index.** An idea must beat random picks from the
+  same universe with the same turnover (`--shuffle`), not just the index.
+- **Train, then holdout once.** Compare variants on a train period, choose,
+  then run the holdout a single time. Never iterate against holdout results;
+  once seen, a holdout is no longer a clean test.
+- **Rules fixed before the run.** Where a script has a pass rule, it is written
+  in its docstring before the first run, so a pass can't be tuned into
+  existence.
+- **Continuous prices.** Splits, bonuses, demergers, ticker changes and
+  trade-for-trade spells are adjusted so they don't read as losses
+  ([data](data.md)). Dividends are not included, so returns are price-only;
+  the NIFTY 500 benchmark is a price index too.
+
+## Momentum
+
+```bash
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py                        # as configured
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --shuffle 10           # random-pick controls
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --universe-skip 200 --universe-size 300   # ranks 201-500
+```
+
+Top 200 by liquidity, rebuilt monthly, 15 stocks, full costs. Reports CAGR,
+worst fall, Sharpe, and the two halves of the period separately. Options for
+testing variants:
+
+| Flag | Tests |
 |---|---|
-| Equal-weight buy & hold, same 49 stocks | **17.73%** |
-| NIFTY 500 index | **11.82%** |
-| This strategy | **1.29%** |
-| Shuffled-entry controls (7 seeds) | mean 0.60%, sd 0.49, range 0.03-1.39 |
+| `--lookback-months`, `--skip-months` | 9-1 against 12-1, or no skipped month |
+| `--score nse_blend` | NSE's Nifty200 Momentum 30 scoring in this engine |
+| `--selection overlap` | holding only names in both the 9- and 12-month lists |
+| `--risk-off-scale` | holding fewer stocks when the market is below its 200 DMA |
+| `--stop pct\|atr`, `--stop-refill` | a trailing stop between rebalances |
+| `--vol-target`, `--cash-yield-pct` | volatility targeting, with cash earning a liquid-fund rate |
+| `--start`, `--end` | restricting to a train or holdout window |
+| `--export` | trades and equity to Excel |
 
-The strategy beat 6 of 7 randomised controls, sitting about 1.4 standard
-deviations above the control mean. That is **not** statistical significance, and
-one control beat it outright. Read at face value the entry rules are worth
-roughly 0.7% a year -- against a 10.5% a year gap to the index. Even if the
-effect is real, it is economically irrelevant.
+Run the start date a few days apart to see how much the result depends on
+which days the rebalance falls.
 
-## Fix attempt: loosen the exits (train/holdout)
+## 52-week high and low volatility
 
-Hypothesis: the system cut winners during ordinary noise. Tested by widening
-stops, moving the trend-break exit from the 50 DMA to the 200 DMA, and dropping
-fixed targets and the cooldown. Variants were compared on 2016-2022 only; the
-2023-2026 holdout was run after choosing.
+```bash
+PYTHONPATH=. .venv/bin/python research/run_factor_backtest.py
+PYTHONPATH=. .venv/bin/python research/run_factor_backtest.py --holdout   # once
+```
 
-| variant | train CAGR | holdout CAGR |
+Two well-known factors run through the momentum engine: the point-in-time top
+200 by liquidity, monthly, 15 names equal-weighted, costs included, no 200-DMA
+gate. Compared with momentum, the NIFTY 500 and random picks. The pass rule is
+in the script's docstring.
+
+## Swing, GARP & QARP, quarterly results, mutual funds, F&O
+
+Each has its own backtest, described with the feature:
+
+| Feature | Command | Write-up |
 |---|---|---|
-| baseline | 1.11% | -- |
-| wide_stops | 3.91% | -- |
-| trend_200 | 2.87% | -- |
-| **let_winners_run** | **5.17%** | **3.31%** |
-| NIFTY 500 index | 11.86% | 11.64% |
-| buy & hold same names | 23.93% | **16.89%** |
+| Swing setups and score | `scripts/run_swing.py --backtest`, `research/run_swing_experiment.py` | [swing](swing.md#backtest) |
+| GARP & QARP | `scripts/run_picker.py --backtest` | [GARP & QARP](picker.md#backtest) |
+| Results verdict and reaction | `research/run_results_backtest.py`, `research/run_drift_backtest.py` | [quarterly results](results.md#backtest-verdict-and-reaction) |
+| Mutual fund states | `scripts/run_mf.py --backtest` | [mutual fund evaluation](mf_evaluation.md#backtest) |
+| Expected ranges | `scripts/run_range_backtest.py` | [ranges](ranges.md#calibration) |
+| F&O range and signals | `scripts/run_fno_backtest.py`, `research/run_option_backtest.py` | [F&O validation](f_o/validation.md), [option rules](f_o/backtest.md) |
 
-The hypothesis was right about the mechanism and insufficient as a fix. Loosening
-exits nearly tripled the average win (9.8% -> 25.6%) and extended holds from 26
-to 109 days, so winners genuinely were being cut early. But 3.31% still loses to
-holding the same stocks by 13.6 points a year.
+Results are written to `config/*_calibration.json` and shown on the matching
+dashboard page.
 
-Train 5.17% -> holdout 3.31% is a degradation but not a collapse, so the variant
-is **not badly overfit**. It generalises to being consistently mediocre.
-
-**The 2023-2026 holdout is now spent.** It was run twice only because the first
-run was invalidated by the OBV bug -- a correction of a broken measurement, not a
-second attempt at a different variant. Any new idea needs a fresh untouched
-period or a different universe.
-
-## What this means
-
-Across the baseline, the R-multiple targets, the loosened exits and the holdout,
-every result points the same way: on large-cap Indian equities over this period,
-timing entries and exits destroyed value relative to holding. Per-symbol results
-are unanimous -- all 50 names show a negative strategy return while most of the
-underlying stocks rose several hundred percent.
-
-**Do not trade the v1 signal rules.** They are kept in the repo because the
-negative result is evidence, and because the infrastructure beneath them --
-data, costs, controls -- is what the momentum work is built on.
-
-
-## Mutual fund states (2026-10-18)
-
-531 Direct Growth funds in 15 equity and hybrid categories, 91 since merged
-or closed, monthly from Jun 2018. The outcome is the fund's rank in its
-category over the next 12 months (0.50 = no information). In 2018-21,
-**STRONG and WEAK funds ranked the same afterwards (gap 0.00, t = 0.1)**.
-From 2022, WEAK funds ranked 0.46 (t = -2.1) and STRONG funds 0.52 (gap
-t = 1.7). Over 36 months the sign flips between halves. Past category rank
-barely predicts, so the verdicts ship with this line beside them. Full
-write-up in [mutual fund evaluation](mf_evaluation.md).
-
-## GARP & QARP picker (2026-10-17)
-
-Nifty 200, quarterly rebalance after each results season, top 15 equal
-weight, Jun 2022 to Aug 2026 (17 periods), fundamentals point in time from
-NSE filings. Against the equal-weight universe, keeping only the 150 largest
-by market cap on each date: **GARP +2.3% a quarter (t = 2.0)**, **QARP
--2.6% a quarter (t = -2.2)**. GARP's edge is 3.2% on all of today's index
-and 1.1% (not significant) in the largest 100: part of it is hindsight about
-which stocks grew into the index. Neither ranks anything; both are shown as
-shortlists with this beside them. Full write-up in [GARP & QARP](picker.md).
-
-**Re-tested 2026-10-18 on a survivorship-free universe** (the 200 largest
-NSE companies by market cap on each date, from the full market, delisted
-ones included, 386 names): **GARP +0.35% a quarter (t = 0.3)**, QARP
--1.9% (t = -1.8). GARP's edge was hindsight and does not survive. The
-equal-weight universe falls from 24% to 19% a year.
-
-## Quarterly results verdict (2026-10-17)
-
-3,226 Nifty 200 filings, Mar 2021 to Sep 2026, entry at the reaction-day
-close. Strong cards beat the index by 2.0% on the reaction day and weak ones
-lag by 0.8%, so the scorecard tracks what the market prices. After that,
-strong minus weak is +1.7% over 60 sessions (t = 1.6): **not enough to rank
-on**. The **reaction** drifts: rallied minus sold off is +3.6% over 60
-sessions (t = 2.6). Full write-up in [quarterly results](results.md).
-
-**Re-tested 2026-10-18 on the survivorship-free universe** (3,553 filings,
-334 stocks, Mar 2020 to Sep 2026): verdict unchanged (strong minus weak
-+1.6%, t = 1.6). The **reaction drift survives**: +3.5% over 60 sessions
-(t = 2.6), +1.5% over 20 (t = 3.3); +3.0% (t = 2.2) when the 105 filings
-priced from closes only are left out.
-
-**As a long-only rule after costs (2026-10-18): fails.** Buy each rallied
-filing at the reaction-day close, 20 equal slots, idle capital in the NIFTY
-500, 0.35% a round trip, Oct 2021 to Oct 2026. Against the equal-weight
-point-in-time universe: hold 20 sessions -0.02% a quarter (t = 0.0), hold 60
-+0.69% (t = 0.9); CAGR 10.6% and 13.2% against the universe's 10.2%; worst
-drawdown -21.5% and -25.5% against -23.7%; turnover about 4x a year. Per
-filing, rallied stocks beat the universe by 1.8% over 60 sessions after
-costs (t = 2.5), but only 1.5% (t = 1.6) without the close-only filings,
-and a capped book skips a third to 44% of rallies because results season
-bunches them. A 40-slot book at 60 sessions reaches t = 2.4, but that setting was
-found after looking. Nothing ranks on the reaction. Full write-up in
-[quarterly results](results.md#does-the-drift-survive-costs-as-a-rule).
-
-
-## 52-week high and low volatility (2026-10-19)
-
-`run_factor_backtest.py`. Two factors with strong published evidence, run
-through the momentum engine: the point-in-time top 200 by liquidity, rebuilt
-monthly, delisted names included, 15 names equal-weighted, costs included. No
-200-DMA gate. The pass rule is in the script's docstring and was committed
-(b1a0db2) before the first run.
-
-Train, 2018-07 to 2022-12:
-
-| | CAGR | Sharpe | Max drawdown | Turnover / rebalance | Cost drag / yr |
-|---|---|---|---|---|---|
-| 52-week high | 12.6% | 0.68 | −36.2% | 108% | 2.1% |
-| Low volatility | 10.3% | 0.70 | −25.3% | 13% | 0.3% |
-| Momentum (as configured) | 25.7% | 1.09 | −36.9% | 51% | 1.4% |
-| NIFTY 500 | 12.5% | 0.72 | −38.3% | | |
-| Random picks, 5 seeds | 4.7% (sd 5.0) | | | | |
-
-**Neither passed.**
-
-- **52-week high** beat random picks by 7.9 points, but beat the index by
-  only 0.2. The rule needed +2.0 points over the index after costs. Most of
-  its gain over random picks is just being in rising stocks, which momentum
-  already does twice as well.
-- **Low volatility** did what the theory says about risk: its drawdown was
-  13 points shallower than the index's. But it didn't pay for it. Its Sharpe
-  was slightly below the index (0.70 against the 0.92 needed) and CAGR 2.2
-  points lower. In this sample a Nifty 500 fund gives a similar ride for
-  less effort.
-
-The 2023– holdout was **not run**, so it is still unseen for both factors.
-
-Two observations that are not part of the rule:
-
-- **Ties churn the 52-week-high ranking.** In a rising market many stocks
-  sit at exactly 1.00 (a new high), so their order is arbitrary. That's why
-  turnover reached 108% a rebalance against momentum's 51%. A
-  tie-broken variant would be a new hypothesis and needs its own test.
-- **The 201–500 liquidity ranks** (2018–2026, holdout years included, printed
-  as a robustness read) were far stronger: 52-week high made 27.9% a year after
-  6.9% cost drag, and momentum 34.1%. Those numbers have now been seen,
-  so that universe is no longer a clean test for either idea.
-
-Verdict: no new page. Momentum remains the only ranking in this framework that
-has beaten the index after costs on a survivorship-free universe.
-
-## Momentum on a continuous price history (2026-10-11)
-
-> **Supersedes every momentum figure below this section.** Those were run on
-> raw bhavcopy closes: a split or bonus on a held stock was booked as a loss
-> (a 1:1 bonus = -50%), a demerger as a loss, a ticker change or a spell in
-> the trade-for-trade series as a forced sale at -5%, and a day with no
-> price valued the holding at zero. All five are fixed ([data](data.md)).
-> The live ranking was never affected; only `run_pit_momentum.py` was.
-
-Same setup as before: top 200 by liquidity, monthly, 15 stocks, full costs,
-`risk_off_scale: 1.0`, four start dates a week apart, data to 2026-10-09.
-
-| | CAGR avg (range, 4 starts) | worst fall | Sharpe | 2017-12 to 2022-04 | 2022-05 on |
-|---|---|---|---|---|---|
-| **9-month (main)** | **23.0** (20.0 - 24.4) | -36 to -42% | 1.0 | 23.3 | 23.2 |
-| 12-month | 20.2 (18.8 - 22.4) | -42 to -45% | 0.9 | 20.6 | 20.4 |
-| random picks, same universe (10 seeds) | 9.3 (4.8 - 13.1) | -38 to -50% | 0.5 | | |
-| NIFTY 500 | 10.2 | -38% | | | |
-
-- **The old numbers badly understated momentum.** 11.7% becomes 23.0%, and
-  random picks rise only from 3.8% to 9.3%. Momentum stocks are exactly the
-  ones that split and issue bonuses (their prices have run up), so they
-  were hit hardest by reading those as crashes. 19 held positions went
-  through one, HDFCBANK, BAJFINANCE and BRITANNIA among them.
-- **The ranking carries real information.** The default start beats every
-  random pick, by 14.9 points (4.9 sd). It also holds in both halves (23.3%
-  and 23.2%).
-- **Checked for the opposite error.** A wrong adjustment would create a fake
-  jump *up*. Every daily move above 15% on a held position was listed and
-  checked: all are real (the Adani falls of Jan-Feb 2023, 4 June 2024,
-  circuit limits); the one on an ex-date (EASEMYTRIP, 3:1 bonus plus 2:1
-  split) is a real +20% day after the factor of 8.
-- **9 months still leads 12** on all four starts.
-- **The fall is no smaller.** -36% to -42% against the index's -38%.
-
-What this does not include, so the figures are still better than an
-account would see: **tax** (most gains here are short-term, 20% STCG since
-July 2024), **slippage** beyond 0.05% a side, and the spun-off company in a
-demerger. Dividends are missing too, which works the other way (about 1%
-a year, on the index as well).
-
-### Momentum works outside the universe it was tuned on: ranks 201-500
-
-The settings (9-1 lookback, 15 names, exit rank 30) were all chosen on the
-top 200. Liquidity ranks 201-500 were never used, so they are the cleanest
-test available (`--universe-skip 200 --universe-size 300`):
-
-| ranks 201-500 | CAGR avg (range) | worst fall | Sharpe |
-|---|---|---|---|
-| momentum | **28.1** (22.9 - 30.8) | -34 to -37% | 1.16 |
-| random picks (10 seeds) | 11.8 (8.2 - 15.7) | -56 to -61% | 0.63 |
-
-16 points over random picks from the same names, about 6.5 sd. The edge is
-not an artefact of tuning on the top 200.
-
-### Volatility targeting: not adopted (2026-10-11)
-
-ROADMAP §4: momentum's falls, not its return, are the problem. Volatility
-targeting scales gross exposure to aim at a target portfolio volatility
-(`vol_target`). Tested on ranks 201-500, declared beforehand at the config's
-15% target; 12% and 20% shown for sensitivity only. Idle cash earns a 6.5%
-liquid-fund rate (`--cash-yield-pct 6.5`); at 0% the test would be unfair to
-it.
-
-| ranks 201-500 | CAGR avg (range) | avg worst fall | worst fall | worst 6 months | volatility | Sharpe |
-|---|---|---|---|---|---|---|
-| **off** | **28.1** (22.9 - 30.8) | -35.4% | -37.1% | -23.8% | 24.6% | 1.16 |
-| 15% target | 22.3 (17.2 - 24.4) | -32.8% | -34.9% | -20.0% | 19.7% | 1.15 |
-| 12% target | 20.9 (15.6 - 23.5) | -30.4% | -35.3% | -18.7% | 17.9% | 1.18 |
-| 20% target | 23.9 (18.8 - 26.5) | -34.8% | -36.5% | -21.7% | 21.9% | 1.12 |
-| 15% target, idle cash at 0% | 20.9 | -33.2% | -36.2% | -20.7% | 19.7% | 1.09 |
-
-The top 200 (where it was tuned, for reference): off 23.0%, worst fall -36
-to -42%; 15% target 18.9%, -33 to -43%.
-
-**Verdict: no.** It does what it says -- volatility falls from 25% to 20% --
-but that costs **about 6 points of CAGR for 2.6 points off the average
-worst fall**, and Sharpe doesn't improve (1.16 vs 1.15). The worst fall
-barely moves (-37.1% to -34.9%) because exposure is set monthly from the
-last 60 days' volatility: a sudden fall like March 2020 is half over before
-the book has shrunk. On the top 200 the worst fall got deeper on one start.
-`vol_target: false` stays.
-
-## Momentum: trailing stop between rebalances (re-run 2026-10-11)
-
-Question: the list is rebuilt monthly, so a stock that falls mid-month is held
-until the next rebalance. Would a trailing stop help, and at what distance?
-
-`run_pit_momentum.py --stop pct|atr` trails the highest close since entry.
-A stop is judged on the close and sold at the **next session's close**, the
-same lag the rebalance has. After a stop, the cash either waits for the next
-rebalance (`--stop-refill cash`) or buys the best name from the last ranking
-that isn't held, wasn't stopped since, and is above its 200 DMA (`next`).
-Current setup otherwise (9-month, 15 stocks, top 200, full costs), on the
-continuous history above. Compared on **2017-12 to 2022-12**, then run on
-**2023-01 to 2026-10**, four start dates each. That second period is **not
-a clean holdout**: earlier experiments were judged on it (see the v1
-section above). It is a second look, not a test.
-
-| stop | 2017-22 CAGR avg (range) | worst fall | 2023-26 CAGR avg (range) | worst fall | stops / yr |
-|---|---|---|---|---|---|
-| **none** | **20.0** (17.1 - 21.9) | -42% | **26.2** (24.1 - 27.8) | -41% | 0 |
-| 10%, cash | 17.0 (10.6 - 22.5) | -27% | 17.3 (13.7 - 22.0) | -33% | 75 |
-| 15%, cash | 17.8 (15.9 - 19.8) | -31% | 22.8 (18.7 - 24.8) | -35% | 42 |
-| 20%, cash | 19.8 (17.8 - 21.3) | -36% | 24.6 (23.0 - 26.3) | -41% | 23 |
-| 25%, cash | 19.1 (18.5 - 20.6) | -36% | 26.3 (23.2 - 28.6) | -37% | 14 |
-| 30%, cash | 19.4 (17.5 - 21.0) | -34% | 24.5 (23.1 - 25.6) | -41% | 8 |
-| 15%, next | 16.8 (13.0 - 21.8) | -40% | 25.1 (21.1 - 29.0) | -36% | 47 |
-| 20%, next | 21.1 (20.4 - 21.6) | -39% | 27.1 (24.5 - 30.3) | -39% | 25 |
-| 25%, next | 19.9 (18.1 - 21.5) | -43% | 27.2 (24.3 - 30.2) | -39% | 15 |
-| 4.5x ATR, cash | 12.5 (4.8 - 19.7) | -34% | 17.2 (14.3 - 21.0) | -33% | 110 |
-
-NIFTY 500 over the same starts: 10.7% and 9.8%. Tighter ATR multiples and
-10% with refill were worse.
-
-**Verdict: no stop. The config stays `stop: none`.**
-
-- **Tight stops buy a smaller fall at a high price.** 10-15% with cash cut
-  the 2017-22 worst fall from -42% to -27/-31%, but cost 2-3 points a year
-  there and 3-9 points in 2023-26. They fire 40-75 times a year across 15
-  positions.
-- **20% with refill is the only variant ahead in both periods**, by 1.1 and
-  0.9 points, beating no-stop on 2 and 3 of 4 starts. That is within the
-  spread between start dates, it was the best of 17 tried, and the second
-  period isn't clean. Not enough to adopt; a candidate to watch in live
-  data.
-- **ATR stops did worst**, but that test is weaker: the market table has
-  closes only, so ATR comes from close-to-close moves and runs small.
-- Caveat: selling at the next close is harsher than a resting stop order
-  for a fast fall, and kinder for a gap.
-
-The monthly rebalance already works as a slow stop: a broken stock falls
-out of the ranking (`exit_rank: 30`) or below its 200 DMA and is sold at the
-next rebalance. The portfolio-wide fall (-36% to -42%) is what neither stops
-nor volatility targeting fixed.
-
-## Momentum, re-run on the repaired market history (2026-10-08)
-
-> **Superseded (2026-10-11)**: this and every section below ran on raw
-> closes that read splits, bonuses, demergers and ticker changes as losses.
-> Their absolute CAGRs understate momentum by about half; comparisons
-> between variants may still hold but have not been re-checked.
-
-Everything below this section was run on a market history that, it turned
-out, had **249 trading days (about 9% since 2016) recorded as empty**: failed
-downloads saved as "no data" and never retried ([data](data.md)). 227 of
-them were refilled, and the current setup was re-run on the repaired
-history: top 200 by liquidity, monthly, 15 stocks, `risk_off_scale: 1.0`,
-data to 2026-10-08.
-
-| | CAGR range, 4 start dates | average | worst fall | vs random picks (10 seeds) |
-|---|---|---|---|---|
-| **9-month (main)** | **11.1 - 12.1** | **11.7** | -39 to -46% | beats 10/10, +7.6 pts, **3.2 sd** |
-| 12-month | 9.2 - 11.3 | 10.4 | -42 to -50% | beats 10/10, +7.2 pts, 2.8 sd |
-| overlap of both | 5.8 - 11.6 | 8.4 | -41 to -51% | |
-| NIFTY 500 | 9.9 - 10.3 | | -38% | |
-| random picks (9-month universe) | -0.1 - 8.0 | 3.8 | -48 to -55% | |
-
-**Split in halves** (default start): 9-month 11.3% to 2022-04 (index 11.7%)
-and 11.6% from 2022-05 (index 9.0%); 12-month 13.1% and 12.0%.
-
-What changed, and what still holds:
-
-- **The headline is lower and much less sensitive to dates.** 9-month
-  averages 11.7%, not 12.5%, and the spread across start dates shrank from
-  5 points to 1. Against the index's ~10.1% over the same starts, the edge
-  is **about 1.5 points a year**, with deeper falls (-39% to -46% against
-  -38%). The ranking still clearly carries information: it beats every
-  random pick from the same universe, by about 3 standard deviations.
-- **9 months now leads 12 months** on all four start dates (11.7% vs
-  10.4% on average). Split into halves, 12 months does a little better in
-  both, so the lead depends on the path. 9 stays the main ranking with 12
-  alongside, as before.
-- **Skipping the latest month still helps** (9-month): 11.4 / 12.1 / 12.1 /
-  11.1% with the skip, against 10.4 / 13.3 / 8.3 / 7.6% without. That's 3
-  of 4, averaging 11.7% vs 9.9%.
-- **The overlap is worse than either list**, more clearly than before.
-- **NSE-blend scoring, semi-annual: still not adopted.** It returned 10.8 /
-  10.8 / 14.7% on three starts, against 11.4 / 12.1 / 12.1% for the current
-  ranking, with falls of -48% to -53%.
-- **Reopened: the market-regime rule.** Holding half the stocks when the
-  index is below its 200-day average (`risk_off_scale: 0.5`) now returns
-  15.7 / 10.9 / 12.3 / 14.5% against 11.4 / 12.1 / 12.1 / 11.1% without it.
-  That's 3 of 4 starts, averaging 13.4% vs 11.7%, with similar worst falls
-  (-42% to -43% vs -39% to -46%). On the old history the rule lost with 12
-  months and won only with 9. The reasons it was dropped haven't changed:
-  the live advisor doesn't do it, it concentrates rather than de-risks, and
-  it was tuned on this same data. **The config is unchanged.** If it's
-  revisited, it needs a period it wasn't chosen on.
-
-## Momentum: does skipping the latest month earn its place? (2026-10-04)
-
-The ranking scores 12-1 momentum: the return from 12 months ago to 1 month
-ago, leaving out the latest month because one-month returns tend to reverse.
-That came from the academic literature (mostly US data) and had never been
-tested here. Tested now on the survivorship-free engine, data 2016-10 to
-2026-10, top 200 by liquidity, monthly rebalance, 15 names, full costs:
+## Signal-rule backtest
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --skip-months 0   # plain 12-month return
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --skip-months 1   # 12-1 (current)
+PYTHONPATH=. .venv/bin/python research/run_backtest.py --shuffle
 ```
 
-> **Corrected 2026-10-04.** The first version of this section was run with
-> ETFs in the universe. The ISIN filter that should keep them out had never
-> run: ingestion discarded the ISIN, the instrument map in `market.db` was
-> empty, and the universe functions skipped the filter when it was empty.
-> LIQUIDCASE, a liquid-fund ETF, was in the latest holdings. The map is now
-> built at ingestion, an empty map is an error, and every figure below was
-> re-run on equities only. The default 12-1 run fell from 14.0% to **11.8%**.
-
-**12-month lookback, CAGR %** (each row is the same test from a different
-start date, so the monthly rebalance falls on different days):
-
-| start | skip 0 | skip 1 | difference |
-|---|---|---|---|
-| 2017-12-07 (default) | 8.6 | **11.8** | +3.2 |
-| 2017-12-14 | 14.1 | **14.4** | +0.3 |
-| 2017-12-21 | 12.2 | **13.4** | +1.2 |
-| 2017-12-28 | 9.6 | **12.8** | +3.2 |
-| first half, to 2022-04 | **9.8** | 9.1 | -0.7 |
-| second half, from 2022-05 | 5.6 | **12.8** | +7.2 |
-
-The skip wins five of the six, by 0.3 to 7.2 points, with higher Sharpe in
-the same five. It loses the first half, narrowly (Sharpe 0.48 vs 0.49), and
-most of its edge comes from the second half. **Kept**, but the case is weaker
-than it first looked: it rests mainly on 2022-2026.
-
-It depends on the lookback, though. With 9 months the skip still helps
-(15.0 vs 16.9). With 6 months it hurts (8.6 vs 7.5): dropping a month from
-six throws away a sixth of the signal. The skip belongs with long lookbacks.
-The 9-month 12-1 figure (16.9%) beats the 12-month one (11.8%) on this start
-date. That is one draw and has not been checked across start dates, so it is
-a lead to test, not a reason to change the lookback.
-
-**The dates alone move the result by 2.6 points.** The same strategy returned
-11.8% to 14.4% depending only on which days the monthly rebalance fell on. The
-headline CAGR figures in this repo are one draw from that range, not a precise
-number. (The 14.5% once quoted in the README predated both the data moving
-forward and the ETF fix.)
-
-### 9-month lookback, and holding only the 12/9 overlap (2026-10-04)
-
-The 9-month lookback looked better on one run above, so it was tested across
-the same start dates. Then a third variant: hold only the stocks in the top 15
-on **both** the 12-month and the 9-month ranking. A stock is bought when it is
-top 15 on both, and sold when it falls past 30 on either. That holds a
-varying number of stocks, 10.8 on average.
-
-```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --lookback-months 9
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --selection overlap
-```
-
-**15 stocks, CAGR %:**
-
-| start | 12-month | 9-month | overlap |
-|---|---|---|---|
-| 2017-12-07 (default) | 11.8 | **16.9** | 13.6 |
-| 2017-12-14 | 14.4 | **17.3** | 14.6 |
-| 2017-12-21 | **13.4** | 11.9 | 11.4 |
-| 2017-12-28 | 12.8 | **16.4** | 15.5 |
-| first half, to 2022-04 | 9.1 | **13.9** | 7.2 |
-| second half, from 2022-05 | 12.8 | **18.9** | 14.7 |
-| average of the four starts | 13.1 | **15.6** | 13.8 |
-| worst fall, four starts | -41 to -46 | -40 to -52 | -42 to -54 |
-
-The 9-month lookback beats 12 months in five of six runs, including both
-halves of history, and beats random picks by 3.3 standard deviations (12-month:
-2.0). It trades more, costing about 0.5 points a year extra, already
-included. The caveat: 12, 9 and 6 months were all tried on the same nine
-years and the best kept, so expect some of the gain to shrink.
-
-The overlap did **not** beat the 9-month list on any start date. In the first
-half it returned 7.2%, below the index's 11.7%. Requiring agreement between
-the two windows sounds safer, but it held fewer stocks and had deeper falls.
-
-**Adopted 2026-10-04: 9 months is now the main ranking**, with 12 months
-kept alongside for comparison. *Same day, later:* every run in this section
-held half as many stocks in RISK-OFF (`risk_off_scale: 0.5`). With that rule
-removed, 9 and 12 months tie; see the next section. Both are kept. The daily guide (section 3b) and the dashboard
-(Momentum tab) show both ranks and scores and mark the names in the top 15 on
-both.
-
-At 10 stocks the 9-month lookback is worse: 6.1% to 18.2% across the four
-starts, with falls of -53% to -58% on three of them. Fewer stocks and a
-shorter window together are too jumpy.
-
-### Market regime filter: fewer stocks in RISK-OFF (2026-10-04)
-
-When the NIFTY 500 was below its 200-day average, the backtest held half as
-many stocks (7 instead of 15), with **all** the money split across those 7 --
-not half in cash. It made the book more concentrated, not safer. The live advisor
-never did this, so the backtest behind the advice was not testing what the
-advice actually tells you to do. Tested by switching it off (`risk_off_scale: 1.0`):
-
-```bash
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 0.5
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --risk-off-scale 1.0
-```
-
-**CAGR %, half the stocks in RISK-OFF (0.5) vs no change (1.0):**
-
-| start | 12-month: 0.5 | 12-month: 1.0 | 9-month: 0.5 | 9-month: 1.0 |
-|---|---|---|---|---|
-| 2017-12-07 (default) | 11.8 | **12.4** | **16.9** | 11.7 |
-| 2017-12-14 | **14.4** | 12.5 | **17.3** | 15.9 |
-| 2017-12-21 | **13.4** | 11.6 | **11.9** | 11.6 |
-| 2017-12-28 | 12.8 | **13.4** | **16.4** | 10.9 |
-| first half, to 2022-04 | 9.1 | **10.5** | **13.9** | 12.7 |
-| second half, from 2022-05 | 12.8 | **13.2** | **18.9** | 11.0 |
-| 0.5 wins | 2 of 6 | | 6 of 6 | |
-
-With 12 months the rule wins 2 of 6. With 9 months it wins all six, but
-that lookback was itself chosen on this data, with the rule switched on.
-In neither case did it do what a regime filter is for, which is no surprise
-once you see it never held cash: the worst falls are no shallower (12-month: -43% either way, and in the second half -38.5% with the
-rule against -34.0% without; 9-month: -52% with it on one start date, -43%
-without). Two settings tuned together on the same nine years can look good
-together by chance.
-
-**Adopted 2026-10-04: `risk_off_scale: 1.0`.** The regime is still shown on
-the dashboard, as information. Backtest and live advice now behave the same
-in a falling market.
-
-With the rule off, across the four start dates (**superseded**: on the
-repaired history these are 11.7%, 10.4% and 8.4%; see the section at the top):
-
-| | CAGR range | average | worst fall | vs random picks |
-|---|---|---|---|---|
-| 9-month (main) | 10.9 - 15.9 | 12.5 | -39 to -43% | 3.0 sd |
-| 12-month | 11.6 - 13.4 | 12.5 | -43 to -45% | 3.1 sd |
-| overlap of both | 10.0 - 12.1 | 11.1 | -46 to -47% | |
-| NIFTY 500 | 10.4 | | -37% | |
-
-The two lookbacks tie: 9 months has the shallower falls, 12 months the
-steadier returns across start dates. Neither is proven better, so both stay,
-9 as the main ranking and 12 alongside. The overlap is worse than either.
-
-**The honest headline** (updated 2026-10-08): the ranking clearly carries
-information (it beats random picks from the same universe by about 3
-standard deviations), but the edge over simply holding the index is about
-1.5 points a year, with deeper falls.
-The earlier 16.9% depended on the regime rule paired with the 9-month
-lookback, and did not survive removing the rule.
-
-The skip-month table above and the NSE-blend table below were run with the
-rule on. Their comparisons stand, since both sides of each comparison used the
-same settings, but their absolute CAGRs are not current.
-
-### NSE's Nifty200 Momentum 30 scoring, tested here
-
-The index scores each stock on 6-month **and** 12-month return, each divided
-by the volatility of daily returns over the last year, z-scored across the
-eligible stocks and averaged 50/50. It rebalances semi-annually and weights by
-free-float market cap times the score, capped at 5%. The published methodology
-does not say whether the latest month is skipped.
-
-The scoring formula alone, swapped into this engine (`--score nse_blend`),
-everything else unchanged:
-
-| variant | CAGR % | max DD % | Sharpe |
-|---|---|---|---|
-| current: 12-1 / vol, monthly | 11.8 | **-43** | 0.57 |
-| NSE blend, skip 0, monthly | 7.5 | -53 | 0.41 |
-| NSE blend, skip 1, monthly | 5.4 | -51 | 0.34 |
-| NSE blend, skip 0, semi-annual | **16.4** | -49 | **0.65** |
-
-The 6-month half pulls the monthly blend down, the same thing the 6-month
-lookback test showed. Semi-annual NSE blend wins this one run, but on timing
-it is a coin toss. Across three start dates it returned **16.4%, 10.6% and
-14.3%**, with drawdowns of -49% to -54%. Monthly 12-1 over the same three
-starts returned 11.8% to 14.4%, with drawdowns of -41% to -44%. Semi-annual
-12-1 did worst, at 8.9% to 10.0%. With only ~17 rebalances in nine years, one
-badly timed rebalance decides the result.
-
-**Not adopted.** On average the semi-annual NSE blend roughly ties monthly
-12-1 (13.8% vs 13.2% across the three starts), with a much wider spread and
-drawdowns 6 to 10 points deeper. Nothing here beats the current ranking
-reliably. Not tested: the index's market-cap weighting and 5% cap, since this
-engine holds equal weights. That is a different portfolio, not a different
-ranking.
-
-The dashboard no longer shows the 12-1 figure, which nobody can check against
-a broker. It shows plain 12M % and 1M % returns, plus the Score the rank
-actually sorts by.
-
-# Backtest
-
-```bash
-PYTHONPATH=. .venv/bin/python run_backtest.py --shuffle
-```
-
-`--shuffle` runs a randomised-entry control alongside the strategy. **If the
+Walk-forward simulation of entry and exit rules on the watch list.
+`--shuffle` runs a randomised-entry control alongside the strategy: **if the
 strategy does not clearly beat its own shuffled control, the entry rules are
 adding nothing.** Also accepts `--start` / `--end` for holdout testing.
 
-
-# Experiments (train / holdout)
+## Experiments (train / holdout)
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_experiment.py                       # compare on train
-PYTHONPATH=. .venv/bin/python run_experiment.py --holdout --variant X # ONE shot
+PYTHONPATH=. .venv/bin/python research/run_experiment.py                       # compare on train
+PYTHONPATH=. .venv/bin/python research/run_experiment.py --holdout --variant X # ONE shot
 ```
 
-Variants live in `VARIANTS` in `run_experiment.py`. Each should embody a
-*hypothesis about why the strategy fails*, not a threshold sweep -- so that a win
-is interpretable rather than accidental. Choose on train, then run the holdout
-once. Never iterate against holdout results.
+Variants live in `VARIANTS` in `research/run_experiment.py`. Each should embody
+a *hypothesis about why the strategy fails*, not a threshold sweep -- so that
+a win is interpretable rather than accidental. Choose on train, then run the
+holdout once.
 
 ---
 
-See also: [strategy](strategy.md) for the rules being tested, [data](data.md) for why survivorship bias mattered so much.
+See also: [strategy](strategy.md) for the rules being tested, [data](data.md)
+for how the price history is kept continuous.

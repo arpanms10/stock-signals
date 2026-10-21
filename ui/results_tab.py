@@ -1,6 +1,6 @@
 """Results tab: this season's quarterly results for the stocks you follow.
 
-Reads what run_results.py stored (data/results/); the Check button runs it.
+Reads what scripts/run_results.py stored (data/results/); the Check button runs it.
 Nothing here fetches on page load except NSE's results calendar, which is
 cached for half a day and shared with the Swing tab.
 """
@@ -34,9 +34,6 @@ def render(run_script=None) -> None:
     today = dt.date.today()
     want = engine.expected_quarter(today)
     st.subheader("Quarterly results")
-    c.evidence("none", "The scorecard did not predict the drift after results (strong "
-                       "minus weak +1.6% over 60 sessions, t 1.6). The price reaction did: "
-                       "rallied minus sold off +3.5% (t 2.6).")
     st.caption(
         "Your holdings, the watch list and the latest swing and momentum picks, "
         "scored from NSE's own filings. Each verdict compares the company with "
@@ -59,9 +56,9 @@ def render(run_script=None) -> None:
     top[4].write("")
     if run_script and top[4].button("Check for new results", type="primary",
                                     width="stretch", key="results_run",
-                                    help="Runs run_results.py: scores new filings "
+                                    help="Runs scripts/run_results.py: scores new filings "
                                          "and updates price reactions."):
-        run_script("Check quarterly results", ["run_results.py"])
+        run_script("Check quarterly results", ["scripts/run_results.py"])
 
     f1, f2 = st.columns([3, 2])
     picked = f1.pills("Followed because", SOURCES, selection_mode="multi",
@@ -85,13 +82,13 @@ def render(run_script=None) -> None:
 
 
 def _backtest() -> None:
-    """What run_results_backtest.py found, from config/results_calibration.json."""
+    """What research/run_results_backtest.py found, from config/results_calibration.json."""
     import json
     from pathlib import Path
     path = Path(__file__).resolve().parents[1] / "config" / "results_calibration.json"
-    with st.expander("Has the verdict predicted anything? (backtest)"):
+    with st.expander("Backtest: has the verdict or the reaction predicted anything?"):
         if not path.exists():
-            st.caption("No backtest yet. Run `run_results_backtest.py` (about an hour "
+            st.caption("No backtest yet. Run `research/run_results_backtest.py` (about an hour "
                        "the first time: it reads ~3,000 filings).")
             return
         cal = json.loads(path.read_text())
@@ -99,16 +96,13 @@ def _backtest() -> None:
         st.caption(f"Tested {cal['tested_on']}: {cal['events']} filings from "
                    f"{cal['stocks']} Nifty 200 stocks, quarters {q[0]} to {q[-1]}. "
                    "Entry at the close of the reaction day; returns less the NIFTY 500.")
-        (st.success if cal["verdict_predicts"] else st.warning)(
-            "The verdict has predicted 60-session excess returns."
-            if cal["verdict_predicts"] else
-            "No reliable edge from the verdict: a strong card has not gone on to "
-            "beat a weak one once the reaction is known. Read it; don't trade on it.")
-        if cal.get("reaction_predicts"):
-            st.info("The **reaction** has: stocks that rallied on their results kept "
-                    "beating those that sold off over the next 60 sessions. The "
-                    "market's first read carries on; the Reaction column is the one "
-                    "to watch.")
+        st.markdown(
+            "In this run, the verdict **"
+            + ("did" if cal["verdict_predicts"] else "did not")
+            + "** pass the backtest's test for predicting 60-session excess returns, "
+            "and the price reaction **"
+            + ("did" if cal.get("reaction_predicts") else "did not")
+            + "**. The numbers behind that are below.")
         for h, r in cal["horizons"].items():
             st.markdown(f"**{h} sessions on** -- strong minus weak, per quarter: "
                         f"{r['verdict_spread_mean']}% (t = {r['verdict_spread_t']}, "

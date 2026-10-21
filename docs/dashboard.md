@@ -38,10 +38,6 @@ opens Compare funds) and the **data chip**, which turns amber or red when a
 source is behind and opens to say which, with the button that fixes it.
 Anything stale also gets a warning line on every page.
 
-Every page title is followed by an **evidence line**: how far its signals held
-up in a backtest (tested / weak / no edge / experimental), so the strength of
-a verdict is visible before reading it.
-
 ## Badges
 
 | | meaning |
@@ -61,8 +57,8 @@ colourblindness.
 ## Two target frames, deliberately separate
 
 A holding bought cheaply that has since run up has entry targets *below* today's
-price. Shown on a row recommending a buy, that reads as "sell lower than you
-buy" -- which is how the bug was found.
+price. Shown on a row recommending a buy, that would read as "sell lower than
+you buy", so the two are kept apart.
 
 - **Buying today** uses today's price: `₹1,423 to buy · stop ₹1,379 · T1 ₹1,489 · T2 ₹1,555`
 - **Holding a position** uses your entry, marking targets already achieved:

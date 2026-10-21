@@ -41,8 +41,7 @@ def render() -> None:
         cols[3].metric("In the top band", f"{int(m['in_top'].sum())}")
         cols[4].metric("Top band on both", f"{int(m['in_both'].sum())}",
                        help="In the top band on BOTH lookbacks "
-                            f"({' and '.join(f'{x}-month' for x in lbs)}). "
-                            "Holding only these did worse than either list in the backtest.")
+                            f"({' and '.join(f'{x}-month' for x in lbs)}).")
 
         st.caption(f"Ranked by **Score**: the return from {main_lb} months ago "
                    "to 1 month ago, divided by volatility, for names above their "
@@ -157,7 +156,7 @@ def entry_levels(symbols: list[str], market: list[dict]) -> None:
                                      e.get("t2"), f"Needs: {e['note']}"),
                         unsafe_allow_html=True)
 
-    import watching as wg
+    from book import watching as wg
     already = set(wg.symbols())
     if row["symbol"] in already:
         st.caption(f"✓ {row['symbol']} is on your watch list.")

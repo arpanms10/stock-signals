@@ -2,7 +2,7 @@
 
 Pure functions over a chain DataFrame (see data/sources/nse_derivatives.py:
 one row per strike, ce_* and pe_* columns). No I/O, so the backtest in
-run_fno_backtest.py runs exactly this code on historical bhavcopy chains.
+scripts/run_fno_backtest.py runs exactly this code on historical bhavcopy chains.
 
 What open interest is evidence of: where option WRITERS have put money. A
 large put OI below spot means writers are paid as long as price stays above
@@ -38,9 +38,10 @@ DEFAULTS = {
     "equity_pcr_bearish_below": 0.5,
     "equity_pcr_bullish_above": 0.8,
     "equity_pcr_stretched_above": 1.05,
-    # Share of expiry closes inside spot +/- straddle, by sessions out.
-    "range_hit_pct": {"index": {5: 49, 10: 56, 20: 58},
-                      "equity": {5: 61, 10: 63, 20: 54}},
+    # Share of expiry closes inside spot +/- straddle, by sessions out. Empty
+    # until run_fno_backtest.py measures it on your own history
+    # (config/fno_calibration.json, read by records/fno_report.py).
+    "range_hit_pct": {},
     "near_expiry_sessions": 2,
     "risk_free_pct": 6.5,
     "stale_minutes": 30,
@@ -315,7 +316,7 @@ def expected_range(spot: float, move: float | None, support: Wall | None,
 
     The live default until validation (2026-10-08) showed the walls only made
     the range narrower, never more accurate: it held exactly as often as its
-    width predicted. Kept so run_fno_backtest.py can keep reporting it.
+    width predicted. Kept so scripts/run_fno_backtest.py can keep reporting it.
     Returns (low, high, low_from, high_from).
     """
     lo_c, hi_c = [], []
@@ -386,7 +387,7 @@ def analyse(symbol: str, strikes: pd.DataFrame, spot: float, expiry: dt.date,
     return v
 
 
-NO_EDGE = "positioning only: no measured edge (docs/f_o/validation.md)"
+NO_EDGE = "positioning only, not a forecast"
 
 
 def _reasons(v: FnoView) -> list[str]:
@@ -398,8 +399,8 @@ def _reasons(v: FnoView) -> list[str]:
                     f"straddle ({100 * v.straddle / v.spot:.1f}%): the move the market is "
                     "pricing to expiry.")
             if v.range_hit_pct is not None:
-                line += (f" Since {'Jan 2024' if v.kind == 'equity' else '2019'} the "
-                         "expiry close landed inside it about "
+                line += (" In the F&O history on file the expiry close landed "
+                         "inside it about "
                          f"{v.range_hit_pct:.0f}% of the time for "
                          f"{'stocks' if v.kind == 'equity' else 'indices'} this far out.")
         else:
@@ -422,20 +423,19 @@ def _reasons(v: FnoView) -> list[str]:
     if v.pcr["oi"] is not None:
         if v.kind == "equity":
             r.append(f"PCR {v.pcr['oi']:.2f} on open interest: {v.pcr_bias} against "
-                     "stock norms. No absolute signal; against other stocks the same "
-                     "day, high PCR leaned up ~5-6 points -- tentative, unconfirmed.")
+                     "stock norms -- positioning, not a forecast.")
         else:
             r.append(f"PCR {v.pcr['oi']:.2f} on open interest: {v.pcr_bias} against "
-                     f"{norms} norms -- positioning only; it did not predict direction.")
+                     f"{norms} norms -- positioning, not a forecast.")
     if v.pcr["chg_oi"] is not None:
         r.append(f"PCR {v.pcr['chg_oi']:.2f} on today's added OI: {v.chg_pcr_bias} "
-                 "-- what writers did today (untested: end-of-day history only).")
+                 "-- what writers did today.")
     else:
         r.append(f"Today's OI change: calls {v.pcr['ce_chg_oi']:+,.0f}, puts "
                  f"{v.pcr['pe_chg_oi']:+,.0f} contracts -- a side is unwinding, so no ratio.")
     if v.max_pain is not None:
-        r.append(f"Max pain {_fmt(v.max_pain)}: historically a worse guess for the "
-                 "expiry close than today's price.")
+        r.append(f"Max pain {_fmt(v.max_pain)}: the strike where option buyers, in "
+                 "total, would lose the most at expiry.")
     if v.futures and v.futures.buildup:
         r.append(f"Futures {v.futures.price_chg:+,.2f} with OI {v.futures.chg_oi:+,.0f}: "
                  f"{v.futures.buildup}.")
@@ -801,15 +801,16 @@ def conditional_note(v: "FnoView", cond: dict | None) -> str | None:
                      f"stock) it held {low['pct']:.0f}% (n={low['n']:,})")
     if not notes:
         return None
-    return (f"Since 2024, stocks' range held {base:.0f}% overall; " + "; ".join(notes) + ".")
+    return (f"In the F&O history on file, stocks' range held {base:.0f}% overall; "
+            + "; ".join(notes) + ".")
 
 
 # ------------------------------------------------------------ option check
 
 @dataclass
 class OptionCheck:
-    """The facts about one contract a buyer would weigh. Not a recommendation:
-    the validation found nothing here that predicts direction."""
+    """The facts about one contract a buyer would weigh. Not a recommendation
+    and not a forecast of direction."""
     symbol: str
     strike: float
     side: str                     # "CE" | "PE"
@@ -918,9 +919,9 @@ def option_check(v: FnoView, strikes: pd.DataFrame, strike: float, side: str,
         oc.payoff.sort(key=lambda t: t[1])
 
     n = oc.notes
-    n.append("Direction: nothing in this data predicted whether the price rose or fell "
-             "by expiry (docs/f_o/validation.md). The odds below are for a move of the "
-             "needed size, up or down alike.")
+    n.append("Direction: these numbers say nothing about whether the price will rise "
+             "or fall. The odds below are for a move of the needed size, up or down "
+             "alike.")
     if mid is None:
         n.append("No live quote or trade for this strike -- no price to check.")
     if spread is not None and spread > 5:
@@ -933,8 +934,7 @@ def option_check(v: FnoView, strikes: pd.DataFrame, strike: float, side: str,
                  "after, which lowers premiums even if the price doesn't move.")
     if v.vol and v.vol.iv_pct is not None and v.vol.iv_pct < 20 and v.kind == "equity":
         n.append("Options are cheap for this stock against its own past year (IV "
-                 "percentile below 20). For stocks like that, moves exceeded the priced "
-                 "move more often than usual (range held 56% vs 61%).")
+                 "percentile below 20).")
     if v.sessions <= 2:
         n.append("Near expiry: time decay is fastest now, and the premium is mostly "
                  "a bet on the next few sessions.")

@@ -1,6 +1,6 @@
 """Regression: no ETF or fund may enter the backtest universe or a live ranking.
 
-LIQUIDCASE (ISIN INF0R8F01034) appeared in run_pit_momentum.py's latest
+LIQUIDCASE (ISIN INF0R8F01034) appeared in research/run_pit_momentum.py's latest
 holdings. ETFs trade in the EQ series, so they are in the bhavcopy alongside
 stocks; the ISIN is the only discriminator. Ingestion discarded it, nothing
 ever built the instrument map, and both universe functions skipped the equity

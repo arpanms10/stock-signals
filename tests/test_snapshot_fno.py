@@ -3,7 +3,7 @@ import datetime as dt
 import json
 from pathlib import Path
 
-import snapshot_fno as sf
+from scripts import snapshot_fno as sf
 from data import store
 from data.sources import nse_derivatives as d
 
@@ -47,13 +47,13 @@ def test_signed_counts():
 
 
 def test_keep_awake_until_close():
-    import keep_awake_fno as ka
+    from scripts import keep_awake_fno as ka
     assert ka.seconds_until_close(dt.datetime(2026, 10, 9, 9, 20)) == (6 * 60 + 15) * 60
     assert ka.seconds_until_close(dt.datetime(2026, 10, 9, 16, 0)) == 0
 
 
 def test_awake_agent_runs_weekday_mornings():
-    import jobs
+    from ops import jobs
     p = jobs.awake_plist()
     assert p["StartCalendarInterval"] == [{"Weekday": d, "Hour": 9, "Minute": 20}
                                          for d in range(1, 6)]

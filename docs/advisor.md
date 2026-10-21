@@ -7,7 +7,7 @@ Verdicts on your own book: what to buy, trim or exit, funded and taxed.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_advisor.py --total-capital 2000000 --cash 50000
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py --total-capital 2000000 --cash 50000
 ```
 
 A verdict per holding with its reasoning, stop, targets and quantity.
@@ -32,16 +32,11 @@ sector and stop the moment it is compliant, and no single holding gives up more
 than half its value for a sector reason -- beyond that a sizing fix has become
 an exit in disguise.
 
-An earlier version only trimmed satellites, and separately the legacy
-rank-verdict returned before the sector check ever ran. Between them, the
-largest risk the framework could identify produced no action at all.
-
 ## Tax on the whole plan
 
 Per-holding figures apply the rate flat, which overstates tax. The **annual
 LTCG exemption belongs to the year, not to any one sale**, so it is applied
-across the plan once every sell is known. On a plan realising Rs 65,087 of
-long-term gains, that took the estimate from Rs 8,136 to zero.
+across the plan once every sell is known.
 
 
 # Decision log
@@ -50,8 +45,8 @@ Every run records its verdicts -- and, separately, the top-ranked names you do
 **not** own, which is what the ranking is actually asserting.
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_advisor.py            # logs automatically
-PYTHONPATH=. .venv/bin/python run_advisor.py --no-log   # skip
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py            # logs automatically
+PYTHONPATH=. .venv/bin/python scripts/run_advisor.py --no-log   # skip
 ```
 
 Advice is scored once it is 21 days old -- judging a call made three days ago

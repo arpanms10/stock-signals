@@ -4,7 +4,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-import fundamentals as fu
+from scoring import fundamentals as fu
 
 
 def sheet():

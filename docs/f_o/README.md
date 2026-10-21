@@ -9,10 +9,10 @@ and about 213 stocks.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY BANKNIFTY RELIANCE --excel
-PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --expiry 2026-11-23
-PYTHONPATH=. .venv/bin/python run_fno.py --selftest       # are NSE's endpoints still working?
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY BANKNIFTY RELIANCE --excel
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py RELIANCE --expiry 2026-11-23
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py --selftest       # are NSE's endpoints still working?
 ```
 
 The dashboard has the same view under the **F&O** tab. Nothing is fetched
@@ -28,45 +28,36 @@ A symbol without F&O contracts gets a clear message, not an empty result.
 
 ## What it shows, and how far to trust it
 
-The view has two parts, and [validation](validation.md) is why they are
-separate.
+The view has two parts.
 
 **The range: spot ± the ATM straddle.** The ATM call plus put premium
 (bid/ask mid) is what the market charges for a move either way by expiry. It
-is shown with **how often the expiry close actually landed inside it**,
-measured from January 2024 to September 2026:
+is shown with **how often the expiry close has landed inside such a range**
+on past data, for the same group (stocks, monthly indices, weekly NIFTY) and
+the same number of sessions to expiry. For stocks it also gives a separate
+rate when options are cheap for that stock (IV percentile below 20) or
+results fall before expiry, if that rate differs.
 
-| sessions to expiry | stocks | indices (monthly) | NIFTY weekly |
-|---|---|---|---|
-| ~1–2 | | | 64–65% |
-| ~4–5 | 60% | 50% | 62% |
-| ~10 | 63% | 57% | |
-| ~20 | 54% | 67% (small sample) | |
-
-For stocks it also says when one of the two measured conditions applies:
-options cheap for that stock (IV percentile below 20: held 56%) or results
-before expiry (57%), against 61% overall.
-
-So this is a band with roughly even odds, not a target. If there's no ATM
-quote, the range falls back to ±1σ from ATM IV and says that this hit rate
-hasn't been measured. The rates come from `config/fno_calibration.json`, which every validation
-run rewrites (the values in `config/scoring.yaml` are a fallback). Weekly
-NIFTY expiries are quoted from their own weekly measurements.
+This is a band, not a target. If there's no ATM quote, the range falls back
+to ±1σ from ATM IV and says that this hit rate hasn't been measured. The
+rates come from `config/fno_calibration.json`, which every
+`scripts/run_fno_backtest.py` run rewrites (the values in `config/scoring.yaml`
+are a fallback). Weekly NIFTY expiries are quoted from their own weekly
+measurements.
 
 **Positioning: walls, PCR, max pain, futures buildup.** These are shown
 because they describe where option writers have put money, which is worth
-knowing. On about 13,000 stock and 2,000 index observations, none of them
-reliably told you where price ended up (stock PCR has a tentative relative
-tilt, below):
+knowing. They are context, not signals; [validation](validation.md) shows how
+to test each one.
 
-| output | how | what validation found |
-|---|---|---|
-| **Put wall** ("support") | the put strike below spot with the most OI (within ±10%, holding ≥5% of the puts there) | held exactly as often as any level the same distance below spot |
-| **Call wall** ("resistance") | the call strike above spot with the most OI, same rules | same |
-| **PCR (OI)** | put OI ÷ call OI, read against **its own kind's norms**: indices bearish < 0.7, bullish > 1.2, stretched > 1.6. Stocks bearish < 0.5, bullish > 0.8, stretched > 1.05 (their 20th/80th/97th percentiles; stock PCR runs much lower) | no absolute direction. Among stocks on the same day, high PCR leaned up by ~5–6 points: tentative, not a live signal |
-| **PCR (today's ΔOI)** | put OI added today ÷ call OI added today; blank when either side is unwinding | not tested (the history is end-of-day) |
-| **Max pain** | the expiry price at which option holders, in total, collect the least | a worse guess for the expiry close than today's price |
-| **Futures buildup** | sign of the futures price change against the sign of the OI change | not tested |
+| output | how |
+|---|---|
+| **Put wall** ("support") | the put strike below spot with the most OI (within ±10%, holding ≥5% of the puts there) |
+| **Call wall** ("resistance") | the call strike above spot with the most OI, same rules |
+| **PCR (OI)** | put OI ÷ call OI, read against **its own kind's norms**: indices bearish < 0.7, bullish > 1.2, stretched > 1.6. Stocks bearish < 0.5, bullish > 0.8, stretched > 1.05 (their 20th/80th/97th percentiles; stock PCR runs much lower) |
+| **PCR (today's ΔOI)** | put OI added today ÷ call OI added today; blank when either side is unwinding |
+| **Max pain** | the expiry price at which option holders, in total, collect the least |
+| **Futures buildup** | sign of the futures price change against the sign of the OI change |
 
 Only out-of-the-money strikes count as walls. A call written below spot is
 already in the money: it's a hedge or a covered position, not a ceiling.
@@ -76,25 +67,16 @@ a chain with no clear wall on one side, no ATM quote, or a chain more than 30
 minutes old during market hours. The thresholds are in the `fno:` section of
 `config/scoring.yaml`.
 
-### What changed after validation
-
-Until 2026-10-08 the range was the tighter of the OI wall and the straddle on
-each side, and the PCR thresholds were index ones for everything. Validation
-showed the walls only made the range narrower, never more accurate, and that
-index thresholds labelled 71% of stocks "bearish". Both were changed.
-`run_fno_backtest.py` still reports the old range for comparison.
-
 ## Check an option
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py NIFTY --option 22000PE --lots 2
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py NIFTY --option 22000PE --lots 2
 ```
 
 The dashboard has the same panel below "Reach a level": pick put or call, a
 strike and lots. It shows the facts a buyer would weigh, and deliberately
-**no buy or sell suggestion**: the validation found nothing in this data
-that predicts direction, so a suggestion would be a guess presented as a
-result.
+**no buy or sell suggestion**: nothing in this data is used to predict
+direction.
 
 - **Premium:** bid, ask, mid, last, spread, OI and volume (is it liquid?),
   and the cost for the lots, which is also a buyer's maximum loss.
@@ -149,7 +131,7 @@ column of the reach check in [validation](validation.md).
 ## Reach: is a target or stop realistic?
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_fno.py RELIANCE --level 1250 1150
+PYTHONPATH=. .venv/bin/python scripts/run_fno.py RELIANCE --level 1250 1150
 ```
 
 For any price, plus both walls automatically:
@@ -170,31 +152,30 @@ The dashboard shows the same numbers under each wall and in a **Reach a
 level** box.
 
 What it isn't: **a forecast of direction.** Up and down moves are pooled, so
-+5% and −5% get the same number. The sample's own direction was a falling
-market, and baking that in would bias every estimate. It also counts daily
++5% and −5% get the same number, so the sample's own direction doesn't bias
+the estimate. It also counts daily
 closes only, so an intraday touch is more likely than it says. Use it to
 judge whether a target is realistic for this expiry, or how often a stop at
 that distance would have been hit, not whether price is headed there.
 
 The curves live in `config/fno_reach.json`, rebuilt by every
-`run_fno_backtest.py` run from the observations 5 and 10 sessions out. Out
-of sample (built on Jan 2024 – Jun 2025, tested on Jul 2025 onward), the
-historical numbers were within about 1–4 points of what happened, and the
-model ran 2–4 points high for stocks. See [validation](validation.md).
+`scripts/run_fno_backtest.py` run from the observations 5 and 10 sessions out.
+How well they match outcomes out of sample is in the validation report; see
+[validation](validation.md).
 
 ## Intraday snapshots
 
 ```bash
-PYTHONPATH=. .venv/bin/python install_schedule.py --fno-intraday           # install
-PYTHONPATH=. .venv/bin/python install_schedule.py --fno-intraday --remove  # remove
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --fno-intraday           # install
+PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --fno-intraday --remove  # remove
 ```
 
-Installs a second launchd agent that runs `snapshot_fno.py` every 30 minutes,
+Installs a second launchd agent that runs `scripts/snapshot_fno.py` every 30 minutes,
 09:30–15:30 on weekdays, for the forward-log basket. It skips exchange
 holidays and does nothing outside market hours, and it only runs while the
 Mac is awake.
 
-The same install adds a second agent, `keep_awake_fno.py`, at 09:20 on
+The same install adds a second agent, `scripts/keep_awake_fno.py`, at 09:20 on
 weekdays. On an NSE trading day it runs macOS's own `caffeinate -i` until
 15:35, which stops the Mac sleeping when idle. That's a process holding a
 sleep assertion, not a change to system settings, and it ends with the
@@ -211,8 +192,8 @@ needs before it can be tested. Until then it's labelled untested.
 To see how a day went, after the close:
 
 ```bash
-PYTHONPATH=. .venv/bin/python snapshot_fno.py --report                      # today
-PYTHONPATH=. .venv/bin/python snapshot_fno.py --report --date 2026-10-08 --excel
+PYTHONPATH=. .venv/bin/python scripts/snapshot_fno.py --report                      # today
+PYTHONPATH=. .venv/bin/python scripts/snapshot_fno.py --report --date 2026-10-08 --excel
 ```
 
 It prints one row per underlying: snapshots taken, first and last time,
@@ -224,26 +205,26 @@ same PCR line ("PCR through the day").
 
 ## Keeping it current
 
-The Saturday job (`run_weekly.py`) now also:
+The Saturday job (`scripts/run_weekly.py`) also:
 
-1. runs `run_fno.py --selftest`, which checks every live NSE endpoint
-   answers with real data (NSE changed this API once already, and one
-   retired endpoint answers 200 with an empty body);
-2. runs `run_fno_backtest.py --ingest`, which adds the week's bhavcopy,
+1. runs `scripts/run_fno.py --selftest`, which checks every live NSE endpoint
+   answers with real data (a retired NSE endpoint can answer 200 with an
+   empty body);
+2. runs `scripts/run_fno_backtest.py --ingest`, which adds the week's bhavcopy,
    index history and results dates, then re-runs the validation. That
    rewrites `config/fno_calibration.json` (the hit rates the range quotes)
    and `config/fno_reach.json` (the reach curves), so neither goes stale or
    needs editing by hand. Both are local build outputs, not in git (like
    `data/fo_history.db` they are built from); a fresh checkout gets them
-   from the first `run_fno_backtest.py --ingest`.
+   from the first `scripts/run_fno_backtest.py --ingest`.
 
 `--ingest-old` adds the 2019–2023 index history; it only needs running once.
 
 ## Forward log
 
 ```bash
-PYTHONPATH=. .venv/bin/python record_fno.py               # score expired cycles, record this one
-PYTHONPATH=. .venv/bin/python record_fno.py --check-only  # score only
+PYTHONPATH=. .venv/bin/python scripts/record_fno.py               # score expired cycles, record this one
+PYTHONPATH=. .venv/bin/python scripts/record_fno.py --check-only  # score only
 ```
 
 `history/fno_ranges.xlsx` gets one tab per monthly expiry. Each tab holds
@@ -260,8 +241,7 @@ replaces it. The Saturday job runs it, so a cycle is normally logged 15–20
 sessions before expiry.
 
 Judge it over several cycles. Stocks move together, so one large market move
-can push most of a cycle outside its range. The log started with the
-October 2026 expiry.
+can push most of a cycle outside its range.
 
 ## Snapshots
 
@@ -278,12 +258,12 @@ data/sources/nse_derivatives.py   live chain, futures, expiries, lot sizes, F&O 
 data/sources/nse_events.py        results dates from board-meeting announcements
 data/fo_bhavcopy.py               historical chains from the F&O bhavcopy
 strategy/fno.py                   PCR, walls, max pain, straddle, range (pure)
-fno_report.py                     load + text + Excel, shared by CLI and UI
-run_fno.py                        command line
-run_fno_backtest.py               the validation; writes the calibration files
-record_fno.py                     the monthly forward log
-snapshot_fno.py                   intraday snapshots (launchd)
-run_option_backtest.py            option rule backtest (docs/f_o/backtest.md)
+records/fno_report.py                     load + text + Excel, shared by CLI and UI
+scripts/run_fno.py                        command line
+scripts/run_fno_backtest.py               the validation; writes the calibration files
+scripts/record_fno.py                     the monthly forward log
+scripts/snapshot_fno.py                   intraday snapshots (launchd)
+research/run_option_backtest.py            option rule backtest (docs/f_o/backtest.md)
 ui/fno_tab.py                     dashboard tab
 ```
 

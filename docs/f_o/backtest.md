@@ -8,11 +8,11 @@ after costs, and the trade log to check it against.
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --action buy --side PE --strike moves:-1
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --compare
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --action sell --side CE --strike moves:+1 \
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --action buy --side PE --strike moves:-1
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --compare
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --action sell --side CE --strike moves:+1 \
     --universe stocks --sessions 5 --excel
-PYTHONPATH=. .venv/bin/python run_option_backtest.py --universe NIFTY --cycle weekly --sessions 2
+PYTHONPATH=. .venv/bin/python research/run_option_backtest.py --universe NIFTY --cycle weekly --sessions 2
 ```
 
 The "Check an option" panel answers "what are this contract's odds?". This
@@ -74,111 +74,40 @@ straddle out.
 - **`--excel`:** a workbook with Metrics, Trades, Year x Month, By symbol
   and By kind, plus the trade log as CSV beside it.
 
-## First results (indices, monthly, entry 10 sessions out, 2019 – Sep 2026)
+## Reading the results
 
-From `--compare`, rupees per lot after costs. The automatic check passed for
-every rule.
+- **Judge a rule by period, not by its total.** Option rules swing with the
+  market regime: a rule that sells puts wins small and often in calm markets
+  and can lose heavily in a sell-off, when the matching buying rule does well.
+  Use `--start` / `--end` to split the history.
+- **Sellers win small and often, and lose big and rarely.** Look at the worst
+  trade and the max drawdown, not just the win rate.
+- **Per lot, not per rupee of margin.** A short option needs a lot of margin
+  per lot, so return on capital is much lower than the per-lot totals
+  suggest, and a gap through the strike can cost many months of premium.
+- **Stocks: use the average per trade.** The totals add up one lot in every
+  stock every month, which isn't a portfolio anyone holds. Short stock options
+  expiring on the same day also lose together in a broad fall, and one stock's
+  gap can be many times the median trade.
+- Stock history starts in 2024, so it is a short sample.
 
-| rule | trades | win rate | profit factor | total | max drawdown |
-|---|---|---|---|---|---|
-| buy CE ATM | 298 | 34.6% | 0.91 | −2.42 L | 10.47 L |
-| buy PE ATM | 293 | 32.1% | 0.93 | −1.65 L | 4.94 L |
-| buy CE 1 straddle above | 247 | 17.4% | 0.94 | −0.49 L | 3.49 L |
-| buy PE 1 straddle below | 248 | 19.0% | 0.71 | −2.50 L | 3.95 L |
-| sell CE 1 straddle above | 247 | 82.6% | 1.02 | +0.15 L | 4.31 L |
-| sell PE 1 straddle below | 248 | 81.0% | 1.34 | +2.15 L | 1.91 L |
-| sell CE ATM | 298 | 65.1% | 1.05 | +1.27 L | 10.21 L |
-| sell PE ATM | 293 | 67.9% | 1.03 | +0.67 L | 4.58 L |
-
-**Buying lost after costs in every case, and selling made money in every
-case, but that is not a free lunch.** The same split by period as the
-validation:
-
-| | 2019–21 | 2022–23 | 2024–26 |
-|---|---|---|---|
-| sell PE 1 straddle below: profit factor (total) | 1.32 (+0.40 L) | **0.51 (−1.23 L)** | 2.19 (+2.98 L) |
-| buy PE 1 straddle below: profit factor (total) | 0.72 (−0.48 L) | **1.87 (+1.16 L)** | 0.44 (−3.18 L) |
-
-- **Regime decides it.** The seller's best rule lost heavily through the
-  2022–23 sell-offs, exactly when the buyer's made money. Its worst single
-  trade was −₹43,818 per lot (NIFTY, February 2022).
-- **Sellers win small and often, and lose big and rarely.** That's the
-  same "straddle slightly overprices the move" seen in the
-  [validation](validation.md), collected one premium at a time, with the
-  tail risk attached.
-- **Per lot, not per rupee of margin.** A short index option needs
-  roughly a lakh or more of margin per lot, depending on the strike and
-  the day. Return on capital is much lower than the totals suggest, and a
-  gap through the strike can cost many months of premium.
-- **The headline totals mix three regimes.** Judge any rule by period,
-  as above, not by its total.
-
-What these rules would have done after costs, not what to trade.
-
-## Stocks (monthly, entry 10 sessions out, Jan 2024 – Sep 2026)
-
-From `--compare --universe stocks`, with in-the-money stock options
-squared off on expiry day (about 18% of trades). That's about 6,500 trades per rule
-across ~200 stocks, and the automatic check passed for every rule. Use the
-**average per trade**: the totals add up one lot in every stock every month,
-which isn't a portfolio anyone holds.
-
-| rule | trades | win rate | profit factor | average per trade (₹/lot) |
-|---|---|---|---|---|
-| buy CE ATM | 6,612 | 32.0% | 0.86 | −1,484 |
-| buy PE ATM | 6,625 | 32.9% | 0.78 | −2,252 |
-| buy CE 1 straddle above | 6,450 | 15.7% | 0.72 | −1,496 |
-| buy PE 1 straddle below | 6,444 | 14.1% | 0.60 | −1,839 |
-| sell CE 1 straddle above | 6,450 | 84.1% | 1.27 | +1,087 |
-| sell PE 1 straddle below | 6,444 | 85.4% | 1.51 | +1,472 |
-| sell CE ATM | 6,612 | 67.2% | 1.06 | +554 |
-| sell PE ATM | 6,625 | 66.3% | 1.17 | +1,401 |
-
-The same pattern as indices, more strongly: buying lost after costs and
-selling made money, in every rule.
-
-| profit factor by year | 2024 | 2025 | 2026 |
-|---|---|---|---|
-| sell PE 1 straddle below | 1.43 | 1.75 | 1.36 |
-| buy PE 1 straddle below | 0.64 | 0.51 | 0.67 |
-| sell CE 1 straddle above | 1.27 | 1.10 | 1.60 |
-
-- **Consistent across all three years, but they're only three years.**
-  Stock history starts in 2024, so the sample has no stretch like 2022–23,
-  when the same put-selling rule lost heavily on indices.
-- **Losses arrive together.** About 200 short options expire on the same
-  day, so a broad fall hits them all at once. For selling the put one
-  straddle below, 27% of expiries lost on average across stocks; the worst
-  were Dec-2024 (−₹8,429 per stock-lot) and Oct-2024 (−₹8,243).
-- **The single-stock tail is severe.** The worst short put lost **₹2.21
-  lakh on one lot** (IEX), about 50× the median trade (+₹4,344). The worst
-  short call lost ₹1.71 lakh (INDIACEM). A bought option can't lose more
-  than its premium: the worst bought put lost ₹28,036.
-- **Margin.** Short stock options tie up a lot of margin per lot, so
-  return on capital is far below these per-lot figures.
-- **Skips:** 214 cycles had no traded ATM straddle to measure "one
-  straddle" from, 16 had a split or bonus inside, and up to 61 had no traded
-  strike near the target. All are counted in the output.
-
-Selling won small and often; a single stock's gap or a market-wide fall took
-back months of premium. What these rules would have done after costs, not
-what to trade.
+What a rule would have done after costs, not what to trade.
 
 ## Also: trade logs for the equity backtests
 
-The same reporting now runs on the existing backtests:
+The same reporting runs on the equity backtests:
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_backtest.py --export
-PYTHONPATH=. .venv/bin/python run_pit_momentum.py --export
+PYTHONPATH=. .venv/bin/python research/run_backtest.py --export
+PYTHONPATH=. .venv/bin/python research/run_pit_momentum.py --export
 ```
 
-- **`run_backtest.py`** (the signal engine) prints the trade statistics
+- **`research/run_backtest.py`** (the signal engine) prints the trade statistics
   above, equity drawdown stats and a monthly return table. It first checks
   a sample of fills: entry and exit on real trading sessions, each filled
   at that session's open ± slippage. `--export` writes the trade log
   (Excel and CSV), and splits by symbol and by exit rule.
-- **`run_pit_momentum.py`** (the rotation strategy) has no discrete trades.
+- **`research/run_pit_momentum.py`** (the rotation strategy) has no discrete trades.
   Its record is the equity curve, the monthly return table, strategy vs
   benchmark by year, and the holdings at every rebalance, all in the
   `--export` workbook.

@@ -9,7 +9,7 @@ category, see [mutual fund evaluation](mf_evaluation.md).
 ---
 
 ```bash
-PYTHONPATH=. .venv/bin/python run_mf_ppfas.py
+PYTHONPATH=. .venv/bin/python scripts/run_mf_ppfas.py
 ```
 
 Run it once a month, after about the 10th; PPFAS publishes 7-10 days after
@@ -64,7 +64,7 @@ warning is printed.
 
 Arbitrage positions carry no price risk and are treated as cash, never as
 stock picks. A stock moving from the arbitrage book into the core portfolio
-(TCS in Nov 2025, DLF in Aug 2026) is labelled as such.
+is labelled as such.
 
 ## Limits
 

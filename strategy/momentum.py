@@ -70,8 +70,12 @@ def risk_adjusted_momentum(close: pd.Series, lookback_months: int = 12,
     return mom / vol.replace(0, np.nan)
 
 
-def build_panel(frames: dict[str, pd.DataFrame], cfg: dict) -> pd.DataFrame:
-    """One row per (date, symbol) with the momentum inputs attached."""
+def build_panel(frames: dict[str, pd.DataFrame], cfg: dict,
+                last_only: bool = False) -> pd.DataFrame:
+    """One row per (date, symbol) with the momentum inputs attached.
+
+    `last_only` keeps just each symbol's latest row -- all a live ranking
+    needs -- instead of a panel of every date."""
     m = cfg.get("momentum_strategy", {})
     rows = []
     for sym, f in frames.items():
@@ -84,7 +88,7 @@ def build_panel(frames: dict[str, pd.DataFrame], cfg: dict) -> pd.DataFrame:
         d["vol"] = realised_volatility(d["close"], m.get("vol_window", 252))
         d["ram"] = d["mom"] / d["vol"].replace(0, np.nan)
         d["sma200"] = d["close"].rolling(200, min_periods=200).mean()
-        rows.append(d)
+        rows.append(d.tail(1) if last_only else d)
     if not rows:
         return pd.DataFrame()
     return pd.concat(rows, ignore_index=True)
