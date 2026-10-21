@@ -105,8 +105,7 @@ def _forward() -> None:
     first, last = pd.to_datetime(p["price_date"]).min(), pd.to_datetime(p["price_date"]).max()
     st.caption(f"{p['price_date'].nunique()} scan dates, {first:%d-%b-%Y} to "
                f"{last:%d-%b-%Y}. Outcomes are replayed with each scan's own plan. "
-               "Only closed trades count as results; this is the evidence that "
-               "will confirm or overturn the backtest below.")
+               "Only closed trades count as results.")
     _static(s.rename(columns={"group": "", "trades": "Trades", "win_pct": "Win %",
                               "avg_r": "Avg R", "avg_ret_pct": "Avg %"}),
             {"Trades": "{:,.0f}", "Win %": "{:.1f}%", "Avg R": "{:+.3f}",
@@ -221,9 +220,6 @@ def render(on_watch=None) -> None:
     cfg = _cfg()
     s = cfg["swing"]
     st.subheader("Swing: setups to hold for days to a few weeks")
-    c.evidence("none", "The score did not rank setups in the backtest, so each setup "
-                       "comes with its measured hit rate rather than a promise. How it "
-                       "has done is below the list.")
     st.caption("Liquid stocks in an uptrend that show a pullback or a breakout "
                "today, scored, each with an entry, a stop and targets. How it "
                "works and how it has done are below the list.")

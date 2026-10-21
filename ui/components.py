@@ -58,28 +58,9 @@ def badge(action: str, urgent: bool = False) -> str:
             f'{ring}">{word}{mark}</span>')
 
 
-# Level -> (Streamlit badge colour, label). Streamlit's own colours follow
-# the light or dark theme; fixed hex values went unreadable in dark mode.
-EVIDENCE = {
-    "tested": ("green", "Evidence: tested"),
-    "weak": ("orange", "Evidence: weak"),
-    "none": ("gray", "Evidence: no edge"),
-    "experimental": ("gray", "Experimental"),
-    "info": ("blue", "Describes, does not predict"),
-}
-
-
 def muted(text: str) -> str:
     """Secondary text in markdown, in the theme's grey."""
     return ":gray[" + str(text).replace("[", "(").replace("]", ")") + "]"
-
-
-def evidence(level: str, text: str) -> None:
-    """One line under a page title saying how far its signals were borne out
-    in a backtest, so the strength of a verdict is visible before reading it."""
-    colour, label = EVIDENCE[level]
-    with st.container(border=True):
-        st.markdown(f":{colour}-badge[{label}] &nbsp; {text}")
 
 
 def pill(text: str, tone: str = "neutral", title: str | None = None) -> str:

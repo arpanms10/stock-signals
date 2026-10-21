@@ -260,8 +260,7 @@ def text(v: fno.FnoView, levels: list | None = None) -> str:
     head += (f"  ·  expiry {v.expiry:%d-%b-%Y} ({v.sessions} sessions)"
              f"  ·  NSE {v.timestamp:%d-%b %H:%M}")
     L.append(head)
-    since = "2024" if v.kind == "equity" else "2019"
-    hit = (f"   held ~{v.range_hit_pct:.0f}% of the time since {since}"
+    hit = (f"   held ~{v.range_hit_pct:.0f}% of the time in the F&O history on file"
            if v.range_hit_pct is not None else "   (hit rate not measured)")
     L.append(f"Range to expiry: {_px(v.range_low)} – {_px(v.range_high)}"
              f"   = spot ± {v.range_from or '-'} {_px(v.straddle if v.range_from == 'straddle' else v.iv_move)}"
@@ -272,7 +271,7 @@ def text(v: fno.FnoView, levels: list | None = None) -> str:
              f"1σ by IV ±{_px(v.iv_move)}")
     if v.vol:
         L.append(vol_line(v.vol))
-    L.append("Positioning (no measured edge -- see docs/f_o/validation.md):")
+    L.append("Positioning (where writers are, not a forecast):")
     L.append(f"  Put wall  (support)     {_wall(v.support)}"
              + (f"   next {_px(v.supports[1].strike)}" if len(v.supports) > 1 else ""))
     L.append(f"  Call wall (resistance)  {_wall(v.resistance)}"
@@ -287,9 +286,6 @@ def text(v: fno.FnoView, levels: list | None = None) -> str:
     walls = [x for x in (v.resistance_reach, v.support_reach) if x is not None]
     if walls or levels:
         L.append("Reach (how often a move this size got there; not a forecast of direction):")
-        if v.kind == "index":
-            L.append("  (indices: the model has been the better-calibrated column; the "
-                     "historical ones ran 4-8 points high out of sample)")
         L += [f"  {'call wall' if x.side == 'up' else 'put wall ':<9}  {reach_line(x)}"
               for x in walls]
         L += [f"  {'level':<9}  {reach_line(x)}" for x in (levels or [])]
@@ -400,8 +396,8 @@ def write_excel(results: list[Result], path: Path | None = None) -> Path:
     autosize(ws)
     ws.cell(len(rows) + 3, 1, "Decision support, not investment advice. "
             "OI is in contracts. Range = spot ± ATM straddle; range_hit_pct is how often the "
-            "expiry close landed inside it since Jan 2024. Walls, PCR and max pain are "
-            "positioning: validation found no edge (docs/f_o/validation.md). *_reach_pct: how "
+            "expiry close landed inside it in the F&O history on file. Walls, PCR and max "
+            "pain are positioning, not forecasts. *_reach_pct: how "
             "often a move this size reached the wall on a daily close before expiry -- "
             "not a forecast of direction.")
 

@@ -38,9 +38,6 @@ def _scored(as_of: dt.date, universe: str) -> pd.DataFrame:
 def render(as_of: dt.date, held: set[str], run_script=None) -> None:
     cfg = pe.load_config()
     st.subheader("GARP & QARP: fundamental shortlists")
-    c.evidence("none", "On a survivorship-free universe GARP beat the market by +0.35% a "
-                       "quarter (t 0.3) and QARP lagged by 1.9% (t −1.8). Shortlists to "
-                       "research, not ranked picks.")
     st.caption(
         "Two classic ways to buy good businesses without overpaying, applied to "
         f"the {cfg['universe'].replace('nifty', 'Nifty ')} using only NSE's own "

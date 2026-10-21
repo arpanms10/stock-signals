@@ -60,7 +60,8 @@ def _fmt(v, key: str) -> str:
 def _evidence() -> None:
     line = _calibration_line()
     if line:
-        c.evidence("weak", line)
+        with st.container(border=True):
+            st.markdown(line)
     else:
         st.warning("No backtest yet -- run it from Data and jobs (or `scripts/run_mf.py "
                    "--backtest`) to see what these states were worth historically.")

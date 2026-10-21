@@ -41,8 +41,7 @@ def render() -> None:
         cols[3].metric("In the top band", f"{int(m['in_top'].sum())}")
         cols[4].metric("Top band on both", f"{int(m['in_both'].sum())}",
                        help="In the top band on BOTH lookbacks "
-                            f"({' and '.join(f'{x}-month' for x in lbs)}). "
-                            "Holding only these did worse than either list in the backtest.")
+                            f"({' and '.join(f'{x}-month' for x in lbs)}).")
 
         st.caption(f"Ranked by **Score**: the return from {main_lb} months ago "
                    "to 1 month ago, divided by volatility, for names above their "

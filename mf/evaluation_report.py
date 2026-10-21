@@ -112,7 +112,7 @@ def build(path: Path, ev: engine.Evaluation) -> Path:
                    "SLIPPING/YOUNG -> WATCH; STRONG with room -> ADD; else HOLD."),
         ("bullet", "Not held: STRONG -> ADD, WEAK -> AVOID, SLIPPING/YOUNG -> WATCH, OK -> NEUTRAL."),
         ("sub", "Caveat"),
-        ("text", "Past category rank predicts future rank weakly. scripts/run_mf.py --backtest "
+        ("text", "Past rank is no guarantee of future rank. scripts/run_mf.py --backtest "
                  "measures what each state was worth on funds that existed at the time, closed "
                  "ones included. Decision support, not advice."),
         ("text", calibration_line() or "No backtest yet: scripts/run_mf.py --backtest."),

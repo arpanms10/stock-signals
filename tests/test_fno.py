@@ -115,10 +115,10 @@ def test_range_without_walls_is_the_move():
     assert (lo, hi, lf, hf) == (90, 110, "expected move", "expected move")
 
 
-def _real(name, sym):
+def _real(name, sym, cfg=None):
     c = d.parse_chain(json.loads((FIX / f"{name}_chain.json").read_text()), sym)
     f = d.parse_futures(json.loads((FIX / f"{name}_quote.json").read_text()))
-    return fno.analyse(sym, c.strikes, c.spot, c.expiry, c.timestamp, fut=f)
+    return fno.analyse(sym, c.strikes, c.spot, c.expiry, c.timestamp, fut=f, cfg=cfg)
 
 
 @pytest.mark.parametrize("name,sym", [("nifty", "NIFTY"), ("reliance", "RELIANCE")])
@@ -177,13 +177,16 @@ def test_stock_pcr_read_against_stock_norms():
 
 
 def test_range_hit_pct_takes_nearest_measured_offset():
-    assert fno.range_hit_pct("equity", 4, S) == 61
-    assert fno.range_hit_pct("equity", 13, S) == 63
-    assert fno.range_hit_pct("index", 25, S) == 58
+    s = {"range_hit_pct": {"index": {5: 49, 10: 56, 20: 58},
+                           "equity": {5: 61, 10: 63, 20: 54}}}
+    assert fno.range_hit_pct("equity", 4, s) == 61
+    assert fno.range_hit_pct("equity", 13, s) == 63
+    assert fno.range_hit_pct("index", 25, s) == 58
+    assert fno.range_hit_pct("equity", 10, S) is None   # nothing measured yet
 
 
 def test_live_range_is_straddle_not_walls():
-    v = _real("reliance", "RELIANCE")
+    v = _real("reliance", "RELIANCE", cfg={"fno": {"range_hit_pct": {"equity": {10: 60}, "index": {10: 55}}}})
     assert v.range_from == "straddle"
     assert v.range_low == pytest.approx(v.spot - v.straddle)
     assert v.range_high == pytest.approx(v.spot + v.straddle)

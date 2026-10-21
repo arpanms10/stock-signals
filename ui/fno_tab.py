@@ -197,9 +197,8 @@ def _option_panel(v, res) -> None:
                 f"{'historical' if best == 'model' else 'model'} "
                 f"{_pct(oc.p_profit_hist if best == 'model' else oc.p_profit_model)}",
                 delta_color="off", delta_arrow="off",
-                help=f"How often a move this size finished beyond the breakeven. The "
-                     f"{best} estimate is shown first: it has been the better-calibrated "
-                     f"one for {'indices' if v.kind == 'index' else 'stocks'}. A move of "
+                help=f"How often a move this size finished beyond the breakeven: the "
+                     f"{best} estimate first, the other below it. A move of "
                      "the same size the other way gets the same number -- there is no "
                      "direction in it.")
     m[4].metric("In the money at expiry",
@@ -239,16 +238,12 @@ def _px(x) -> str:
 
 def render() -> None:
     st.subheader("F&O: where option writers have put their money")
-    c.evidence("experimental", "Walls, PCR and max pain showed no edge on ~14,000 "
-                               "expiries. The expected range is shown with how often "
-                               "it held.")
     st.caption(
         "The range is spot ± the ATM straddle -- the move the market is pricing -- "
-        "with how often the expiry close actually landed inside it (stocks since "
-        "2024, indices since 2019). "
-        "Walls, PCR and max pain show where writers are positioned; tested on "
-        "~14,000 expiries, none of them predicted where price ended up "
-        "(`docs/f_o/validation.md`).")
+        "with how often the expiry close actually landed inside it in the F&O "
+        "history on file (**Refresh F&O history + validation** measures it). "
+        "Walls, PCR and max pain show where writers are positioned, not where "
+        "price will go.")
 
     try:
         symbols = _underlyings()
@@ -307,12 +302,13 @@ def render() -> None:
     m[2].metric("Range high", _px(v.range_high),
                 f"spot + {v.range_from}" if v.range_from else None,
                 delta_color="off", delta_arrow="off")
-    m[3].metric("Held since " + ("2024" if v.kind == "equity" else "2019"),
+    m[3].metric("Held in history",
                 f"~{v.range_hit_pct:.0f}%" if v.range_hit_pct is not None else "--",
                 f"{'stocks' if v.kind == 'equity' else 'indices'}, this far out",
                 delta_color="off", delta_arrow="off",
                 help="Share of expiry closes inside spot ± ATM straddle, measured "
-                     "5/10/20 sessions before monthly expiries, Jan 2024 - Sep 2026.")
+                     "5/10/20 sessions before monthly expiries in the F&O history "
+                     "on file. Blank until the validation has been run.")
     m[4].metric("Expected move", f"±{_px(v.straddle)}" if v.straddle else "--",
                 f"±{_px(v.iv_move)} by IV ({v.atm_iv:.1f}%)" if v.iv_move else None,
                 delta_color="off", delta_arrow="off",
@@ -324,33 +320,32 @@ def render() -> None:
     if v.vol:
         _vol_row(v.vol)
 
-    st.markdown("**Positioning** &nbsp; " + c.pill("no measured edge", "neutral"),
+    st.markdown("**Positioning** &nbsp; " + c.pill("where writers are, not a forecast", "neutral"),
                 unsafe_allow_html=True)
     m = st.columns(6)
     m[0].metric("Put wall", _px(v.support.strike) if v.support else "--",
                 _reach_caption(v.support_reach),
                 delta_color="off", delta_arrow="off",
-                help="Largest put OI below spot, read as support. Held no more often "
-                     "than any level the same distance away. 'reached' = how often a "
+                help="Largest put OI below spot, read as support. 'reached' = how often a "
                      "move this size closed at or below it before expiry.")
     m[1].metric("Call wall", _px(v.resistance.strike) if v.resistance else "--",
                 _reach_caption(v.resistance_reach),
                 delta_color="off", delta_arrow="off",
-                help="Largest call OI above spot, read as resistance. Same caveat. "
+                help="Largest call OI above spot, read as resistance. "
                      "'reached' = how often a move this size closed at or above it "
                      "before expiry.")
     m[2].metric("PCR (OI)", f"{v.pcr['oi']:.2f}" if v.pcr["oi"] else "--",
                 f"{v.pcr_bias} ({norms})", delta_color="off", delta_arrow="off",
                 help="Stocks run far lower PCR than indices, so each is read against "
-                     "its own norms. Did not predict direction.")
+                     "its own norms.")
     m[3].metric("PCR (today's ΔOI)",
                 f"{v.pcr['chg_oi']:.2f}" if v.pcr["chg_oi"] else "--",
                 v.chg_pcr_bias, delta_color="off", delta_arrow="off",
                 help="Put/call ratio of OI added today. Blank when a side is "
                      "unwinding -- a ratio of a gain and a loss means nothing. "
-                     "Untested: the history is end-of-day only.")
+                     "The stored history is end-of-day only.")
     m[4].metric("Max pain", _px(v.max_pain),
-                help="Historically a worse guess for the expiry close than today's price.")
+                help="The strike at which option buyers, in total, would lose the most at expiry.")
     m[5].metric("Futures", _px(v.futures.price) if v.futures else "--",
                 (v.futures.buildup or f"{v.futures.basis:+,.2f} basis") if v.futures else None,
                 delta_color="off", delta_arrow="off")
@@ -381,14 +376,10 @@ def render() -> None:
                   help="Share of past cases where the expiry close was at or beyond it.")
         r3.metric("Model (IV)", _pct(x.model_expiry), "beyond at expiry",
                   delta_color="off", delta_arrow="off",
-                  help="Same question from the straddle-implied normal distribution. "
-                       "Out of sample it ran 2-4 points high for stocks.")
+                  help="Same question from the straddle-implied normal distribution.")
         if x.n:
             lc.caption(f"From {x.n:,} past {'stock' if v.kind == 'equity' else 'index'} "
-                       "observations, 5-10 sessions before monthly expiries."
-                       + (" For indices the model column has been better calibrated: "
-                          "the historical ones ran 4-8 points high out of sample."
-                          if v.kind == "index" else ""))
+                       "observations, 5-10 sessions before monthly expiries.")
 
     _option_panel(v, res)
 

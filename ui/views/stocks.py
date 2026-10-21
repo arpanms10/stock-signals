@@ -29,9 +29,8 @@ def render() -> None:
                      help="Runs scripts/run_backfill.py, then reloads."):
         state.run_and_reload(label, service.SCRIPTS[label])
     state.refreshed_notice()
-    c.evidence("tested", "Trade verdicts follow the momentum rank, which held up in a "
-                         "survivorship-free backtest. Exits on red flags are rules on "
-                         "balance-sheet facts, not forecasts.")
+    st.caption("Trade verdicts follow the momentum rank. Exits on red flags are "
+               "rules on balance-sheet facts, not forecasts.")
     for w in snap.warnings:
         st.warning(w)
 
@@ -273,12 +272,13 @@ def _watching(snap) -> None:
             c.watching_table(snap.watching,
                              {k: v.get("median") for k, v in _h.items()}, _h),
             unsafe_allow_html=True)
+        t1m = (_h.get("t1") or {}).get("median", "?")
+        t2m = (_h.get("t2") or {}).get("median", "?")
         st.caption(
-            "**T1:17** and **T2:37** are how many sessions each target normally "
-            "takes — measured across 9,650 real paths, not forecast. Hover a column "
-            "heading or a status for what it means. Calibration, not a rule: slow "
-            "positions returned 7.4% over the next six months against 9.6% for "
-            "fast ones, too small a gap to trade on.")
+            f"**T1:{t1m}** and **T2:{t2m}** are the usual number of sessions each "
+            "target takes, as set in config/scoring.yaml "
+            "(targets.horizon_sessions). Hover a column heading or a status for "
+            "what it means. A guide to what is normal, not an exit rule.")
         with st.expander("What each status means"):
             st.markdown(c.watching_legend(_h), unsafe_allow_html=True)
 

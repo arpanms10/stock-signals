@@ -93,8 +93,8 @@ def _fno():
 def _analyze():
     from ui import analyze_tab
     st.subheader("Analyze a stock")
-    c.evidence("info", "Both analysts describe the stock as it is today; neither "
-                       "forecasts its price.")
+    st.caption("Both analysts describe the stock as it is today; neither "
+               "forecasts its price.")
     analyze_tab.render()
 
 

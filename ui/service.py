@@ -363,7 +363,7 @@ SCRIPTS = {
     "Refresh GARP / QARP filings": ["scripts/run_picker.py", "--refresh"],
     # Month-end NAVs of every Direct Growth fund (Mutual funds pages).
     "Refresh fund NAVs": ["scripts/run_mf.py", "--refresh", "--no-holdings"],
-    # Rewrites config/mf_calibration.json, the Mutual funds evidence line.
+    # Rewrites config/mf_calibration.json, the Mutual funds backtest line.
     "Rerun mutual fund backtest": ["scripts/run_mf.py", "--backtest"],
 }
 
@@ -388,7 +388,7 @@ JOB_GROUPS = [
          "seconds; about 25 min the first time"),
         ("Refresh GARP / QARP filings", "GARP / QARP", None, "minutes"),
     ]),
-    ("Backtests · change the evidence lines, not the data", [
+    ("Backtests · recompute the backtest numbers, not the data", [
         ("Rerun swing backtest", "Swing", None, "minutes"),
         ("Rerun range calibration", "Today", None, "seconds"),
         ("Rerun mutual fund backtest", "Mutual funds", None, "about 2 min"),
