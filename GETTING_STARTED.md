@@ -195,8 +195,8 @@ with a button to refresh it.
 
 ## Updating to a newer version
 
-- **ZIP download:** download the new ZIP, unzip it, copy your `config` and
-  `data` folders across from the old copy, and run `setup_project.py` once.
+- **ZIP download:** download the new ZIP, unzip it, copy your `config`,
+  `data` and `history` folders across from the old copy, and run `setup_project.py` once.
 - **git:** `git pull`, then run `setup_project.py` once to pick up anything
   new.
 
