@@ -379,6 +379,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |
 | [**Validation**](docs/validation.md) | How the backtests work and how to run them |
 | [**Data**](docs/data.md) | Sources, five silent NSE traps, freshness |
+| [**Data storage**](docs/storage.md) | What each database, Excel file and CSV holds, and what to back up |
 | [**Automation**](docs/automation.md) | The Saturday job and its failure modes; all jobs in [Scheduled jobs](#scheduled-jobs) |
 | [**Operations**](docs/operations.md) | Setup, watchlist, tuning, tests |
 | [**GARP & QARP**](docs/picker.md) | Growth / quality at a reasonable price from filings, point in time, and the backtest |

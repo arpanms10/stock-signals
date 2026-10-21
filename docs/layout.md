@@ -14,7 +14,7 @@ run_ui.py          open the dashboard
 scripts/           everything you or the scheduled jobs run: refreshes, records, reports
 research/          backtests and experiments (see docs/validation.md)
 config/            settings, and the files you fill in (holdings, MF book, watch list)
-data/ history/     downloaded data (not in git) / forward records (in git)
+data/ history/     downloaded data (not in git) / forward records (in git); see docs/storage.md
 docs/              how each part works
 tests/             the test suite (pytest)
 
