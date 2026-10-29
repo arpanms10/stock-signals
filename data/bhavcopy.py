@@ -82,6 +82,12 @@ CREATE TABLE IF NOT EXISTS market_demergers (
 CREATE TABLE IF NOT EXISTS market_actions_synced (
     through TEXT
 );
+-- The earliest date the actions feed has been read from. A database first
+-- built with --years 2 and later extended to 10 would otherwise never fetch
+-- the older splits, and the backtest would read each one as a crash.
+CREATE TABLE IF NOT EXISTS market_actions_from (
+    frm TEXT
+);
 """
 
 T2T_SERIES = ("BE", "BZ")
@@ -377,8 +383,16 @@ def sync_actions(con, start: dt.date, end: dt.date, verbose: bool = True) -> int
             print(f"  actions {frm} .. {to}: {len(actions)}", flush=True)
         frm = to + dt.timedelta(days=1)
         time.sleep(0.5)
-    con.execute("DELETE FROM market_actions_synced")
-    con.execute("INSERT INTO market_actions_synced VALUES (?)", (end.isoformat(),))
+    # Widen the recorded coverage, never narrow it: back-filling an older
+    # gap must not move `through` backwards.
+    through = actions_synced_through(con)
+    if through is None or end > through:
+        con.execute("DELETE FROM market_actions_synced")
+        con.execute("INSERT INTO market_actions_synced VALUES (?)", (end.isoformat(),))
+    frm = actions_synced_from(con)
+    if frm is None or start < frm:
+        con.execute("DELETE FROM market_actions_from")
+        con.execute("INSERT INTO market_actions_from VALUES (?)", (start.isoformat(),))
     con.commit()
     return n
 
@@ -386,6 +400,30 @@ def sync_actions(con, start: dt.date, end: dt.date, verbose: bool = True) -> int
 def actions_synced_through(con) -> dt.date | None:
     r = con.execute("SELECT through FROM market_actions_synced").fetchone()
     return dt.date.fromisoformat(r[0]) if r else None
+
+
+def actions_synced_from(con) -> dt.date | None:
+    """None for a database synced before this was recorded: its coverage
+    is unknown, so the next ingest reads the whole window again."""
+    r = con.execute("SELECT frm FROM market_actions_from").fetchone()
+    return dt.date.fromisoformat(r[0]) if r else None
+
+
+def actions_gaps(con, start: dt.date, today: dt.date) -> list[tuple[dt.date, dt.date]]:
+    """The windows of the actions feed still to read for history from `start`:
+    the full history once, then any older stretch the ingest has since been
+    extended to, then a rolling window that also catches ex-dates announced
+    ahead."""
+    ahead = today + dt.timedelta(days=60)
+    through = actions_synced_through(con)
+    if through is None:
+        return [(start, ahead)]
+    gaps = []
+    frm = actions_synced_from(con)
+    if frm is None or start < frm:
+        gaps.append((start, frm or through))
+    gaps.append((through - dt.timedelta(days=45), ahead))
+    return gaps
 
 
 def load_demergers(con) -> list[tuple[str, str]]:
