@@ -339,3 +339,62 @@ def test_forward_score_against_the_index(market, tmp_path):
     assert list(t["open"]) == [False, True]
     assert t["return_pct"].notna().all()
     assert (t["excess_pct"] > 0).all()        # the two strongest of five
+
+
+def test_verdicts_survive_a_json_round_trip(tmp_path):
+    import json
+    v = RULE.judge("train", {"cagr_pct": np.float64(6.0), "sharpe": np.float64(-1.0)})
+    back = json.loads(json.dumps(v, default=str))
+    assert back["checks"] == {"cagr_pct >= 5": True, "sharpe > 0": False}
+
+
+def test_measure_runs_only_where_the_holdout_is_already_spent():
+    d = _fresh()
+    with pytest.raises(ledger.Refused, match="unseen holdout"):
+        ledger.check(d, FAM, "measure", None)
+    ledger.record(d, FAM, "train", "r", _result(True))
+    ledger.record(d, FAM, "holdout", "r", _result(True))
+    ledger.check(d, SIB, "measure", None)
+
+
+# --- phase 7: comparing strategies ----------------------------------------
+
+from lab import compare  # noqa: E402
+
+
+def _fake_results():
+    months = pd.date_range("2020-01-31", periods=24, freq="ME")
+    rng = np.random.default_rng(5)
+    a = 100 * np.cumprod(1 + rng.normal(0.01, 0.04, 24))
+    b = 100 * np.cumprod(1 + rng.normal(0.01, 0.04, 24))
+    idx = 100 * np.cumprod(1 + rng.normal(0.008, 0.03, 24))
+
+    def curves(x):
+        return {"strategy": {d.strftime("%Y-%m-%d"): v for d, v in zip(months, x)},
+                "benchmark": {d.strftime("%Y-%m-%d"): v for d, v in zip(months, idx)}}
+    return {"A": {"train": {"curves": curves(a)}}, "B": {"train": {"curves": curves(b)}},
+            "C": {"holdout": {"curves": curves(a)}}}
+
+
+def test_correlation_covers_strategies_with_that_split_and_the_index():
+    corr = compare.correlation("train", _fake_results())
+    assert list(corr.columns) == ["A", "B", "NIFTY 500"]
+    assert corr.loc["A", "A"] == 1.0
+
+
+def test_a_full_weight_blend_is_the_strategy_itself():
+    data = _fake_results()
+    out = compare.blend("A", "B", 1.0, "train", data)
+    assert out["100% / 0%"] == out["A"]
+    half = compare.blend("A", "B", 0.5, "train", data)["50% / 50%"]
+    assert half["max_drawdown_pct"] <= 0
+
+
+def test_a_measure_run_is_recorded_and_shown():
+    d = _fresh()
+    d["families"]["fam"] = {"holdout": {"on": "x", "by": "y"}, "seen": [], "trials": 3}
+    ledger.record(d, FAM, "measure", None,
+                  {**_result(False), "universe": "liquidity ranks 1-200"})
+    assert ledger.status(d, FAM) == "measured; family holdout spent: forward only"
+    assert d["families"]["fam"]["trials"] == 3
+    assert d["families"]["fam"]["seen"]

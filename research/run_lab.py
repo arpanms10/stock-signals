@@ -5,12 +5,16 @@
     PYTHONPATH=. .venv/bin/python research/run_lab.py train high52
     PYTHONPATH=. .venv/bin/python research/run_lab.py holdout high52     # once, after train
     PYTHONPATH=. .venv/bin/python research/run_lab.py robustness high52  # ranks 201-500
+    PYTHONPATH=. .venv/bin/python research/run_lab.py measure momentum_9_1  # spent families
+    PYTHONPATH=. .venv/bin/python research/run_lab.py compare high52 lowvol --weight 0.5
 
 A strategy is registered in lab/strategies.py and its pass rule in
 lab/rules.py, committed before `train` runs. `holdout` runs only for a
 strategy whose train passed under the same rule, and only once. Both are
 enforced by the ledger, research/lab_ledger.json. `robustness` (liquidity
 ranks 201-500, whole period) is printed for reading and judged by no rule.
+`measure` re-measures a strategy over the whole window with no verdict --
+only for a family whose holdout is already spent, such as momentum.
 
 Results go to config/lab_results.json for the Strategy lab page. See
 docs/lab.md.
@@ -112,6 +116,8 @@ def cmd_run(a, split: str) -> int:
         start, end, size, skip = *harness.TRAIN, 200, 0
     elif split == "holdout":
         start, end, size, skip = harness.HOLDOUT_START, last, 200, 0
+    elif split == "measure":
+        start, end, size, skip = harness.TRAIN[0], last, 200, 0
     else:
         start, end, size, skip = harness.TRAIN[0], last, 300, 200
     tax = (False if a.tax == "none" else
@@ -122,7 +128,8 @@ def cmd_run(a, split: str) -> int:
     r = harness.evaluate(s, con, base, start, end, bench, seeds=a.seeds,
                          universe_size=size, universe_skip=skip, progress=_say, tax=tax,
                          trials=max(trials, 1))
-    verdict = harness.judge(s.name, split, r) if split != "robustness" else None
+    verdict = (harness.judge(s.name, split, r)
+               if split in ("train", "holdout") else None)
     r["verdict"] = verdict
     r["run_on"] = dt.date.today().isoformat()
     _print_result(r, verdict)
@@ -147,12 +154,39 @@ def _record(s, split, rule, r) -> None:
     print(f"Ledger: {ledger.PATH} -- commit it with the result")
 
 
+def cmd_compare(a) -> int:
+    from lab import compare
+    corr = compare.correlation(a.split)
+    if corr.empty:
+        print(f"No {a.split} results yet: run train first.")
+        return 1
+    print(f"Correlation of monthly returns ({a.split}):")
+    print(corr.to_string())
+    if a.names:
+        if len(a.names) != 2:
+            print("Name two strategies to blend.")
+            return 1
+        b = compare.blend(*a.names, weight_a=a.weight, split=a.split)
+        if not b:
+            print("Those two have no months in common.")
+            return 1
+        print(f"\nBlend, rebalanced monthly, before costs (correlation {b.pop('correlation')}):")
+        import pandas as pd
+        print(pd.DataFrame(b).T.to_string())
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--db", default=str(ROOT / "data" / "market.db"))
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
-    for name in ("show", "train", "holdout", "robustness"):
+    cp = sub.add_parser("compare")
+    cp.add_argument("names", nargs="*", help="two strategies to blend")
+    cp.add_argument("--weight", type=float, default=0.5, help="weight of the first")
+    cp.add_argument("--split", default="train",
+                    choices=["train", "holdout", "robustness", "measure"])
+    for name in ("show", "train", "holdout", "robustness", "measure"):
         p = sub.add_parser(name)
         p.add_argument("name")
         if name != "show":
@@ -168,6 +202,8 @@ def main(argv=None) -> int:
         return cmd_list(a)
     if a.cmd == "show":
         return cmd_show(a)
+    if a.cmd == "compare":
+        return cmd_compare(a)
     return cmd_run(a, a.cmd)
 
 

@@ -15,6 +15,7 @@ market to be ranked.
              F&O           expected range to expiry, experimental (ui/fno_tab.py)
   Research   Analyze a stock                                      (ui/analyze_tab.py)
              Compare funds                                        (ui/mf_tab.py)
+             Strategy lab  tests and forward records              (ui/views/lab.py)
 
 Under the bar, on every page: search (ui/views/search.py) and the data chip,
 which opens to Data and jobs (ui/views/data_jobs.py) -- where every refresh
@@ -102,6 +103,11 @@ def _compare():
     mf_tab.render_compare()
 
 
+def _lab():
+    from ui.views import lab
+    lab.render()
+
+
 def _data():
     from ui.views import data_jobs
     data_jobs.render()
@@ -125,6 +131,7 @@ P.update(
     fno=st.Page(_fno, title="F&O (experimental)", url_path="fno"),
     analyze=st.Page(_analyze, title="Analyze a stock", url_path="analyze"),
     compare=st.Page(_compare, title="Compare funds", url_path="compare-funds"),
+    lab=st.Page(_lab, title="Strategy lab", url_path="strategy-lab"),
     data=st.Page(_data, title="Data and jobs", url_path="data", visibility="hidden"),
     search=st.Page(_search, title="Search", url_path="search", visibility="hidden"),
 )
@@ -134,7 +141,7 @@ nav = st.navigation({
     "Portfolio": [P["stocks"], P["funds"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],
-    "Research": [P["analyze"], P["compare"]],
+    "Research": [P["analyze"], P["compare"], P["lab"]],
     "More": [P["data"], P["search"]],
 }, position="top")
 

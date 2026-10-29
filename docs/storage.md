@@ -62,6 +62,9 @@ in `backtests/`, and the weekly job's dated report and logs.
 |---|---|---|
 | `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | no |
 | `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | no |
+| `history/lab/<strategy>.csv` | Each forward strategy's monthly picks, append-only ([strategy lab](lab.md#forward-records)) | no |
+| `config/lab_results.json` | The latest strategy lab results the Strategy lab page shows | no |
+| `research/lab_ledger.json` | Which test windows each strategy family has already seen ([strategy lab](lab.md#the-ledger)) | yes |
 | `data/results/` | Quarterly results per company, scorecards, backtest working files | no |
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |

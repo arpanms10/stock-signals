@@ -26,7 +26,8 @@ class Check:
 
     def judge(self, metrics: dict) -> bool:
         v = metrics.get(self.metric)
-        return v is not None and v == v and OPS[self.op](v, self.value)
+        # bool(): a numpy comparison would be saved to JSON as the string "False".
+        return bool(v is not None and v == v and OPS[self.op](v, self.value))
 
     def __str__(self) -> str:
         return f"{self.metric} {self.op} {self.value:g}"

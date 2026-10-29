@@ -49,7 +49,7 @@ a loss that never happened, and each is handled:
 | gap | what would go wrong | how it is handled |
 |---|---|---|
 | A held stock with no price that day | valued at zero until the delisting rule sold it | valued at its last close |
-| Splits and bonuses | a 1:1 bonus read as a 50% loss, and the stock looked crashed to the ranking | `market_actions`: every split/bonus since 2016, back-adjusted in `load_wide()` |
+| Splits and bonuses | a 1:1 bonus read as a 50% loss, and the stock looked crashed to the ranking | `market_actions`: every split/bonus since 2016, back-adjusted in `load_wide()`. `market_actions_from` records how far back the feed was read, so a history first built for 2 years and later extended to 10 fetches the older actions too |
 | Demergers | the value handed to the spun-off company read as a loss | `market_demergers`: the ex-date fall is adjusted out. The new company's later returns are not captured |
 | Ticker changes (ZOMATO -> ETERNAL) | read as a delisting, and the new ticker had no history to rank | tickers sharing an ISIN that never traded together are one series under the current name |
 | Trade-for-trade series (BE/BZ) | the stock vanished and was force-sold | `market_t2t`, a separate table that only prices holdings. Ranking and every universe stay EQ-only |

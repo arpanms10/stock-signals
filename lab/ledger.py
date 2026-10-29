@@ -14,6 +14,7 @@ research/lab_ledger.json has two parts:
 
 The guard refuses:
   train    without a pass rule;
+  measure  (the whole window, no verdict) while the family's holdout is unseen;
   holdout  when the family's holdout is spent, when train has not passed,
            when the rule changed after the train run, or a second time.
 
@@ -64,6 +65,11 @@ def check(data: dict, strategy, split: str, fingerprint: str | None) -> None:
     if split == "robustness":
         return
     fam = data["families"].get(strategy.family, {})
+    if split == "measure":
+        if not fam.get("holdout"):
+            raise Refused(f"A measure run covers 2023+, the {strategy.family} family's "
+                          "unseen holdout. Use train, then holdout.")
+        return
     if split == "holdout" and fam.get("holdout"):
         h = fam["holdout"]
         raise Refused(f"The {strategy.family} family's holdout was spent on "
@@ -95,11 +101,12 @@ def record(data: dict, strategy, split: str, fingerprint: str | None,
     fam = family(data, strategy.family)
     m = result.get("metrics", {})
     verdict = result.get("verdict") or {}
-    if split == "robustness":
+    if split in ("robustness", "measure"):
         window = f"{result.get('universe')}, {result.get('start')} .. {result.get('end')}"
         if window not in fam["seen"]:
             fam["seen"].append(window)
-        return
+        if split == "robustness":
+            return
     if not _runs(data, strategy.name, "train") and split == "train":
         fam["trials"] = fam.get("trials", 0) + 1
     entry["runs"].append({
@@ -122,6 +129,8 @@ def status(data: dict, strategy) -> str:
     fam = data["families"].get(strategy.family, {})
     if holds:
         return "holdout " + ("passed" if holds[-1]["passed"] else "failed")
+    if not trains and _runs(data, strategy.name, "measure"):
+        return "measured; family holdout spent: forward only"
     if trains:
         if not trains[-1]["passed"]:
             return "train failed"

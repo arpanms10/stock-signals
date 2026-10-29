@@ -7,7 +7,8 @@
     "window": "2023-01-01 .."
    },
    "seen": [
-    "liquidity ranks 201-500, 2017 .. 2026-10 (vol targeting, trailing stops, the 9-1 choice)"
+    "liquidity ranks 201-500, 2017 .. 2026-10 (vol targeting, trailing stops, the 9-1 choice)",
+    "liquidity ranks 1-200, 2018-07-01 .. 2026-10-23"
    ],
    "trials": 12,
    "source": "docs/ROADMAP.md: lookback 9 vs 12, skip 0 vs 1, risk_off_scale 0.5 vs 1, NSE blend, overlap selection, max extension cap, volatility targeting, pct and ATR trailing stops, random controls. trials is a lower bound."
@@ -112,6 +113,18 @@
      "edge_vs_controls_pct": 3.18,
      "sharpe": 0.64,
      "max_drawdown_pct": -38.45
+    },
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "73ed08579f9fb319",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 11.0,
+     "excess_cagr_pct": -1.47,
+     "edge_vs_controls_pct": 3.18,
+     "sharpe": 0.64,
+     "max_drawdown_pct": -38.45
     }
    ]
   },
@@ -129,6 +142,52 @@
      "edge_vs_controls_pct": 2.59,
      "sharpe": 0.77,
      "max_drawdown_pct": -28.73
+    },
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "72a9c4cf9e999995",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 10.9,
+     "excess_cagr_pct": -1.57,
+     "edge_vs_controls_pct": 2.59,
+     "sharpe": 0.77,
+     "max_drawdown_pct": -28.73
+    }
+   ]
+  },
+  "momentum_9_1": {
+   "family": "momentum",
+   "runs": [
+    {
+     "split": "measure",
+     "on": "2026-10-29",
+     "rule": null,
+     "window": "2018-07-01 .. 2026-10-23",
+     "passed": false,
+     "cagr_pct": 24.2,
+     "excess_cagr_pct": 13.36,
+     "edge_vs_controls_pct": 14.35,
+     "sharpe": 1.05,
+     "max_drawdown_pct": -37.38
+    }
+   ]
+  },
+  "momentum_12_1": {
+   "family": "momentum",
+   "runs": [
+    {
+     "split": "measure",
+     "on": "2026-10-29",
+     "rule": null,
+     "window": "2018-07-01 .. 2026-10-23",
+     "passed": false,
+     "cagr_pct": 16.46,
+     "excess_cagr_pct": 5.61,
+     "edge_vs_controls_pct": 5.58,
+     "sharpe": 0.78,
+     "max_drawdown_pct": -47.1
     }
    ]
   }

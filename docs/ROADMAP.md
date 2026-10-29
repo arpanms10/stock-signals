@@ -126,6 +126,24 @@ mutual fund states were each built, backtested and either shown calibrated or
 kept as reading aids. 52-week high and low volatility failed a pre-registered
 rule and were not built further. See [validation](validation.md).
 
+### DONE · Strategy lab
+
+One harness for every ranking strategy: register a scoring function, fix a
+pass rule, and `research/run_lab.py` runs it on the point-in-time universe
+with costs, capital-gains tax lot by lot, random controls, the
+equal-weighted universe, a deflated Sharpe and a bootstrap range. A ledger
+in git (`research/lab_ledger.json`) records which windows each family has
+seen and refuses a second look at a holdout. Forward strategies record
+their picks monthly in `history/lab/`. Research → Strategy lab shows it all
+([strategy lab](lab.md)).
+
+Measured there on 2026-10-29, 2018-07 to 2026-10, the 200 most liquid
+names: momentum 9-1 made 24.2% a year before tax and **20.4% after**
+(NIFTY 500 10.8% and 9.9%), deflated Sharpe 0.98 after 13 tries; 12-1
+made 16.5% and 14.2%, deflated Sharpe 0.78.
+
+`lab/`, `backtest/tax_lots.py`
+
 ### NOT BUILT · Telegram
 
 Deliberately deferred: the dashboard and macOS notifications from the jobs
