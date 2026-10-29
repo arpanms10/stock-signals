@@ -99,7 +99,8 @@ JOBS = {j.name: j for j in [
         When("weekly", 9, 30, day="SAT"),
         "Refreshes the full-market history, company fundamentals and the F&O "
         "history, re-measures the hit rates the pages quote, records the "
-        "month's momentum picks, and writes a report to reports/.",
+        "month's momentum picks and the strategy lab's forward picks, and "
+        "writes a report to reports/.",
         "Market, Momentum, Analyze, F&O, Today"),
     Job("monthly", "Monthly, early in the month", "scripts/run_mf.py",
         ["--refresh", "--no-holdings"], When("monthly", 10, 0, day_of_month=5),

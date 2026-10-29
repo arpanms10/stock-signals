@@ -296,3 +296,46 @@ def test_luck_checks_with_an_index(market):
     assert m["both_halves_beat_index"] in (0, 1)
     assert {"year", "strategy", "NIFTY 500", "vs index"} <= set(r1["by_year"][0])
 
+
+# --- phase 6: forward records ----------------------------------------------
+
+from lab import forward  # noqa: E402
+
+
+def test_rank_on_matches_the_engines_rebalance(market):
+    s = Strategy("t_fw", "t", "", pit.score_ram, {"rebalance_days": 1000})
+    res = runner.run(s, market, BASE, *WINDOW, BENCH, universe_size=5)
+    first_rebalance, held = res.holdings_log[0]
+    # The engine ranks at the close before it trades.
+    days = [d for d in _days(420)]
+    ranked_on = days[days.index(first_rebalance) - 1]
+    ranked = forward.rank_on(s, market, BASE, ranked_on, universe_size=5)
+    assert sorted(ranked["symbol"][:2]) == sorted(held)
+
+
+def test_a_month_is_recorded_once_with_hysteresis(market, tmp_path):
+    s = Strategy("t_rec", "t", "", pit.score_ram)
+    on = dt.date(2025, 3, 3)
+    assert forward.record(s, market, BASE, on, 100.0, folder=tmp_path) == 2
+    assert forward.record(s, market, BASE, dt.date(2025, 3, 20), 100.0, folder=tmp_path) == 0
+    assert forward.record(s, market, BASE, on, 100.0, folder=tmp_path, force=True) == 2
+    rec = forward.read("t_rec", tmp_path)
+    assert list(rec["month"].unique()) == ["2025-03"] and len(rec) == 2
+
+
+def test_hold_keeps_names_until_they_pass_exit_rank():
+    ranked = pd.DataFrame({"symbol": list("ABCDE"), "rank": [1, 2, 3, 4, 5]})
+    st = {"n_hold": 2, "enter_rank": 2, "exit_rank": 4}
+    assert forward.hold(ranked, ["D", "E"], st) == ["D", "A"]
+
+
+def test_forward_score_against_the_index(market, tmp_path):
+    s = Strategy("t_sc", "t", "", pit.score_ram)
+    forward.record(s, market, BASE, dt.date(2025, 3, 3), 100.0, folder=tmp_path)
+    forward.record(s, market, BASE, dt.date(2025, 4, 1), 100.0, folder=tmp_path)
+    closes = pit.load_wide(market, dt.date(2025, 1, 1), dt.date(2025, 8, 1))
+    bench = closes.mean(axis=1)
+    t = forward.score("t_sc", closes, bench, folder=tmp_path)
+    assert list(t["open"]) == [False, True]
+    assert t["return_pct"].notna().all()
+    assert (t["excess_pct"] > 0).all()        # the two strongest of five

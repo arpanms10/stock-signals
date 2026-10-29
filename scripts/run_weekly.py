@@ -98,6 +98,10 @@ def main() -> int:
         if not step("Record momentum picks", ["scripts/record_momentum.py"], log,
                     timeout=1800):
             failures.append("momentum record")
+        # The strategy lab's forward strategies, the same once-a-month rule
+        # (scripts/record_lab.py, history/lab/).
+        if not step("Record lab strategies", ["scripts/record_lab.py"], log, timeout=1800):
+            failures.append("lab record")
         # F&O: check NSE's endpoints still answer properly, then extend the
         # bhavcopy history and re-run the validation -- which rewrites the
         # hit rates and reach curves the live view quotes, so they never go

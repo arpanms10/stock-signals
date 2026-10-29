@@ -16,11 +16,11 @@ register(Strategy(
     "momentum_9_1", "momentum",
     "9-month return skipping the latest month, / volatility, above the 200 DMA "
     "(the live ranking)",
-    pit.score_ram, {"lookback_months": 9, "skip_months": 1}))
+    pit.score_ram, {"lookback_months": 9, "skip_months": 1}, status="forward"))
 register(Strategy(
     "momentum_12_1", "momentum",
     "12-1 momentum / volatility: the comparison lookback shown alongside",
-    pit.score_ram, {"lookback_months": 12, "skip_months": 1}))
+    pit.score_ram, {"lookback_months": 12, "skip_months": 1}, status="forward"))
 register(Strategy(
     "momentum_nse_blend", "momentum",
     "6- and 12-month momentum / volatility, z-scored 50/50 (Nifty200 Momentum 30 style)",
