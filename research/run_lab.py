@@ -23,7 +23,7 @@ import datetime as dt
 
 from data import bhavcopy as bc
 from data import store
-from lab import harness, registry, results
+from lab import harness, ledger, registry, results
 from lab.rules import rule_for
 from scoring import timing
 
@@ -59,9 +59,16 @@ def _print_result(r: dict, verdict: dict | None) -> None:
 
 
 def cmd_list(_a) -> int:
+    data = ledger.load()
     for s in registry.all_strategies():
         rule = "rule" if rule_for(s.name) else "no rule"
-        print(f"{s.name:<22} {s.family:<10} {s.status:<9} {rule:<8} {s.summary}")
+        print(f"{s.name:<22} {s.family:<10} {s.status:<9} {rule:<8} "
+              f"{ledger.status(data, s)}")
+    print("\nFamilies:")
+    for name, f in data["families"].items():
+        h = f.get("holdout")
+        state = f"holdout spent {h['on']}" if h else "holdout unseen"
+        print(f"  {name:<18} {state:<24} trials {f.get('trials', 0)}")
     return 0
 
 
@@ -69,6 +76,7 @@ def cmd_show(a) -> int:
     s = registry.get(a.name)
     print(f"{s.name}  (family {s.family}, {s.status})\n  {s.summary}")
     print(f"  settings: {s.settings or 'momentum_strategy defaults'}")
+    print(f"  ledger: {ledger.status(ledger.load(), s)}")
     rule = rule_for(s.name)
     if rule is None:
         print("  no pass rule yet: add one to lab/rules.py and commit it before train")
@@ -82,9 +90,6 @@ def cmd_show(a) -> int:
 def cmd_run(a, split: str) -> int:
     s = registry.get(a.name)
     rule = rule_for(s.name)
-    if split != "robustness" and rule is None:
-        print(f"{s.name} has no pass rule. Write one in lab/rules.py and commit it first.")
-        return 1
     guard = _guard(s, split, rule)
     if guard:
         print(guard)
@@ -109,12 +114,18 @@ def cmd_run(a, split: str) -> int:
 
 
 def _guard(s, split, rule) -> str | None:
-    """Phase 3 hands this to the ledger."""
+    try:
+        ledger.check(ledger.load(), s, split, rule.fingerprint() if rule else None)
+    except ledger.Refused as e:
+        return f"Refused: {e}"
     return None
 
 
 def _record(s, split, rule, r) -> None:
-    return None
+    data = ledger.load()
+    ledger.record(data, s, split, rule.fingerprint() if rule else None, r)
+    ledger.save(data)
+    print(f"Ledger: {ledger.PATH} -- commit it with the result")
 
 
 def main(argv=None) -> int:

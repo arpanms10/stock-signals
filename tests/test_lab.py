@@ -160,3 +160,77 @@ def test_results_keep_month_end_curves(market, tmp_path):
     saved = results.load(path)["t_r"]["train"]
     assert "_curves" not in saved
     assert 8 <= len(saved["curves"]["strategy"]) <= 12
+
+
+# --- phase 3: the holdout ledger -------------------------------------------
+
+from lab import ledger  # noqa: E402
+
+FAM = Strategy("t_a", "fam", "", pit.score_ram)
+SIB = Strategy("t_b", "fam", "", pit.score_ram)
+
+
+def _result(passed, cagr=10.0):
+    return {"start": "2018-07-01", "end": "2022-12-31", "metrics": {"cagr_pct": cagr},
+            "verdict": {"passed": passed}}
+
+
+def _fresh():
+    return {"families": {}, "strategies": {}}
+
+
+def test_holdout_needs_a_passed_train_under_the_same_rule():
+    d = _fresh()
+    with pytest.raises(ledger.Refused, match="no pass rule"):
+        ledger.check(d, FAM, "train", None)
+    ledger.check(d, FAM, "train", "r1")
+    with pytest.raises(ledger.Refused, match="train .* first"):
+        ledger.check(d, FAM, "holdout", "r1")
+    ledger.record(d, FAM, "train", "r1", _result(False))
+    with pytest.raises(ledger.Refused, match="failed train"):
+        ledger.check(d, FAM, "holdout", "r1")
+    ledger.record(d, FAM, "train", "r1", _result(True))
+    ledger.check(d, FAM, "holdout", "r1")
+
+
+def test_a_rule_edited_after_train_locks_the_holdout():
+    d = _fresh()
+    ledger.record(d, FAM, "train", "r1", _result(False))
+    ledger.record(d, FAM, "train", "r2", _result(True))
+    with pytest.raises(ledger.Refused, match="changed after"):
+        ledger.check(d, FAM, "holdout", "r2")
+
+
+def test_a_holdout_runs_once_and_spends_the_whole_family():
+    d = _fresh()
+    for s in (FAM, SIB):
+        ledger.record(d, s, "train", "r", _result(True))
+    ledger.check(d, FAM, "holdout", "r")
+    ledger.record(d, FAM, "holdout", "r", _result(True))
+    with pytest.raises(ledger.Refused, match="spent"):
+        ledger.check(d, FAM, "holdout", "r")
+    with pytest.raises(ledger.Refused, match="Forward-track t_b"):
+        ledger.check(d, SIB, "holdout", "r")
+    assert ledger.status(d, SIB) == "train passed, family holdout spent: forward only"
+    # Train itself stays open: re-measuring on new data is allowed.
+    ledger.check(d, SIB, "train", "r")
+
+
+def test_trials_count_strategies_not_reruns_and_robustness_is_noted():
+    d = _fresh()
+    ledger.record(d, FAM, "train", "r", _result(False))
+    ledger.record(d, FAM, "train", "r", _result(False))
+    ledger.record(d, SIB, "train", "r", _result(False))
+    assert d["families"]["fam"]["trials"] == 2
+    ledger.record(d, FAM, "robustness", None,
+                  {"universe": "liquidity ranks 201-500", "start": "a", "end": "b"})
+    assert d["families"]["fam"]["seen"] == ["liquidity ranks 201-500, a .. b"]
+
+
+def test_the_committed_ledger_covers_every_registered_family(tmp_path):
+    data = ledger.load()
+    for s in registry.all_strategies():
+        assert s.family in data["families"], s.family
+    assert data["families"]["momentum"]["holdout"]
+    ledger.save(data, tmp_path / "l.json")
+    assert ledger.load(tmp_path / "l.json") == data
