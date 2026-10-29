@@ -53,6 +53,14 @@ def _print_result(r: dict, verdict: dict | None) -> None:
         print(f"after tax ({r['tax']['regime']} rates): {m['after_tax_cagr_pct']}% with "
               f"each year's tax paid, {m['after_tax_liquidation_cagr_pct']}% sold at the "
               f"end; NIFTY 500 held and sold: {r['benchmark']['after_tax_cagr_pct']}%")
+    if "deflated_sharpe" in m:
+        import pandas as pd
+        print(f"\nIs it luck? deflated Sharpe {m['deflated_sharpe']} after {r['trials']} "
+              f"trial(s) in the family (above 0.95 is convincing); yearly return over "
+              f"the index {m.get('excess_range_low')} to {m.get('excess_range_high')} pts "
+              f"(90% range); halves {m['first_half_excess_pct']} / "
+              f"{m['second_half_excess_pct']} pts over the index")
+        print(pd.DataFrame(r["by_year"]).set_index("year").to_string())
     print(f"edge vs random picks: {m.get('edge_vs_controls_pct')} pts "
           f"({m.get('edge_vs_controls_sd')} sd); vs the universe: "
           f"{m.get('excess_vs_universe_pct')} pts")
@@ -108,8 +116,12 @@ def cmd_run(a, split: str) -> int:
         start, end, size, skip = harness.TRAIN[0], last, 300, 200
     tax = (False if a.tax == "none" else
            TaxRules.from_config(base, regime=a.tax, use_exemption=not a.no_exemption))
+    data = ledger.load()
+    trials = ledger.family(data, s.family).get("trials", 0) + (
+        0 if data["strategies"].get(s.name, {}).get("runs") else 1)
     r = harness.evaluate(s, con, base, start, end, bench, seeds=a.seeds,
-                         universe_size=size, universe_skip=skip, progress=_say, tax=tax)
+                         universe_size=size, universe_skip=skip, progress=_say, tax=tax,
+                         trials=max(trials, 1))
     verdict = harness.judge(s.name, split, r) if split != "robustness" else None
     r["verdict"] = verdict
     r["run_on"] = dt.date.today().isoformat()

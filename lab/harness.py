@@ -45,6 +45,12 @@ METRICS = {
     "after_tax_liquidation_cagr_pct": "the same, with everything sold and taxed at the end",
     "tax_drag_pts": "CAGR lost to tax, points (cagr_pct - after_tax_cagr_pct)",
     "excess_after_tax_pct": "liquidation after-tax CAGR minus NIFTY 500's held and sold at the end",
+    "deflated_sharpe": "probability (0-1) the edge over NIFTY 500 is real, given the family's trials",
+    "excess_range_low": "low end of the 90% bootstrap range of the yearly return over NIFTY 500, points",
+    "excess_range_high": "high end of that range, points",
+    "first_half_excess_pct": "excess CAGR over NIFTY 500 in the window's first half, points",
+    "second_half_excess_pct": "the same in the second half",
+    "both_halves_beat_index": "1 when both halves beat NIFTY 500, else 0",
     "avg_turnover_pct": "share of the book traded per rebalance, %",
     "cost_drag_pct_yr": "costs per year, % of starting capital",
 }
@@ -95,14 +101,17 @@ def _dd(curve: pd.Series) -> float:
 def evaluate(strategy: Strategy, con, base: dict, start: dt.date, end: dt.date,
              bench: pd.DataFrame, *, seeds: int = SEEDS, universe_size: int = 200,
              universe_skip: int = 0, controls: bool = True, progress=None,
-             tax: TaxRules | None | bool = True) -> dict:
+             tax: TaxRules | None | bool = True, trials: int = 1) -> dict:
     """Run the strategy and its bars over [start, end]; return every metric
     plus the curves (not JSON: popped by callers that save).
 
     tax=True uses today's rates from the config's tax block; pass TaxRules
     for another regime, or False to skip the after-tax run. Only the
     strategy is run after tax: the bars it is judged against are pre-tax,
-    except the index, which is taxed once on a sale at the end."""
+    except the index, which is taxed once on a sale at the end.
+
+    trials is how many variants of the idea have been tried, this one
+    included (the ledger's family count): the deflated Sharpe allows for it."""
     say = progress or (lambda msg: None)
     kw = dict(universe_size=universe_size, universe_skip=universe_skip)
     say(f"{strategy.name} {start} .. {end}")
@@ -159,11 +168,32 @@ def evaluate(strategy: Strategy, con, base: dict, start: dt.date, end: dt.date,
                                             - u.metrics.get("cagr_pct", 0.0), 2)
         curves["universe_ew"] = u.equity
 
+    _luck(m, out, curves, trials)
     out["metrics"] = m
     out["benchmark"] = bench_m
     out["holdings_log"] = [[str(d), h] for d, h in res.holdings_log]
     out["_curves"] = curves
     return out
+
+
+def _luck(m: dict, out: dict, curves: dict, trials: int) -> None:
+    """The four luck checks of lab/stats.py, added in place."""
+    from lab import stats
+    strat, b = curves["strategy"], curves["benchmark"]
+    if len(strat) < 30 or len(b) < 30:
+        return
+    active = stats.active_returns(strat, b)
+    ctrl = [stats.daily_sharpe(stats.active_returns(v, b))
+            for k, v in curves.items() if k.startswith("control_")]
+    m["deflated_sharpe"] = stats.deflated_sharpe(active, trials, ctrl)
+    rng = stats.bootstrap_range(active)
+    if rng:
+        m["excess_range_low"], m["excess_range_high"] = rng
+    first, second = stats.halves(strat, b)
+    m["first_half_excess_pct"], m["second_half_excess_pct"] = first, second
+    m["both_halves_beat_index"] = int(first > 0 and second > 0)
+    out["trials"] = trials
+    out["by_year"] = stats.by_year(curves).reset_index(names="year").to_dict("records")
 
 
 def judge(strategy_name: str, split: str, result: dict) -> dict | None:

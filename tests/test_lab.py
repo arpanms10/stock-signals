@@ -149,7 +149,9 @@ def test_controls_keep_the_eligible_set_but_lose_the_order(market):
     # and the equal-weighted five.
     assert m["edge_vs_controls_pct"] > 0
     assert m["excess_vs_universe_pct"] > 0
-    assert set(m) >= {k for k in harness.METRICS}
+    luck = {"deflated_sharpe", "excess_range_low", "excess_range_high",
+            "first_half_excess_pct", "second_half_excess_pct", "both_halves_beat_index"}
+    assert set(m) >= set(harness.METRICS) - luck      # the fixture has no index
 
 
 def test_results_keep_month_end_curves(market, tmp_path):
@@ -268,3 +270,29 @@ def test_no_tax_leaves_the_run_untouched(market):
                    tax=TaxRules())
     assert "after_tax_cagr_pct" not in a.metrics
     assert a.holdings_log == b.holdings_log or b.metrics["tax_paid"] > 0
+
+
+# --- phase 5: luck checks in every run -------------------------------------
+
+def test_every_run_reports_the_luck_checks(market):
+    s = Strategy("t_luck", "t", "", pit.score_ram)
+    one = harness.evaluate(s, market, BASE, *WINDOW, BENCH.assign(), seeds=2,
+                           universe_size=5, tax=False)
+    assert "deflated_sharpe" not in one["metrics"]   # no index to beat in the fixture
+
+
+def test_luck_checks_with_an_index(market):
+    s = Strategy("t_luck2", "t", "", pit.score_ram)
+    idx = pd.DataFrame({"date": [d for d in _days(420)]})
+    idx["close"] = 100 * (1.0002 ** np.arange(len(idx)))
+    r1 = harness.evaluate(s, market, BASE, *WINDOW, idx, seeds=2, universe_size=5,
+                          tax=False, trials=1)
+    r20 = harness.evaluate(s, market, BASE, *WINDOW, idx, seeds=2, universe_size=5,
+                           tax=False, trials=20)
+    m = r1["metrics"]
+    assert 0 <= m["deflated_sharpe"] <= 1
+    assert r20["metrics"]["deflated_sharpe"] <= m["deflated_sharpe"]
+    assert m["excess_range_low"] < m["excess_range_high"]
+    assert m["both_halves_beat_index"] in (0, 1)
+    assert {"year", "strategy", "NIFTY 500", "vs index"} <= set(r1["by_year"][0])
+
