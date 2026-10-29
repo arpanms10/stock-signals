@@ -39,12 +39,12 @@ read while a job writes.
 
 | File | Contents |
 |---|---|
-| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](../README.md#recording-what-you-own)) |
+| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](holdings.md)) |
 | `mf_holdings.xlsx` | Your mutual funds, as a percentage of your fund portfolio. No rupee amounts |
 | `watching.xlsx` | Stocks you're keeping an eye on. The app adds to it when you press *Watch* |
 
-**Records.** In `history/`, meant for git. Each is written before the outcome
-is known, so how things turned out can be checked later.
+**Records.** In `history/`, on your computer only (git-ignored). Each is
+written before the outcome is known, so how things turned out can be checked later.
 
 | File | Contents |
 |---|---|
@@ -60,17 +60,18 @@ in `backtests/`, and the weekly job's dated report and logs.
 
 | Where | Contents | In git |
 |---|---|---|
-| `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | yes |
-| `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | yes |
+| `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | no |
+| `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | no |
 | `data/results/` | Quarterly results per company, scorecards, backtest working files | no |
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |
 | `config/equities.csv`, `config/etfs.csv`, `config/fundamentals.csv` | Derived lists and fundamentals, rebuilt by the jobs | no |
+| `data/mf/` | Mutual fund NAV database and the PPFAS disclosures it downloads | no |
 | `config/scoring.yaml`, `config/mf_rules.yaml` | Settings and thresholds you can change | yes |
 
 ## What to back up
 
 Only your input files in `config/` (holdings, mutual funds, watch list) and
-the `history/` records can't be rebuilt. Commit `history/` now and then, or
-copy it with your `config/` files; everything else can be downloaded or
-recomputed.
+the `history/` records can't be rebuilt, and neither is in git. Copy both
+folders somewhere safe now and then (an external drive or a cloud folder);
+everything else can be downloaded or recomputed.

@@ -134,7 +134,7 @@ or `.xlsx`, put the file in the `config` folder, and run:
 
 On Windows: `.venv\Scripts\python scripts\import_holdings.py`. If your
 broker's column names aren't recognised, see
-[recording what you own](README.md#recording-what-you-own) for how to adjust
+[recording what you own](docs/holdings.md) for how to adjust
 the file.
 
 **Your data stays on your computer.** These files are listed in
@@ -195,8 +195,8 @@ with a button to refresh it.
 
 ## Updating to a newer version
 
-- **ZIP download:** download the new ZIP, unzip it, copy your `config` and
-  `data` folders across from the old copy, and run `setup_project.py` once.
+- **ZIP download:** download the new ZIP, unzip it, copy your `config`,
+  `data` and `history` folders across from the old copy, and run `setup_project.py` once.
 - **git:** `git pull`, then run `setup_project.py` once to pick up anything
   new.
 

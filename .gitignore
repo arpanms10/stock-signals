@@ -94,3 +94,8 @@ config/mf_calibration.json
 .claude/*
 # ...except the project skills, which are part of the project (/setup).
 !.claude/skills/
+
+# Your forward records and downloaded disclosures: kept on your computer, not
+# in the repo (see docs/storage.md for backing them up).
+history/
+data/mf/

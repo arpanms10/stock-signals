@@ -29,6 +29,18 @@ strongest?" and holds the top slice, always, rotating monthly. 9-1 momentum
 gated on being above the 200 DMA. There is no market-regime rule. To test it
 on past data, see [validation](validation.md).
 
+## Momentum history
+
+`scripts/record_momentum.py` saves the month's picks -- every stock in the top 15 on
+either lookback, with ranks, scores, the price on the day and the NIFTY 500
+level -- to `history/momentum_picks.xlsx`, one tab per month named like
+`Oct 2026`. Each new month is a new tab at the end. It records once per month
+(the first run of the month is kept; `--force` replaces that tab), and the
+Saturday job runs it.
+
+This lets you check later how the picks did from the prices on the day they
+were suggested. What you hold is not in the file.
+
 ## Fundamentals: NSE primary, Yahoo for the gaps
 
 ```bash

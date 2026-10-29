@@ -12,7 +12,8 @@ import pytest
 from mf import changes as ch
 from mf import ppfas
 
-RAW = Path(__file__).resolve().parent.parent / "data" / "mf" / "ppfas_raw"
+# Two public PPFAS disclosures, kept as fixtures so CI runs these tests.
+RAW = Path(__file__).resolve().parent / "fixtures" / "ppfas"
 SEP_2026 = RAW / "PPFCF_PPFAS_Monthly_Portfolio_Report_September_30_2026.xlsx"
 FEB_2026 = RAW / "PPFCF_PPFAS_Monthly_Portfolio_Report_February_28_2026.xls"
 
