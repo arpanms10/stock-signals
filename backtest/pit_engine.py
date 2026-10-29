@@ -25,6 +25,8 @@ is not held, not stopped since, and still above its 200 DMA (next).
 from __future__ import annotations
 
 import datetime as dt
+from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -152,13 +154,67 @@ def liquid_universe(con, on_date: dt.date, top_n: int, lookback_days: int = 90,
     return [s for s, _ in sorted(ok, key=lambda x: -x[1])[:top_n]]
 
 
+@dataclass
+class Inputs:
+    """What a ranking sees: wide date x symbol frames over the whole window,
+    warm-up included. A score at date t may only use rows up to t -- every
+    frame here is already aligned that way (rolling windows, shifts)."""
+    px: pd.DataFrame          # split-adjusted closes
+    rets: pd.DataFrame        # daily returns
+    vol: pd.DataFrame         # annualised realised volatility, vol_window
+    sma200: pd.DataFrame
+    settings: dict            # the momentum_strategy block in force
+
+
+# A score is a wide frame, higher is better, or a list of (frame, weight)
+# whose parts are z-scored over the candidates at each rebalance and summed
+# -- the shape NSE's momentum index uses.
+Score = pd.DataFrame | list[tuple[pd.DataFrame, float]]
+ScoreFn = Callable[[Inputs], Score]
+
+
+def score_ram(x: Inputs) -> Score:
+    """Momentum over lookback, skipping the latest skip months, / volatility."""
+    m = x.settings
+    lb = m.get("lookback_months", 12) * TRADING_DAYS_MONTH
+    sk = m.get("skip_months", 1) * TRADING_DAYS_MONTH
+    return (x.px.shift(sk) / x.px.shift(lb) - 1) / x.vol.replace(0, np.nan)
+
+
+def score_nse_blend(x: Inputs) -> Score:
+    """NSE's Nifty200 Momentum 30 scores on BOTH 6- and 12-month return over
+    volatility, z-scored across the eligible names and averaged 50/50. The
+    z-scoring has to happen at rank time, over the candidates only."""
+    sk = x.settings.get("skip_months", 1) * TRADING_DAYS_MONTH
+    ram6 = (x.px.shift(sk) / x.px.shift(6 * TRADING_DAYS_MONTH) - 1) \
+        / x.vol.replace(0, np.nan)
+    return [(score_ram(x), 0.5), (ram6, 0.5)]
+
+
+def score_high52(x: Inputs) -> Score:
+    """Closeness to the 52-week high: close / max close of 252 sessions."""
+    return x.px / x.px.rolling(252, min_periods=200).max()
+
+
+def score_lowvol(x: Inputs) -> Score:
+    """Lowest realised volatility first."""
+    return -x.vol
+
+
+SCORES: dict[str, ScoreFn] = {"ram": score_ram, "nse_blend": score_nse_blend,
+                              "high52": score_high52, "lowvol": score_lowvol}
+
+
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         start_capital: float = 1_000_000, costs: CostModel | None = None,
         universe_size: int = 200, shuffle_seed: int | None = None,
-        universe_skip: int = 0) -> PortfolioResult:
+        universe_skip: int = 0, score: ScoreFn | None = None) -> PortfolioResult:
     """universe_skip drops the most liquid names first: skip 200, size 300
     is liquidity ranks 201-500, a universe the momentum settings were not
-    tuned on."""
+    tuned on.
+
+    `score` ranks the universe (see Inputs and Score); without one, the
+    momentum_strategy `score` setting picks a built-in from SCORES."""
     costs = costs or CostModel()
     m = cfg.get("momentum_strategy", {})
     n_hold = m.get("n_hold", 15)
@@ -169,7 +225,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
 
     # Warm-up: momentum needs lookback + skip bars before it can rank anything.
     aliases = symbol_aliases(con)
-    px = load_wide(con, start - dt.timedelta(days=int((lb + vol_w) * 1.6)), end, aliases)
+    # A custom score can ask for more history with warmup_sessions.
+    warmup = max(lb + vol_w, m.get("warmup_sessions", 0))
+    px = load_wide(con, start - dt.timedelta(days=int(warmup * 1.6)), end, aliases)
     if px.empty:
         return PortfolioResult(pd.Series(dtype=float), pd.Series(dtype=float))
 
@@ -177,23 +235,15 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     # A holding with no price today (suspended, moved out of the EQ series)
     # is still owned: value it at its last close, never at zero.
     last_px = px.ffill()
-    mom_matrix = px.shift(sk) / px.shift(lb) - 1
     vol = rets.rolling(vol_w, min_periods=vol_w // 2).std() * np.sqrt(252)
-    ram = mom_matrix / vol.replace(0, np.nan)
-    # NSE's Nifty200 Momentum 30 scores on BOTH 6- and 12-month return over
-    # volatility, z-scored across the eligible names and averaged 50/50.
-    # The z-scoring has to happen at rank time, over the candidates only.
-    nse_blend = m.get("score", "ram") == "nse_blend"
-    # Two other factors, ranked by the same machinery (research/run_factor_backtest.py):
-    #   high52  closeness to the 52-week high: close / max close of 252 days
-    #   lowvol  lowest realised volatility first
-    if m.get("score") == "high52":
-        ram = px / px.rolling(252, min_periods=200).max()
-    elif m.get("score") == "lowvol":
-        ram = -vol
+    sma200 = px.rolling(200, min_periods=200).mean()
+    score = score or SCORES[m.get("score", "ram")]
+    parts = score(Inputs(px, rets, vol, sma200, m))
+    if isinstance(parts, pd.DataFrame):
+        parts = [(parts, 1.0)]
+    ram = parts[0][0]
+    blended = len(parts) > 1
     gate_200 = m.get("require_above_200dma", True)
-    if nse_blend:
-        ram6 = (px.shift(sk) / px.shift(6 * TRADING_DAYS_MONTH) - 1) / vol.replace(0, np.nan)
     # selection: overlap holds only names in the top band on BOTH the primary
     # and the comparison lookback -- the same agreement the live views show.
     alt_lb = (m.get("compare_lookback_months")
@@ -201,7 +251,6 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     if alt_lb:
         ram_alt = (px.shift(sk) / px.shift(alt_lb * TRADING_DAYS_MONTH) - 1) \
             / vol.replace(0, np.nan)
-    sma200 = px.rolling(200, min_periods=200).mean()
     stop_kind = m.get("stop", "none")
     refill = m.get("stop_refill", "cash")
     if stop_kind == "atr":
@@ -382,18 +431,18 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 if max_ext and not pd.isna(ma) and 100 * (px_s / ma - 1) > max_ext:
                     continue
                 cand.append(s)
-            if nse_blend:
-                cand = [s for s in cand if not pd.isna(ram6.loc[ts].get(s, np.nan))]
+            for frame, _ in parts[1:]:
+                cand = [s for s in cand if not pd.isna(frame.loc[ts].get(s, np.nan))]
             if alt_lb:
                 cand = [s for s in cand if not pd.isna(ram_alt.loc[ts].get(s, np.nan))]
             if not cand:
                 continue
-            if nse_blend:
+            if blended:
                 def z(x: pd.Series) -> pd.Series:
                     sd = x.std()
                     return (x - x.mean()) / sd if sd else x * 0
-                score = 0.5 * z(snap[cand]) + 0.5 * z(ram6.loc[ts, cand])
-                ranked = sorted(cand, key=lambda s: -score[s])
+                total = sum(w * z(frame.loc[ts, cand]) for frame, w in parts)
+                ranked = sorted(cand, key=lambda s: -total[s])
             else:
                 ranked = sorted(cand, key=lambda s: -snap[s])
             last_ranked = ranked
