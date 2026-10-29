@@ -54,6 +54,8 @@ config/fno_reach.json
 config/range_calibration.json
 # config/factor_calibration.json <- run_factor_backtest.py (52-week high, low vol).
 config/factor_calibration.json
+# config/lab_results.json <- research/run_lab.py; the Strategy lab page.
+config/lab_results.json
 # config/swing_calibration.json <- run_swing.py --backtest; the Swing tab
 #   shows "no backtest yet" without it.
 config/swing_calibration.json

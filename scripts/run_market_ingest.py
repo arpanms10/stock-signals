@@ -46,12 +46,11 @@ def main() -> None:
         if left:
             print(f"  !! {left:,} symbols still unmapped -- they are treated "
                   f"as non-equity and never ranked")
-    # Splits and bonuses: the full history once, then a rolling window that
-    # also catches ex-dates announced ahead.
-    through = bc.actions_synced_through(con)
-    frm = start if through is None else through - dt.timedelta(days=45)
-    print(f"Syncing splits/bonuses from {frm}")
-    bc.sync_actions(con, frm, today + dt.timedelta(days=60), verbose=through is None)
+    # Splits and bonuses: the full history once, any older stretch the
+    # history has since been extended to, then a rolling window.
+    for frm, to in bc.actions_gaps(con, start, today):
+        print(f"Syncing splits/bonuses {frm} .. {to}")
+        bc.sync_actions(con, frm, to, verbose=(to - frm).days > 90)
 
     # Trade-for-trade (BE/BZ) prices, for days ingested before they were kept.
     left = con.execute("SELECT COUNT(*) FROM market_days WHERE rows > 0 AND date "

@@ -1,0 +1,195 @@
+{
+ "families": {
+  "momentum": {
+   "holdout": {
+    "on": "2026-10-11",
+    "by": "9-1 vs 12-1 lookback and the v1 rules",
+    "window": "2023-01-01 .."
+   },
+   "seen": [
+    "liquidity ranks 201-500, 2017 .. 2026-10 (vol targeting, trailing stops, the 9-1 choice)",
+    "liquidity ranks 1-200, 2018-07-01 .. 2026-10-23"
+   ],
+   "trials": 12,
+   "source": "docs/ROADMAP.md: lookback 9 vs 12, skip 0 vs 1, risk_off_scale 0.5 vs 1, NSE blend, overlap selection, max extension cap, volatility targeting, pct and ATR trailing stops, random controls. trials is a lower bound."
+  },
+  "v1_signals": {
+   "holdout": {
+    "on": "2026-10-04",
+    "by": "the v1 signal rules (retired)",
+    "window": "2023-01-01 .."
+   },
+   "seen": [],
+   "trials": 3,
+   "source": "docs/ROADMAP.md: 50 DMA trend-break exit, RSI trim, entry cooldown dropped"
+  },
+  "high52": {
+   "holdout": null,
+   "seen": [
+    "liquidity ranks 201-500, 2018-07 .. 2026-10 (27.9% CAGR printed, 2026-10-19)"
+   ],
+   "trials": 1,
+   "source": "research/run_factor_backtest.py, train failed 2026-10-19 (12.6% vs NIFTY 500 12.5% on that day's data)"
+  },
+  "lowvol": {
+   "holdout": null,
+   "seen": [
+    "liquidity ranks 201-500, 2018-07 .. 2026-10 (printed 2026-10-19)"
+   ],
+   "trials": 1,
+   "source": "research/run_factor_backtest.py, train failed 2026-10-19 (Sharpe 0.70 vs 0.72)"
+  },
+  "swing": {
+   "holdout": null,
+   "seen": [
+    "2023-26 quintiles of the 'wider stop' ranking (that ranking's holdout is contaminated)"
+   ],
+   "trials": 6,
+   "source": "research/run_swing_experiment.py, 2026-10-13: 9-1 momentum/vol, deepest dip, lowest vol, relative strength, random order, RSI(2) all failed 2018-22 train. The 2023-26 swing holdout is clean for one idea."
+  },
+  "results_reaction": {
+   "holdout": {
+    "on": "2026-10-18",
+    "by": "whole 2020-26 filing history tested at once",
+    "window": "2020 .."
+   },
+   "seen": [],
+   "trials": 4,
+   "source": "docs/results.md: results verdict, reaction drift (t=2.6), drift book after costs (t<=0.9), 40-slot/60-session book found post hoc. Forward-track only."
+  },
+  "garp_qarp": {
+   "holdout": {
+    "on": "2026-10-18",
+    "by": "whole 2020-26 point-in-time history",
+    "window": "2020 .."
+   },
+   "seen": [],
+   "trials": 4,
+   "source": "docs/picker.md: GARP and QARP, today's index and point-in-time universe"
+  },
+  "mf_states": {
+   "holdout": {
+    "on": "2026-10-18",
+    "by": "mutual fund states, 12m and 36m",
+    "window": "2022-01-01 .."
+   },
+   "seen": [],
+   "trials": 2,
+   "source": "docs/mf_evaluation.md"
+  },
+  "fno_positioning": {
+   "holdout": {
+    "on": "2026-10-08",
+    "by": "OI walls, PCR, max pain, Jan 2024 - Sep 2026 at once",
+    "window": "2024 .."
+   },
+   "seen": [],
+   "trials": 5,
+   "source": "docs/f_o/validation.md; the PCR tilt and index skew hints are forward-log only"
+  },
+  "option_rules": {
+   "holdout": {
+    "on": "2026-10-08",
+    "by": "index option buy/sell rules, whole history",
+    "window": "2019 .."
+   },
+   "seen": [],
+   "trials": 6,
+   "source": "docs/f_o/backtest.md: buying lost after costs, selling won but regime-dependent"
+  }
+ },
+ "strategies": {
+  "high52": {
+   "family": "high52",
+   "runs": [
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "73ed08579f9fb319",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 11.0,
+     "excess_cagr_pct": -1.47,
+     "edge_vs_controls_pct": 3.18,
+     "sharpe": 0.64,
+     "max_drawdown_pct": -38.45
+    },
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "73ed08579f9fb319",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 11.0,
+     "excess_cagr_pct": -1.47,
+     "edge_vs_controls_pct": 3.18,
+     "sharpe": 0.64,
+     "max_drawdown_pct": -38.45
+    }
+   ]
+  },
+  "lowvol": {
+   "family": "lowvol",
+   "runs": [
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "72a9c4cf9e999995",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 10.9,
+     "excess_cagr_pct": -1.57,
+     "edge_vs_controls_pct": 2.59,
+     "sharpe": 0.77,
+     "max_drawdown_pct": -28.73
+    },
+    {
+     "split": "train",
+     "on": "2026-10-29",
+     "rule": "72a9c4cf9e999995",
+     "window": "2018-07-01 .. 2022-12-31",
+     "passed": false,
+     "cagr_pct": 10.9,
+     "excess_cagr_pct": -1.57,
+     "edge_vs_controls_pct": 2.59,
+     "sharpe": 0.77,
+     "max_drawdown_pct": -28.73
+    }
+   ]
+  },
+  "momentum_9_1": {
+   "family": "momentum",
+   "runs": [
+    {
+     "split": "measure",
+     "on": "2026-10-29",
+     "rule": null,
+     "window": "2018-07-01 .. 2026-10-23",
+     "passed": false,
+     "cagr_pct": 24.2,
+     "excess_cagr_pct": 13.36,
+     "edge_vs_controls_pct": 14.35,
+     "sharpe": 1.05,
+     "max_drawdown_pct": -37.38
+    }
+   ]
+  },
+  "momentum_12_1": {
+   "family": "momentum",
+   "runs": [
+    {
+     "split": "measure",
+     "on": "2026-10-29",
+     "rule": null,
+     "window": "2018-07-01 .. 2026-10-23",
+     "passed": false,
+     "cagr_pct": 16.46,
+     "excess_cagr_pct": 5.61,
+     "edge_vs_controls_pct": 5.58,
+     "sharpe": 0.78,
+     "max_drawdown_pct": -47.1
+    }
+   ]
+  }
+ }
+}

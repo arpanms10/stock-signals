@@ -240,3 +240,37 @@ def test_repair_clears_only_non_holiday_weekdays(tmp_path):
     cleared = bc.repair_false_empty_days(con, {dt.date(2023, 1, 26)}, verbose=False)
     assert cleared == ["2023-01-02"]
     assert bc.have_days(con) == {"2023-01-26", "2023-01-07", "2023-01-03"}
+
+
+def test_actions_history_is_back_filled_when_the_window_grows(tmp_path, monkeypatch):
+    """A database first synced for 2 years and later ingested for 10 must
+    fetch the older splits too, without moving `through` backwards."""
+    from data import corporate_actions as ca
+    calls = []
+    monkeypatch.setattr(ca, "fetch_all", lambda a, b: (calls.append((a, b)) or [], None))
+    monkeypatch.setattr(ca, "fetch_demergers", lambda a, b: [])
+    monkeypatch.setattr(bc.time, "sleep", lambda s: None)
+    con = bc.connect(tmp_path / "m.db")
+    today = dt.date(2026, 10, 29)
+
+    assert bc.actions_gaps(con, dt.date(2024, 10, 29), today) == [
+        (dt.date(2024, 10, 29), dt.date(2026, 12, 28))]
+    bc.sync_actions(con, dt.date(2024, 10, 29), dt.date(2026, 12, 28), verbose=False)
+
+    gaps = bc.actions_gaps(con, dt.date(2016, 10, 29), today)
+    assert gaps[0] == (dt.date(2016, 10, 29), dt.date(2024, 10, 29))
+    assert gaps[1][1] == dt.date(2026, 12, 28)
+    for frm, to in gaps:
+        bc.sync_actions(con, frm, to, verbose=False)
+    assert bc.actions_synced_from(con) == dt.date(2016, 10, 29)
+    assert bc.actions_synced_through(con) == dt.date(2026, 12, 28)
+    assert min(a for a, _ in calls) == dt.date(2016, 10, 29)
+    # Fully covered now: only the rolling window is left.
+    assert len(bc.actions_gaps(con, dt.date(2016, 10, 29), today)) == 1
+
+
+def test_unknown_coverage_resyncs_the_whole_window(tmp_path):
+    con = bc.connect(tmp_path / "m.db")
+    con.execute("INSERT INTO market_actions_synced VALUES ('2026-12-01')")
+    gaps = bc.actions_gaps(con, dt.date(2016, 10, 29), dt.date(2026, 10, 29))
+    assert gaps[0] == (dt.date(2016, 10, 29), dt.date(2026, 12, 1))

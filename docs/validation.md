@@ -13,7 +13,8 @@ data. Run them after a refresh, or after changing a setting in
 ## Principles every backtest follows
 
 - **Costs included.** STT, stamp duty, exchange fees, GST and slippage --
-  about 0.35% per round trip. Returns are before tax.
+  about 0.35% per round trip. Returns are before tax, except in the
+  [strategy lab](lab.md), which also reports them after capital-gains tax.
 - **Survivorship-free where it matters.** Testing only on companies that still
   exist today flatters every result. The momentum and factor backtests use a
   point-in-time universe rebuilt from the full-market bhavcopy, delisted names
@@ -34,6 +35,14 @@ data. Run them after a refresh, or after changing a setting in
   trade-for-trade spells are adjusted so they don't read as losses
   ([data](data.md)). Dividends are not included, so returns are price-only;
   the NIFTY 500 benchmark is a price index too.
+
+## Strategy lab
+
+New ranking strategies are tested in the [strategy lab](lab.md): one
+harness for every idea, pass rules fixed before the run, a ledger of which
+windows each idea has already seen (`research/lab_ledger.json`), after-tax
+results, luck checks and forward records. The momentum, 52-week high and
+low volatility rankings are registered there too.
 
 ## Momentum
 

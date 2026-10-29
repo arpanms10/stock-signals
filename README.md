@@ -49,6 +49,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended 
 | **GARP & QARP** shortlists from company filings | GARP / QARP | [GARP & QARP](docs/picker.md) |
 | **Mutual funds** judged against their category, for your fund book or any fund | Mutual funds, Compare funds | [mutual fund evaluation](docs/mf_evaluation.md) |
 | **Analyze a stock**: fundamental and technical read of any NSE listing | Analyze a stock | [analyze](docs/analyze.md) |
+| **Strategy lab**: test a new ranking strategy with costs, tax, random controls and a one-time holdout, then track it forward | Strategy lab | [strategy lab](docs/lab.md) |
 | **F&O**: option-chain positioning and the range to expiry | F&O | [F&O analysis](docs/f_o/README.md) |
 | **PPFAS Flexi Cap**: monthly portfolio changes, read as manager decisions | | [PPFAS portfolio](docs/mutual_funds.md) |
 

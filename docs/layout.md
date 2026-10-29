@@ -13,6 +13,7 @@ setup_project.py   start here: guided setup on a new computer
 run_ui.py          open the dashboard
 scripts/           everything you or the scheduled jobs run: refreshes, records, reports
 research/          backtests and experiments (see docs/validation.md)
+lab/               the strategy lab: register, test, ledger, track forward (docs/lab.md)
 config/            settings, and the files you fill in (holdings, MF book, watch list)
 data/ history/     downloaded data / forward records (neither in git); see docs/storage.md
 docs/              how each part works
@@ -56,7 +57,19 @@ scripts/record_momentum.py monthly momentum picks -> history/momentum_picks.xlsx
 scripts/record_fno.py      monthly F&O ranges -> history/fno_ranges.xlsx, scored at expiry
 scripts/record_swing.py    every swing scan -> history/swing/ (records/swing_store.py)
 scripts/record_ranges.py   daily Today ranges -> history/ranges/ (records/ranges_store.py)
-history/                   forward records, local only (momentum picks, F&O, swing, ranges)
+scripts/record_lab.py      monthly picks of the lab's forward strategies -> history/lab/
+history/                   forward records, local only (momentum picks, F&O, swing, ranges, lab)
+
+lab/strategy.py            a strategy: ranking, settings, family, status
+lab/strategies.py          the registered strategies
+lab/rules.py               pass rules, fixed before the first run, fingerprinted
+lab/harness.py             one test for all: controls, universe, tax, luck checks
+lab/ledger.py              which windows each family has seen -> research/lab_ledger.json
+lab/stats.py               deflated Sharpe, bootstrap range, by year, halves
+lab/forward.py             monthly forward picks and their returns
+lab/compare.py             correlation and blends from config/lab_results.json
+research/run_lab.py        list / show / train / holdout / robustness / measure / compare
+backtest/tax_lots.py       capital-gains tax lot by lot, for the backtest
 
 data/sources/prices.py     OHLCV via jugaad-data
 data/sources/nse_fundamentals.py   results, shareholding and pledge from XBRL
