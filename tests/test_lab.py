@@ -102,3 +102,61 @@ def test_the_settings_score_still_selects_a_builtin(market):
                         market, BASE, *WINDOW, BENCH, universe_size=5)
     assert via_cfg.equity.equals(via_fn.equity)
     assert via_cfg.holdings_log == via_fn.holdings_log
+
+
+# --- phase 2: pass rules and the harness ----------------------------------
+
+from lab import harness, results  # noqa: E402
+from lab.rules import C, PassRule  # noqa: E402
+
+RULE = PassRule("2026-10-29", train=(C("cagr_pct", ">=", 5.0), C("sharpe", ">", 0.0)),
+                holdout=(C("cagr_pct", ">", 0.0),))
+
+
+def test_a_rule_passes_only_when_every_check_does():
+    assert RULE.judge("train", {"cagr_pct": 6.0, "sharpe": 0.4})["passed"]
+    v = RULE.judge("train", {"cagr_pct": 6.0, "sharpe": -0.1})
+    assert not v["passed"] and v["checks"] == {"cagr_pct >= 5": True, "sharpe > 0": False}
+
+
+def test_a_missing_or_nan_metric_fails_its_check():
+    assert not RULE.judge("holdout", {})["passed"]
+    assert not RULE.judge("holdout", {"cagr_pct": float("nan")})["passed"]
+
+
+def test_the_fingerprint_changes_with_any_part_of_the_rule():
+    same = PassRule("2026-10-29", train=(C("cagr_pct", ">=", 5.0), C("sharpe", ">", 0.0)),
+                    holdout=(C("cagr_pct", ">", 0.0),))
+    looser = PassRule("2026-10-29", train=(C("cagr_pct", ">=", 4.0), C("sharpe", ">", 0.0)),
+                      holdout=(C("cagr_pct", ">", 0.0),))
+    assert RULE.fingerprint() == same.fingerprint() != looser.fingerprint()
+
+
+def test_every_rule_checks_metrics_the_harness_produces():
+    from lab.rules import RULES
+    for name, rule in RULES.items():
+        registry.get(name)
+        for c in (*rule.train, *rule.holdout):
+            assert c.metric in harness.METRICS, (name, c.metric)
+
+
+def test_controls_keep_the_eligible_set_but_lose_the_order(market):
+    s = Strategy("t_h", "t", "", pit.score_ram)
+    r = harness.evaluate(s, market, BASE, *WINDOW, BENCH, seeds=3, universe_size=5)
+    m = r["metrics"]
+    assert len(r["controls"]["cagr_pct"]) == 3
+    # Holding the two strongest of five drifting names beats random pairs
+    # and the equal-weighted five.
+    assert m["edge_vs_controls_pct"] > 0
+    assert m["excess_vs_universe_pct"] > 0
+    assert set(m) >= {k for k in harness.METRICS}
+
+
+def test_results_keep_month_end_curves(market, tmp_path):
+    s = Strategy("t_r", "t", "", pit.score_ram)
+    r = harness.evaluate(s, market, BASE, *WINDOW, BENCH, seeds=1, universe_size=5)
+    path = tmp_path / "lab_results.json"
+    results.save("t_r", "train", r, path)
+    saved = results.load(path)["t_r"]["train"]
+    assert "_curves" not in saved
+    assert 8 <= len(saved["curves"]["strategy"]) <= 12
