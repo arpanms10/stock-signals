@@ -234,3 +234,37 @@ def test_the_committed_ledger_covers_every_registered_family(tmp_path):
     assert data["families"]["momentum"]["holdout"]
     ledger.save(data, tmp_path / "l.json")
     assert ledger.load(tmp_path / "l.json") == data
+
+
+# --- phase 4: after tax ----------------------------------------------------
+
+from backtest.tax_lots import TaxRules  # noqa: E402
+
+
+def test_tax_is_a_drag_that_compounds_and_the_index_pays_once(market):
+    s = Strategy("t_tax", "t", "", pit.score_ram)
+    r = harness.evaluate(s, market, BASE, *WINDOW, BENCH, seeds=1, universe_size=5)
+    m = r["metrics"]
+    assert m["after_tax_cagr_pct"] < m["cagr_pct"]
+    assert m["after_tax_liquidation_cagr_pct"] <= m["after_tax_cagr_pct"]
+    assert m["tax_drag_pts"] > 0
+    assert r["tax"]["tax_paid"] > 0
+
+
+def test_index_after_tax_is_taxed_on_the_gain_above_the_exemption():
+    idx = pd.Series([100.0, 200.0], index=pd.to_datetime(["2020-01-01", "2023-01-01"]))
+    no_ex = harness.index_after_tax_cagr(idx, TaxRules(use_exemption=False))
+    with_ex = harness.index_after_tax_cagr(idx, TaxRules())
+    owed = 0.125 * 1_000_000 * 1.04
+    years = (idx.index[-1] - idx.index[0]).days / 365.25
+    assert no_ex == pytest.approx(100 * (((2_000_000 - owed) / 1e6) ** (1 / years) - 1), abs=0.01)
+    assert with_ex > no_ex
+
+
+def test_no_tax_leaves_the_run_untouched(market):
+    plain = Strategy("t_nt", "t", "", pit.score_ram)
+    a = runner.run(plain, market, BASE, *WINDOW, BENCH, universe_size=5)
+    b = runner.run(plain, market, BASE, *WINDOW, BENCH, universe_size=5,
+                   tax=TaxRules())
+    assert "after_tax_cagr_pct" not in a.metrics
+    assert a.holdings_log == b.holdings_log or b.metrics["tax_paid"] > 0

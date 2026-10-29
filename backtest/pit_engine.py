@@ -33,6 +33,7 @@ import pandas as pd
 
 from backtest.costs import CostModel
 from backtest.portfolio_engine import PortfolioResult, _metrics
+from backtest.tax_lots import TaxBook, TaxRules
 from data.bhavcopy import (EQUITY_ISIN_PREFIX, load_actions, load_demergers,
                            require_equity_symbols, symbol_aliases)
 from strategy import momentum as mom
@@ -208,13 +209,19 @@ SCORES: dict[str, ScoreFn] = {"ram": score_ram, "nse_blend": score_nse_blend,
 def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         start_capital: float = 1_000_000, costs: CostModel | None = None,
         universe_size: int = 200, shuffle_seed: int | None = None,
-        universe_skip: int = 0, score: ScoreFn | None = None) -> PortfolioResult:
+        universe_skip: int = 0, score: ScoreFn | None = None,
+        tax: TaxRules | None = None) -> PortfolioResult:
     """universe_skip drops the most liquid names first: skip 200, size 300
     is liquidity ranks 201-500, a universe the momentum settings were not
     tuned on.
 
     `score` ranks the universe (see Inputs and Score); without one, the
-    momentum_strategy `score` setting picks a built-in from SCORES."""
+    momentum_strategy `score` setting picks a built-in from SCORES.
+
+    `tax` charges capital-gains tax lot by lot (backtest/tax_lots.py): each
+    financial year's tax is paid from the book at the first rebalance after
+    it ends, so it compounds as a real drag. Metrics then add the after-tax
+    CAGR with the open year's tax paid, and with everything sold at the end."""
     costs = costs or CostModel()
     m = cfg.get("momentum_strategy", {})
     n_hold = m.get("n_hold", 15)
@@ -279,6 +286,12 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     n_stops = 0
     # Idle cash (vol targeting, stops) earns a liquid-fund yield if set.
     cash_growth = (1 + m.get("cash_yield_pct", 0.0) / 100) ** (1 / 252)
+    book = TaxBook(tax) if tax else None
+    total_tax = 0.0
+
+    def stt(value: float) -> float:
+        # Not deductible from capital gains, so kept out of cost and proceeds.
+        return value * costs.stt_pct / 100
 
     for i, ts in enumerate(dates):
         today = ts.date()
@@ -290,6 +303,10 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
         if pending is not None:
             target = [s for s in pending if s in row.index and not pd.isna(row[s])]
             pending = None
+            if book:
+                paid = book.due(today)
+                cash -= paid
+                total_tax += paid
             prices_now = {s: float(row[s]) for s in set(list(shares) + target)
                           if s in row.index and not pd.isna(row[s]) and row[s] > 0}
             marks = last_px.loc[ts]
@@ -302,6 +319,9 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 if s not in target and s in prices_now:
                     fill = costs.fill_price(prices_now[s], "sell")
                     c = costs.sell_cost(fill, shares[s])
+                    if book:
+                        v = fill * shares[s]
+                        book.sell(s, shares[s], v - c + stt(v), today)
                     cash += fill * shares[s] - c
                     total_costs += c
                     traded += fill * shares[s]
@@ -320,6 +340,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                     if delta <= 0:
                         continue
                     c = costs.buy_cost(fill, delta)
+                    if book:
+                        book.buy(s, delta, fill * delta + c - stt(fill * delta), today)
                     cash -= fill * delta + c
                     total_costs += c
                     shares[s] = have + delta
@@ -327,6 +349,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 else:
                     fill = costs.fill_price(prices_now[s], "sell")
                     c = costs.sell_cost(fill, -delta)
+                    if book:
+                        book.sell(s, -delta, fill * -delta - c + stt(fill * -delta), today)
                     cash += fill * (-delta) - c
                     total_costs += c
                     shares[s] = have + delta
@@ -345,6 +369,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             fill = costs.fill_price(float(row[s]), "sell")
             c = costs.sell_cost(fill, shares[s])
             proceeds = fill * shares[s] - c
+            if book:
+                book.sell(s, shares[s], proceeds + stt(fill * shares[s]), today)
             cash += proceeds
             total_costs += c
             del shares[s]
@@ -365,6 +391,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
             c = costs.buy_cost(fill, qty)
             if qty <= 0 or fill * qty + c > cash:
                 continue
+            if book:
+                book.buy(repl, qty, fill * qty + c - stt(fill * qty), today)
             cash -= fill * qty + c
             total_costs += c
             shares[repl] = qty
@@ -377,6 +405,8 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
                 last = px[s].loc[:ts].dropna()
                 if not last.empty and (ts - last.index[-1]).days > 10:
                     cash += float(last.iloc[-1]) * shares[s] * 0.95   # haircut
+                    if book:
+                        book.sell(s, shares[s], float(last.iloc[-1]) * shares[s] * 0.95, today)
                     del shares[s]
 
         marks = last_px.loc[ts]
@@ -506,6 +536,23 @@ def run(con, cfg: dict, start: dt.date, end: dt.date, bench: pd.DataFrame,
     if not bcurve.empty:
         bcurve.index = pd.to_datetime(bcurve.index)
     metrics = _metrics(equity, bcurve, turnover, total_costs, len(turnover))
+    if book and metrics:
+        end_day = dates[-1].date()
+        marks = {s: float(last_px.loc[dates[-1]][s]) for s in shares
+                 if not pd.isna(last_px.loc[dates[-1]].get(s, np.nan))}
+        final = float(equity.iloc[-1])
+        owed = book.open_year_tax()
+        owed_all = book.liquidation_tax(marks, end_day)
+        start_value = float(equity.iloc[0])
+
+        def cagr(v):
+            return round(100 * ((v / start_value) ** (1 / metrics["years"]) - 1), 2)
+        metrics.update({
+            "tax_paid": round(total_tax + owed, 0),
+            "after_tax_cagr_pct": cagr(final - owed),
+            "after_tax_liquidation_cagr_pct": cagr(final - owed_all),
+            "tax_regime": tax.regime,
+        })
     if stop_kind != "none" and metrics:
         metrics["stops_fired"] = n_stops
         metrics["stops_per_year"] = round(n_stops / metrics["years"], 1)

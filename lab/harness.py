@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from backtest.portfolio_engine import PortfolioResult
+from backtest.tax_lots import TaxRules
 from lab import runner
 from lab.strategy import Strategy
 
@@ -40,6 +41,10 @@ METRICS = {
     "edge_vs_controls_pct": "CAGR minus the mean of the random-pick controls, points",
     "edge_vs_controls_sd": "that edge in standard deviations of the controls",
     "excess_vs_universe_pct": "CAGR minus the equal-weighted universe's, points",
+    "after_tax_cagr_pct": "CAGR after capital-gains tax, each year's paid from the book",
+    "after_tax_liquidation_cagr_pct": "the same, with everything sold and taxed at the end",
+    "tax_drag_pts": "CAGR lost to tax, points (cagr_pct - after_tax_cagr_pct)",
+    "excess_after_tax_pct": "liquidation after-tax CAGR minus NIFTY 500's held and sold at the end",
     "avg_turnover_pct": "share of the book traded per rebalance, %",
     "cost_drag_pct_yr": "costs per year, % of starting capital",
 }
@@ -63,6 +68,21 @@ def _variant(strategy: Strategy, suffix: str, score=None, **settings) -> Strateg
                     strategy.status)
 
 
+def index_after_tax_cagr(curve: pd.Series, rules: TaxRules,
+                         capital: float = 1_000_000) -> float:
+    """The index bought at the start and sold at the end, taxed once."""
+    if len(curve) < 2:
+        return float("nan")
+    from backtest.tax_lots import TaxBook
+    first, last = curve.index[0].date(), curve.index[-1].date()
+    book = TaxBook(rules)
+    book.buy("INDEX", 1.0, capital, first)
+    final = capital * float(curve.iloc[-1] / curve.iloc[0])
+    owed = book.liquidation_tax({"INDEX": final}, last)
+    years = max((curve.index[-1] - curve.index[0]).days / 365.25, 1e-9)
+    return round(100 * (((final - owed) / capital) ** (1 / years) - 1), 2)
+
+
 def _sharpe(curve: pd.Series) -> float:
     r = curve.pct_change().dropna()
     return float(np.sqrt(252) * r.mean() / r.std()) if len(r) > 1 and r.std() else 0.0
@@ -74,9 +94,15 @@ def _dd(curve: pd.Series) -> float:
 
 def evaluate(strategy: Strategy, con, base: dict, start: dt.date, end: dt.date,
              bench: pd.DataFrame, *, seeds: int = SEEDS, universe_size: int = 200,
-             universe_skip: int = 0, controls: bool = True, progress=None) -> dict:
+             universe_skip: int = 0, controls: bool = True, progress=None,
+             tax: TaxRules | None | bool = True) -> dict:
     """Run the strategy and its bars over [start, end]; return every metric
-    plus the curves (not JSON: popped by callers that save)."""
+    plus the curves (not JSON: popped by callers that save).
+
+    tax=True uses today's rates from the config's tax block; pass TaxRules
+    for another regime, or False to skip the after-tax run. Only the
+    strategy is run after tax: the bars it is judged against are pre-tax,
+    except the index, which is taxed once on a sale at the end."""
     say = progress or (lambda msg: None)
     kw = dict(universe_size=universe_size, universe_skip=universe_skip)
     say(f"{strategy.name} {start} .. {end}")
@@ -93,6 +119,21 @@ def evaluate(strategy: Strategy, con, base: dict, start: dt.date, end: dt.date,
     m["drawdown_vs_bench_pts"] = round(m.get("max_drawdown_pct", 0.0)
                                        - (bench_m["max_drawdown_pct"] or 0.0), 2)
     curves = {"strategy": res.equity, "benchmark": b}
+
+    if tax:
+        rules = tax if isinstance(tax, TaxRules) else TaxRules.from_config(base)
+        say("  after tax")
+        t = runner.run(strategy, con, base, start, end, bench, tax=rules, **kw)
+        tm = t.metrics
+        m["after_tax_cagr_pct"] = tm.get("after_tax_cagr_pct")
+        m["after_tax_liquidation_cagr_pct"] = tm.get("after_tax_liquidation_cagr_pct")
+        m["tax_drag_pts"] = round(m.get("cagr_pct", 0.0) - tm.get("after_tax_cagr_pct", 0.0), 2)
+        bench_m["after_tax_cagr_pct"] = index_after_tax_cagr(b, rules)
+        m["excess_after_tax_pct"] = round(tm.get("after_tax_liquidation_cagr_pct", 0.0)
+                                          - bench_m["after_tax_cagr_pct"], 2)
+        out["tax"] = {"regime": rules.regime, "exemption": rules.exemption_for(2025),
+                      "tax_paid": tm.get("tax_paid")}
+        curves["after_tax"] = t.equity
 
     if controls:
         cagrs = []
@@ -136,11 +177,13 @@ def judge(strategy_name: str, split: str, result: dict) -> dict | None:
 def table(result: dict) -> pd.DataFrame:
     """The headline rows: strategy and its three bars."""
     m, b = result["metrics"], result["benchmark"]
-    rows = [{"": result["strategy"], "CAGR %": m.get("cagr_pct"), "Sharpe": m.get("sharpe"),
+    rows = [{"": result["strategy"], "CAGR %": m.get("cagr_pct"),
+             "After tax %": m.get("after_tax_liquidation_cagr_pct"), "Sharpe": m.get("sharpe"),
              "Max DD %": m.get("max_drawdown_pct"),
              "Turnover %/rebal": m.get("avg_turnover_pct"),
              "Cost drag %/yr": m.get("cost_drag_pct_yr")},
-            {"": "NIFTY 500", "CAGR %": b.get("cagr_pct"), "Sharpe": b.get("sharpe"),
+            {"": "NIFTY 500", "CAGR %": b.get("cagr_pct"),
+             "After tax %": b.get("after_tax_cagr_pct"), "Sharpe": b.get("sharpe"),
              "Max DD %": b.get("max_drawdown_pct")}]
     if "universe_ew" in result:
         u = result["universe_ew"]

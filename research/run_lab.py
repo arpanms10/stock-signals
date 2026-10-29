@@ -21,6 +21,7 @@ import sys as _sys; from pathlib import Path as _P; _sys.path.insert(0, str(_P(_
 import argparse
 import datetime as dt
 
+from backtest.tax_lots import TaxRules
 from data import bhavcopy as bc
 from data import store
 from lab import harness, ledger, registry, results
@@ -48,6 +49,10 @@ def _print_result(r: dict, verdict: dict | None) -> None:
     m = r["metrics"]
     if "controls" in r:
         print(f"random-pick CAGRs: {r['controls']['cagr_pct']} (sd {r['controls']['sd']})")
+    if "after_tax_cagr_pct" in m:
+        print(f"after tax ({r['tax']['regime']} rates): {m['after_tax_cagr_pct']}% with "
+              f"each year's tax paid, {m['after_tax_liquidation_cagr_pct']}% sold at the "
+              f"end; NIFTY 500 held and sold: {r['benchmark']['after_tax_cagr_pct']}%")
     print(f"edge vs random picks: {m.get('edge_vs_controls_pct')} pts "
           f"({m.get('edge_vs_controls_sd')} sd); vs the universe: "
           f"{m.get('excess_vs_universe_pct')} pts")
@@ -101,8 +106,10 @@ def cmd_run(a, split: str) -> int:
         start, end, size, skip = harness.HOLDOUT_START, last, 200, 0
     else:
         start, end, size, skip = harness.TRAIN[0], last, 300, 200
+    tax = (False if a.tax == "none" else
+           TaxRules.from_config(base, regime=a.tax, use_exemption=not a.no_exemption))
     r = harness.evaluate(s, con, base, start, end, bench, seeds=a.seeds,
-                         universe_size=size, universe_skip=skip, progress=_say)
+                         universe_size=size, universe_skip=skip, progress=_say, tax=tax)
     verdict = harness.judge(s.name, split, r) if split != "robustness" else None
     r["verdict"] = verdict
     r["run_on"] = dt.date.today().isoformat()
@@ -138,6 +145,12 @@ def main(argv=None) -> int:
         p.add_argument("name")
         if name != "show":
             p.add_argument("--seeds", type=int, default=harness.SEEDS)
+            p.add_argument("--tax", choices=["current", "historical", "none"],
+                           default="current",
+                           help="current = today's rates on every sale (default); "
+                                "historical = the rates in force on each sale date")
+            p.add_argument("--no-exemption", action="store_true",
+                           help="assume the Rs 1.25 lakh LTCG exemption is used elsewhere")
     a = ap.parse_args(argv)
     if a.cmd == "list":
         return cmd_list(a)

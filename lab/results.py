@@ -37,7 +37,7 @@ def save(strategy: str, split: str, result: dict, path: Path = PATH) -> None:
     r = dict(result)
     curves = r.pop("_curves", {})
     r["curves"] = {k: _monthly(v) for k, v in curves.items()
-                   if k in ("strategy", "benchmark", "universe_ew")}
+                   if k in ("strategy", "benchmark", "universe_ew", "after_tax")}
     data.setdefault(strategy, {})[split] = r
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=1, default=str))
