@@ -41,6 +41,11 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --install recommended 
 
 | Feature | Dashboard page | Read more |
 |---|---|---|
+| **Portfolio overview**: value, REIT sleeve, Core vs Satellite against 70:30, caps, sectors | Overview, Import holdings | [overview](docs/overview.md) |
+| **Scorecard and valuation**: 100-point descriptive scorecard and suggested role; own band, peers, reverse DCF, scenarios | Scorecard, Valuation | [scorecard](docs/scorecard.md), [valuation](docs/valuation.md) |
+| **Risk, plan and tax**: historical risk, a 70:30 plan for new money, tax lots and trims timed over 3/6/12 months | Risk & plan, Tax & transition | [risk](docs/risk.md), [tax](docs/tax.md) |
+| **Reviews**: thesis-check events from NSE filings, what changed between reviews, a holdings report | Reviews | [monitoring](docs/monitoring.md) |
+| **Research assistant**: `/research` in Claude Code, answering only from the app's figures, checked | Research assistant | [research](docs/research.md) |
 | **Portfolio advisor**: hold / add / trim / exit for each holding, with reasons, sizing, sector caps and tax | Today, Stocks | [advisor](docs/advisor.md) |
 | **Expected ranges**: how far Nifty and your core holdings could move in the next session and week | Today | [ranges](docs/ranges.md) |
 | **Momentum ranking** of the liquid NSE universe, rebalanced monthly | Momentum | [strategy](docs/strategy.md) |
@@ -83,10 +88,20 @@ each one does. Every command the project has is listed in
 | [**Getting started**](GETTING_STARTED.md) | Install, set up and open the dashboard, in plain steps |
 | [**Glossary**](docs/glossary.md) | Every term the dashboard uses, in plain language |
 | [**Troubleshooting**](docs/troubleshooting.md) | NSE not answering, stale data, jobs, errors |
+| [**Portfolio overview**](docs/overview.md) | Value, REIT sleeve, Core vs Satellite against 70:30, caps, sectors, import preview, snapshots |
+| [**Scorecard**](docs/scorecard.md) | 100-point fundamental scorecard per holding, sector models, governance override, suggested role; descriptive |
+| [**Valuation**](docs/valuation.md) | Own 5-year band, peers, reverse DCF, bear/base/bull scenarios; not price targets |
+| [**Risk & plan**](docs/risk.md) | Historical risk of today's mix, exposures, and a 70:30 plan for new money; a simulation |
+| [**Tax & transition**](docs/tax.md) | Tax lots from your tradebooks, this year's gains, trims timed for tax over 3/6/12 months |
+| [**Monitoring & reviews**](docs/monitoring.md) | Thesis-check events from NSE announcements, shareholding and results, each with its filing; what changed between reviews; a holdings report covering every current holding |
+| [**Research assistant**](docs/research.md) | `/research` in Claude Code: answers from a pack of the app's own figures, every figure cited and checked |
+| [**Holding data**](docs/holding_data.md) | Each holding's financials and market figures, with source, period, confidence and freshness |
 | [**Dashboard**](docs/dashboard.md) | The menus, badges and the two target frames |
 | [**Recording what you own**](docs/holdings.md) | Getting holdings from any broker into the app |
 | [**Operations**](docs/operations.md) | Every command, setup, watchlist, tuning, tests |
 | [**Automation**](docs/automation.md) | The scheduled jobs and their failure modes |
+| [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
+| [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |
 | [**Validation**](docs/validation.md) | How the backtests work and how to run them |
 | [**Data**](docs/data.md) | Sources, the NSE traps handled, freshness |
 | [**Data storage**](docs/storage.md) | What each database, Excel file and CSV holds, and what to back up |

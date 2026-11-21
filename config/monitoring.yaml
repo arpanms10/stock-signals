@@ -1,0 +1,87 @@
+# Monitoring & reviews (Phase 8; docs/monitoring.md).
+#
+# Every event is a prompt to re-read the thesis, never a trade signal.
+# Severities:
+#   thesis_check   something that can break the reason you hold it: read the
+#                  filing and note what you decided
+#   watch          worth knowing; no decision expected
+#   info           routine; listed only when you ask for everything
+
+lookback_days: 120          # announcements fetched on the first run
+refetch_overlap_days: 7     # later runs re-read this much before the last fetch
+
+# NSE corporate announcements, matched on the category plus the summary text.
+# First rule that matches wins, so specific rules come first. Patterns are
+# case-insensitive regular expressions.
+announcements:
+  - kind: auditor
+    severity: thesis_check
+    title: Auditor resigned or removed
+    match: "(resign\\w*|cessation|removal|vacat\\w*)[^.]{0,80}statutory auditor|statutory auditor\\w*[^.]{0,80}(resign|cessation|removal|vacat)"
+  - kind: auditor_opinion
+    severity: thesis_check
+    title: Qualified or adverse audit opinion
+    match: "qualified opinion|adverse opinion|disclaimer of opinion|emphasis of matter|impact of audit qualification"
+  - kind: governance
+    severity: thesis_check
+    title: Fraud, default, insolvency or regulatory action
+    match: "\\bfraud\\b|forensic audit|default in (re)?payment|\\bdefaulted\\b|insolvency resolution|corporate insolvency|\\bcirp\\b|show[- ]cause|\\bsebi\\b[^.]{0,40}\\border\\b|search and seizure|enforcement directorate|whistle[- ]?blower"
+  - kind: rating
+    severity: thesis_check
+    title: Credit rating downgrade or negative watch
+    match: "downgrad\\w*[^.]{0,80}rating|rating[^.]{0,120}(downgrad|negative watch|watch with negative|outlook[^.]{0,20}negative)"
+  - kind: pledge
+    severity: thesis_check
+    title: Promoter pledge or encumbrance
+    match: "encumbrance|\\bpledg|invocation of pledge"
+  - kind: news
+    severity: watch
+    title: Exchange sought clarification on news
+    match: "^news verification|clarification sought"
+  - kind: leadership
+    severity: thesis_check
+    title: Top management change
+    match: "(resign\\w*|cessation|step\\w* down|demise)[^.]{0,120}(managing director|\\bmd\\b|\\bceo\\b|\\bcfo\\b|chief executive|chief financial|chairman|whole[- ]time director)|(managing director|\\bceo\\b|\\bcfo\\b|chief executive|chief financial)[^.]{0,80}(resign|cessation|step\\w* down)"
+  - kind: auditor_change
+    severity: watch
+    title: Auditor appointed or rotated
+    match: "^change in auditors|appointment of[^.]{0,30}statutory auditor"
+  - kind: capital
+    severity: watch
+    title: Fund raise, dilution or buyback
+    match: "preferential (issue|allotment)|\\bqip\\b|qualified institutions placement|rights issue|fund rais|raising of funds|buy[- ]?back|issue of warrants"
+  - kind: restructuring
+    severity: watch
+    title: Acquisition, merger, demerger or sale
+    match: "^acquisition$|^amalgamation|^scheme of arrangement|demerger|divest|slump sale|sale of (stake|business|undertaking)"
+  - kind: orders
+    severity: info
+    title: Order or contract
+    match: "bagging|receiving of orders|order win"
+  - kind: routine
+    severity: info
+    title: Routine filing
+    match: "."
+
+# Shareholding, from research.db (refresh_holding_data.py). Each fires once
+# per filing quarter.
+shareholding:
+  promoter_qoq_drop_pts: 1.0     # promoter stake down this much in one quarter
+  promoter_2y_drop_pts: 3.0      # or over the ~2 years on file
+  pledge_pct: 10                 # pledge at or above this, % of promoter holding
+  pledge_rise_pts: 2.0           # pledge up this much since the earliest filing on file
+
+# Results, from the quarterly rows in research.db: one event per new quarter.
+# The comparison is year on year (same quarter last year), so seasonality
+# doesn't trigger it.
+results:
+  pat_yoy_drop_pct: 20           # profit down this much: thesis check
+  revenue_yoy_drop_pct: 10       # revenue down this much: thesis check
+  pat_loss: true                 # a loss after a profitable year-ago quarter: thesis check
+  gnpa_rise_pts: 0.5             # lenders: gross NPA up this much YoY: thesis check
+
+# Review snapshot diff: what counts as a change worth listing.
+review:
+  score_change_pts: 5
+  weight_change_pts: 1.0
+  plan_change_rupees: 5000

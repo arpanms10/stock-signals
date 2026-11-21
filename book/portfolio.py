@@ -29,7 +29,7 @@ HOLDINGS_PATH = Path(__file__).resolve().parents[1] / "data" / "holdings.json"
 HOLDINGS_CSV = Path(__file__).resolve().parents[1] / "config" / "holdings.csv"
 
 HOLDINGS_COLUMNS = ["symbol", "quantity", "lt_quantity", "st_quantity",
-                    "avg_price", "purchase_date", "bucket", "notes"]
+                    "avg_price", "purchase_date", "bucket", "isin", "notes"]
 
 HOLDINGS_HELP = """\
 # Your actual positions. Opens in Excel.
@@ -50,6 +50,8 @@ HOLDINGS_HELP = """\
 #                  core or satellite). Core: a decade or more, held through
 #                  momentum signals. Satellite: one to ten years, never sold
 #                  on rank. Trade: bought to trade; rotates on rank.
+#   isin           optional; the import fills it. Tells a REIT, InvIT, ETF or
+#                  bond from an equity share when the symbol alone cannot.
 #   notes          yours
 """
 
@@ -73,6 +75,7 @@ COLUMN_ALIASES = {
                     "shortterm qty", "st qty", "short-term qty",
                     "short term qty.", "stq"),
     "bucket": ("bucket", "type"),
+    "isin": ("isin", "isin code"),
     "notes": ("notes", "remark", "remarks"),
 }
 
@@ -138,6 +141,7 @@ def read_csv_holdings(path: Path | str | None = None) -> list[dict]:
             "average_price": _to_float(r.get(cols.get("avg_price"))),
             "purchase_date": str(r.get(cols.get("purchase_date"), "") or "").strip(),
             "bucket": str(r.get(cols.get("bucket"), "") or "").strip().lower(),
+            "isin": str(r.get(cols.get("isin"), "") or "").strip().upper(),
             "notes": str(r.get(cols.get("notes"), "") or "").strip(),
         })
     return out

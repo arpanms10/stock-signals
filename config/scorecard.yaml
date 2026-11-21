@@ -1,0 +1,213 @@
+# The 100-point fundamental scorecard (strategy/scorecard.py, docs/scorecard.md).
+#
+# DESCRIPTIVE ONLY. The weights and thresholds below are conventions, not
+# backtested: the score summarises a company's filed record, it does not
+# predict returns, and nothing ranks or trades on it until a pre-registered
+# backtest passes (Phase 3 ships it unvalidated, labelled as such).
+#
+# Each criterion scores linearly between `zero` (0 points) and `full` (all its
+# points). zero > full means lower is better (debt, pledge). A criterion with
+# no data is "not assessed": it drops out of the points available, never
+# scores as zero. The score is points earned / points available x 100, and
+# shown only when at least min_coverage_pct of the 100 points were assessed.
+
+min_coverage_pct: 60
+
+# Component weights: must sum to 100. Criteria points inside each component
+# must sum to its weight.
+weights:
+  revenue_growth: 10
+  earnings_growth: 10
+  returns: 10
+  balance_sheet: 10
+  cash_flow: 10
+  moat: 15
+  governance: 10
+  valuation: 15        # from strategy/valuation.py (Portfolio › Valuation)
+  industry: 10
+
+# Score -> fundamental quality tier (spec §7). Starting points, not rules.
+tiers:
+  - [85, high_conviction_core, "High-conviction core"]
+  - [75, core_candidate, "Core candidate"]
+  - [65, satellite_candidate, "Satellite candidate"]
+  - [55, watchlist, "Watchlist"]
+  - [0, exit_candidate, "Exit candidate"]
+
+# Criteria for an ordinary operating company. Sector models below replace
+# individual criteria (same key) or whole components.
+criteria:
+  revenue_growth:
+    revenue_cagr_3y:   {points: 4, zero: 0, full: 15, label: "Revenue CAGR, 3y (%)"}
+    revenue_cagr_5y:   {points: 3, zero: 0, full: 12, label: "Revenue CAGR, 5y (%)"}
+    revenue_consistency: {points: 3, zero: 0.4, full: 1.0, label: "Years of revenue growth, last 5 (share)"}
+  earnings_growth:
+    pat_cagr_3y:       {points: 3, zero: 0, full: 18, label: "PAT CAGR, 3y (%)"}
+    eps_cagr_3y:       {points: 3, zero: 0, full: 15, label: "EPS CAGR, 3y (%, split/bonus adjusted)"}
+    margin_trend:      {points: 2, zero: -3, full: 2, label: "Net margin change over 3 FY (pts)"}
+    earnings_quality:  {points: 2, zero: 25, full: 3, label: "Exceptional items, % of PBT, last 4 quarters (abs)"}
+  returns:
+    roce_latest:       {points: 4, zero: 8, full: 25, label: "ROCE, latest FY (%)"}
+    roce_avg_3y:       {points: 3, zero: 8, full: 25, label: "ROCE, 3-FY average (%)"}
+    roe_avg_3y:        {points: 3, zero: 8, full: 22, label: "ROE, 3-FY average (%)"}
+  balance_sheet:
+    debt_equity:       {points: 4, zero: 1.5, full: 0.1, label: "Debt / equity (x)"}
+    net_debt_ebitda:   {points: 3, zero: 3.0, full: 0.0, label: "Net debt / EBITDA (x)"}
+    interest_cover:    {points: 3, zero: 2, full: 12, label: "Interest cover (x)"}
+  cash_flow:
+    cfo_pat_3y:        {points: 4, zero: 0.5, full: 1.0, label: "Operating cash flow / PAT, 3 FY (x)"}
+    fcf_positive:      {points: 3, zero: 0.4, full: 1.0, label: "Years of positive free cash flow, last 5 (share)"}
+    capex_cfo_3y:      {points: 3, zero: 1.0, full: 0.3, label: "Capex / operating cash flow, 3 FY (x)"}
+  moat:
+    returns_persistence: {points: 4, zero: 0.2, full: 1.0, label: "Years ROCE beat the sector hurdle, last 5 (share)"}
+    margin_stability:  {points: 3, zero: 6, full: 1.5, label: "EBITDA margin std. dev., 5 FY (pts)"}
+    moat_evidence:     {points: 8, manual: true, label: "Competitive advantage, with evidence (research inputs)"}
+  governance:
+    promoter_trend:    {points: 2, zero: -3, full: 0, label: "Promoter holding change, ~2 years (pts)"}
+    pledge:            {points: 2, zero: 20, full: 0, label: "Promoter shares pledged (% of promoter holding)"}
+    governance_evidence: {points: 6, manual: true, label: "Capital allocation, RPTs, disclosure (research inputs)"}
+  valuation:
+    # From strategy/valuation.py: the headline multiple is P/E (P/B lenders,
+    # EV/EBITDA cyclicals, P/S loss-makers, yield REITs).
+    val_own_band:      {points: 5, zero: 0.9, full: 0.2, label: "Headline multiple, percentile of own 5-year band"}
+    val_peers:         {points: 4, zero: 1.6, full: 0.8, label: "Headline multiple / peer median"}
+    val_margin_of_safety: {points: 3, zero: -40, full: 20, label: "Margin of safety, base scenario (%)"}
+    val_implied_growth: {points: 3, zero: 8, full: -2, label: "Growth (ROE for lenders) the price implies minus delivered (pts)"}
+  industry:
+    sector_outlook:    {points: 10, manual: true, label: "Industry outlook, with evidence (sector outlook file)"}
+
+# ROCE a business should clear to be earning its cost of capital, by sector
+# group (used by returns_persistence). Rough pre-tax hurdles, not estimates
+# of any company's WACC.
+hurdle_roce:
+  default: 15
+  it: 20
+  fmcg: 20
+  power: 10
+  telecom: 10
+  cement: 12
+  metals: 12
+  energy: 12
+  real_estate: 10
+
+# Sector models (spec §6). A model can replace a component's criteria
+# (`replace`) or override single criteria's thresholds (`tune`). Lenders drop
+# industrial leverage and cash-flow metrics: they don't describe a bank.
+sector_models:
+  bank:
+    label: "Bank"
+    replace:
+      returns:
+        roe_avg_3y:    {points: 5, zero: 8, full: 17, label: "ROE, 3-FY average (%)"}
+        roa_latest:    {points: 5, zero: 0.5, full: 1.7, label: "Return on assets, latest FY (%)"}
+      balance_sheet:
+        gnpa:          {points: 4, zero: 6, full: 1.5, label: "Gross NPA, latest quarter (%)"}
+        nnpa:          {points: 3, zero: 2.5, full: 0.3, label: "Net NPA, latest quarter (%)"}
+        credit_cost:   {points: 3, zero: 2.5, full: 0.4, label: "Provisions / advances, last 4 quarters (%)"}
+      cash_flow:
+        not_applicable: "a bank's operating cash flow is its lending book moving; it does not measure earnings quality"
+      moat:
+        returns_persistence: {points: 4, zero: 0.2, full: 1.0, hurdle: 14, label: "Years ROE above 14%, last 5 (share)"}
+        margin_stability:    {points: 3, zero: 8, full: 2, label: "Net margin std. dev., 5 FY (pts)"}
+        moat_evidence:       {points: 8, manual: true, label: "CASA franchise, distribution, underwriting record (research inputs)"}
+  nbfc:
+    label: "Non-bank lender"
+    replace:
+      returns:
+        roe_avg_3y:    {points: 5, zero: 8, full: 20, label: "ROE, 3-FY average (%)"}
+        roa_latest:    {points: 5, zero: 1.0, full: 3.5, label: "Return on assets, latest FY (%)"}
+      balance_sheet:
+        leverage:      {points: 6, zero: 7, full: 3, label: "Assets / equity (x)"}
+        credit_cost:   {points: 4, zero: 4, full: 1, label: "Provisions / loans, last 4 quarters (%)"}
+      cash_flow:
+        not_applicable: "a lender's operating cash flow is its loan book moving"
+      moat:
+        returns_persistence: {points: 4, zero: 0.2, full: 1.0, hurdle: 15, label: "Years ROE above 15%, last 5 (share)"}
+        margin_stability:    {points: 3, zero: 8, full: 2, label: "Net margin std. dev., 5 FY (pts)"}
+        moat_evidence:       {points: 8, manual: true, label: "Cost of funds, underwriting, distribution (research inputs)"}
+  insurance:
+    label: "Insurance"
+    replace:
+      returns:
+        roe_avg_3y:    {points: 10, zero: 8, full: 18, label: "ROE, 3-FY average (%)"}
+      balance_sheet:
+        not_applicable: "solvency ratio is the measure; it is not in the filings on file (research inputs)"
+      cash_flow:
+        not_applicable: "an insurer's cash flow is premium float"
+  it:
+    label: "IT services"
+    tune:
+      roce_latest: {zero: 15, full: 40}
+      roce_avg_3y: {zero: 15, full: 40}
+      roe_avg_3y: {zero: 12, full: 30}
+      revenue_cagr_3y: {zero: 3, full: 15}
+      cfo_pat_3y: {zero: 0.7, full: 1.05}
+  fmcg:
+    label: "FMCG"
+    tune:
+      roce_latest: {zero: 15, full: 45}
+      roce_avg_3y: {zero: 15, full: 45}
+      roe_avg_3y: {zero: 12, full: 35}
+      revenue_cagr_3y: {zero: 3, full: 12}
+      cfo_pat_3y: {zero: 0.7, full: 1.05}
+  pharma:
+    label: "Pharma and healthcare"
+    tune:
+      roce_latest: {zero: 8, full: 22}
+  capital_goods:
+    label: "Capital goods and construction"
+    tune:
+      cfo_pat_3y: {zero: 0.4, full: 0.9}
+      capex_cfo_3y: {zero: 1.2, full: 0.3}
+  cement: &cyclical
+    label: "Cyclical"
+    tune:
+      revenue_consistency: {zero: 0.2, full: 0.8}
+      margin_stability: {zero: 10, full: 3}
+      roce_latest: {zero: 5, full: 18}
+      roce_avg_3y: {zero: 5, full: 18}
+      net_debt_ebitda: {zero: 3.5, full: 0.5}
+  metals: *cyclical
+  chemicals: *cyclical
+  energy: *cyclical
+  power:
+    label: "Power and utilities"
+    tune:
+      debt_equity: {zero: 3.0, full: 0.8}
+      net_debt_ebitda: {zero: 6.0, full: 2.0}
+      roce_latest: {zero: 6, full: 14}
+      roce_avg_3y: {zero: 6, full: 14}
+      capex_cfo_3y: {zero: 1.5, full: 0.5}
+  telecom:
+    label: "Telecom"
+    tune:
+      net_debt_ebitda: {zero: 4.5, full: 1.0}
+      debt_equity: {zero: 3.0, full: 0.5}
+      roce_latest: {zero: 5, full: 18}
+      capex_cfo_3y: {zero: 1.2, full: 0.5}
+  real_estate:
+    label: "Real estate"
+    tune:
+      debt_equity: {zero: 1.0, full: 0.1}
+      cfo_pat_3y: {zero: 0.2, full: 1.0}
+      revenue_consistency: {zero: 0.2, full: 0.8}
+
+# Governance override (spec §5.8): a high total never neutralises these.
+# Each caps the fundamental quality tier at the named tier, whatever the score.
+overrides:
+  severe_cap: watchlist
+  moderate_cap: satellite_candidate
+  pledge_severe_pct: 25          # pledged, % of promoter holding
+  pledge_moderate_pct: 10
+  pledge_rise_severe_pts: 10     # rise over the filings on file (~2 years)
+  promoter_sold_moderate_pts: 5  # promoter stake down by this much over ~2 years
+
+# Portfolio role (spec §7: a second axis). Quality is about the company;
+# role is about where it belongs in your book. The engine suggests, you
+# decide in the holdings file's bucket column.
+role:
+  core_tiers: [high_conviction_core, core_candidate]
+  core_cap_bands: [large, mid]
+  core_max_debt_equity: 1.0      # non-lenders
+  core_min_traded_cr: 5          # average daily traded value, ₹ cr (20 sessions)
+  core_min_years_on_file: 4      # fiscal years of PAT needed; every one of the last 5 must be a profit

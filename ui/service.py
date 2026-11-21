@@ -26,6 +26,7 @@ if str(ROOT) not in sys.path:
 from scoring import fundamentals as fu           # noqa: E402
 from data import instruments as ins           # noqa: E402
 from book import portfolio as pf              # noqa: E402
+from book import securities as sec
 from book import watching as wg               # noqa: E402
 from data import bhavcopy as bc     # noqa: E402
 from data import freshness as fr    # noqa: E402
@@ -130,9 +131,11 @@ def build(universe: str = "nifty200", universe_size: int = 200) -> Snapshot:
     # ---------------------------------------------------------- holdings
     prices, values, tradeable, uncovered = {}, {}, {}, []
     for sym, h in holdings.items():
-        if sym in excluded or sym.endswith("-RR"):
+        kind = sec.classify(sym, h.get("isin", "")).kind
+        if sym in excluded or kind != sec.EQUITY:
+            label = sec.KIND_LABEL[kind] if kind != sec.EQUITY else "fund / ETF"
             uncovered.append({"symbol": sym, "qty": h.get("quantity"),
-                              "why": "fund / ETF / REIT -- not company equity"})
+                              "why": f"{label} -- not company equity"})
             continue
         if sym not in frames:
             uncovered.append({"symbol": sym, "qty": h.get("quantity"),
@@ -338,6 +341,8 @@ def freshness_checks(con=None, mkt=None) -> list[dict]:
 SCRIPTS = {
     "Refresh prices (watchlist + holdings)": ["scripts/run_backfill.py", "--years", "10"],
     "Refresh fundamentals (NSE + Yahoo)": ["scripts/fetch_fundamentals.py"],
+    "Refresh holding data (filings, statements, market stats)":
+        ["scripts/refresh_holding_data.py"],
     "Update full-market data": ["scripts/run_market_ingest.py", "--years", "10"],
     "Suggest buckets": ["scripts/set_buckets.py"],
     # F&O: the bhavcopy history behind IV percentile, realised vol and the

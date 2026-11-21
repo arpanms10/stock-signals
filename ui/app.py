@@ -5,8 +5,16 @@ own data, so opening Mutual funds or Analyze no longer waits for the whole
 market to be ranked.
 
   Today                    everything that wants a decision (ui/views/today.py)
-  Portfolio  Stocks        holdings with verdicts, and the watch list (ui/views/stocks.py)
+  Portfolio  Overview      value, sleeves, Core vs Satellite, caps   (ui/views/overview.py)
+             Stocks        holdings with verdicts, and the watch list (ui/views/stocks.py)
              Mutual funds  your MF book against each category (ui/mf_tab.py)
+             Scorecard     100-point fundamental scorecard, descriptive (ui/views/scorecard.py)
+             Valuation     own band, peers, reverse DCF, scenarios   (ui/views/valuation.py)
+             Risk & plan   historical risk, exposures, 70:30 plan    (ui/views/risk.py)
+             Tax & transition  tax lots, this year's gains, timed trims (ui/views/tax.py)
+             Reviews       thesis-check events, what changed between reviews (ui/views/reviews.py)
+             Holding data  financials and market figures, with sources (ui/views/holding_data.py)
+             Import holdings  broker file -> preview -> confirm  (ui/views/import_page.py)
   Ideas      Momentum      top band on both lookbacks (ui/views/momentum.py)
              Swing         pullback / breakout setups with a plan (ui/swing_tab.py)
              Quarterly results                                    (ui/results_tab.py)
@@ -14,6 +22,7 @@ market to be ranked.
   Market     Overview      the ranked universe, entry levels      (ui/views/market.py)
              F&O           expected range to expiry, experimental (ui/fno_tab.py)
   Research   Analyze a stock                                      (ui/analyze_tab.py)
+             Research assistant  the pack, how to ask, checked answers (ui/views/assistant.py)
              Compare funds                                        (ui/mf_tab.py)
 
 Under the bar, on every page: search (ui/views/search.py) and the data chip,
@@ -41,6 +50,51 @@ P: dict = {}
 def _today():
     from ui.views import today
     today.render(P)
+
+
+def _overview():
+    from ui.views import overview
+    overview.render()
+
+
+def _scorecard():
+    from ui.views import scorecard
+    scorecard.render()
+
+
+def _valuation():
+    from ui.views import valuation
+    valuation.render()
+
+
+def _risk():
+    from ui.views import risk
+    risk.render()
+
+
+def _reviews():
+    from ui.views import reviews
+    reviews.render()
+
+
+def _assistant():
+    from ui.views import assistant
+    assistant.render()
+
+
+def _tax():
+    from ui.views import tax
+    tax.render()
+
+
+def _holding_data():
+    from ui.views import holding_data
+    holding_data.render()
+
+
+def _import():
+    from ui.views import import_page
+    import_page.render()
 
 
 def _stocks():
@@ -115,7 +169,16 @@ def _search():
 P.update(
     today=st.Page(_today, title="Today", icon=":material/today:", url_path="today",
                   default=True),
+    overview=st.Page(_overview, title="Overview", url_path="overview"),
     stocks=st.Page(_stocks, title="Stocks", url_path="stocks"),
+    importer=st.Page(_import, title="Import holdings", url_path="import"),
+    scorecard=st.Page(_scorecard, title="Scorecard", url_path="scorecard"),
+    valuation=st.Page(_valuation, title="Valuation", url_path="valuation"),
+    risk=st.Page(_risk, title="Risk & plan", url_path="risk"),
+    tax=st.Page(_tax, title="Tax & transition", url_path="tax"),
+    reviews=st.Page(_reviews, title="Reviews", url_path="reviews"),
+    assistant=st.Page(_assistant, title="Research assistant", url_path="assistant"),
+    holding_data=st.Page(_holding_data, title="Holding data", url_path="holding-data"),
     funds=st.Page(_funds, title="Mutual funds", url_path="mutual-funds"),
     momentum=st.Page(_momentum, title="Momentum", url_path="momentum"),
     swing=st.Page(_swing, title="Swing", url_path="swing"),
@@ -131,10 +194,11 @@ P.update(
 
 nav = st.navigation({
     "": [P["today"]],
-    "Portfolio": [P["stocks"], P["funds"]],
+    "Portfolio": [P["overview"], P["stocks"], P["scorecard"], P["valuation"], P["risk"], P["tax"], P["reviews"], P["holding_data"], P["funds"],
+                  P["importer"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],
-    "Research": [P["analyze"], P["compare"]],
+    "Research": [P["analyze"], P["compare"], P["assistant"]],
     "More": [P["data"], P["search"]],
 }, position="top")
 

@@ -33,7 +33,7 @@ def test_ui_takes_defaults_without_a_terminal(monkeypatch):
 
 def test_templates_step_creates_workbooks_once(tmp_path, monkeypatch, capsys):
     made = sp.templates(sp.UI(yes=True), tmp_path)
-    assert sorted(p.name for p in made) == ["holdings.xlsx", "mf_holdings.xlsx",
-                                            "watching.xlsx"]
+    assert sorted(p.name for p in made) == ["holdings.xlsx", "mf_holdings.xlsx", "research_inputs.xlsx",
+                                            "sector_outlook.xlsx", "watching.xlsx"]
     assert sp.templates(sp.UI(yes=True), tmp_path) == []
     assert "already there" in capsys.readouterr().out

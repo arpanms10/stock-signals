@@ -49,6 +49,32 @@ ops/jobs.py                the scheduled jobs, for launchd, cron and Task Schedu
 scripts/install_schedule.py   --list / --status / --install / --remove for those jobs
 scoring/fundamentals.py    quality score, incl. the lender rubric
 data/instruments.py        equity vs fund vs DVR classification
+strategy/scorecard.py      the 100-point scorecard: criteria, sector models, override, role (pure)
+strategy/valuation.py      valuation methods, reverse DCF, scenarios (pure)
+book/valuations.py         values your holdings from data on disk; peers from the Nifty 200 filings
+strategy/portfolio_risk.py historical risk of the current mix, themes, overlaps, flags (pure)
+strategy/optimiser.py      the Core–Satellite plan for new money: targets, buys, trims (pure)
+book/risk_view.py          risk and plan inputs from your book, scorecards, valuations, prices
+strategy/capgains.py       dated tax rates, FIFO sales, set-off and exemption, costs of selling (pure)
+strategy/lots.py           tax lots from tradebooks: opening lot, splits, bonuses, broker reconciliation (pure)
+strategy/transition.py     times each trim to the cheapest date in 3/6/12 months; gain harvesting (pure)
+book/tradebook.py          reads config/tradebooks/ (Zerodha tradebook xlsx/csv), merges by trade ID
+book/tax_view.py           lots, this year's realised gains and the timed plans from your book
+book/research_pack.py      the research pack: every engine's figures with source, period, kind, freshness
+strategy/answer_check.py   checks an assistant's answer against the pack (§14.1 rules)
+scripts/research.py        pack / check / path / list for the /research skill
+strategy/monitor.py        announcements, shareholding, results -> thesis-check events; review diffs (pure)
+book/monitoring.py         event store, review snapshots, the review report (research.db, data/reviews/)
+book/holdings_report.py    every current holding on one page, rendered from the research pack
+data/sources/nse_announcements.py  NSE corporate announcements for one company
+scripts/run_review.py      fetch announcements, detect events, snapshot, diff, write the report
+book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
+data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
+data/market_stats.py       52w, volume, beta, returns, market cap, free float
+data/enrich.py             refresh one holding: fetch, compute, store, log
+scripts/value_holdings.py  own band, peers, reverse DCF, bear/base/bull scenarios
+scripts/score_holdings.py  the 100-point scorecard for each holding (print / save / export)
+scripts/refresh_holding_data.py  each holding's filings, statements and market stats -> research.db
 scripts/import_holdings.py broker .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
                            --trade SYMBOL... marks positions bought to trade
 scripts/set_buckets.py     pre-fill the core/satellite column

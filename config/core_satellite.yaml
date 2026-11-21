@@ -1,0 +1,40 @@
+# Core-Satellite targets and portfolio guidelines (strategy/overview.py).
+# Every number here is a review trigger, not a trading rule: crossing one asks
+# you to look, it never sells anything.
+
+horizon_years: 10
+objective: long-term capital appreciation
+
+# Operating-company equity only. REITs / InvITs are a separate sleeve
+# (alternative income / listed real assets) and are not part of this split.
+# Your bucket column decides the role: core = core; satellite and trade both
+# count as satellite. A blank bucket is satellite, the app's default.
+targets:
+  core_pct: 70
+  satellite_pct: 30
+
+# Review triggers on the operating-equity split.
+drift:
+  core_low_pct: 67        # below: investigate the core underweight
+  core_high_pct: 73       # above: consider sending new money to satellite
+  satellite_low_pct: 27   # below: are there quality growth opportunities?
+  satellite_high_pct: 33  # above: investigate the satellite overweight
+
+# Largest single holding, % of the whole book. The tightest applicable
+# guideline wins (a small-cap core holding gets the small-cap limit).
+position_max_pct:
+  core: 8
+  satellite: 4
+  small_cap: 2
+
+# Largest sector, % of operating equity, without an explicit decision.
+sector_max_pct: 25
+
+# Satellite split guideline (% of the whole operating book). Used once the
+# satellite category of each holding is known (Phase 3); shown for reference.
+satellite_mix_pct:
+  midcap_growth: 10
+  smallcap_growth: 5
+  emerging: 5
+  cyclical: 5
+  special_situations: 5

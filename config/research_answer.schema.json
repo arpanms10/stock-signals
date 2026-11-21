@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Research answer",
+  "description": "One answer from the research assistant (Claude Code over data/research/pack.json). Every figure cites a path in the pack; scripts/research.py check verifies them.",
+  "type": "object",
+  "required": ["question", "pack_generated_at", "status", "summary", "findings", "not_advice"],
+  "additionalProperties": false,
+  "properties": {
+    "question": {"type": "string", "minLength": 3},
+    "asked_at": {"type": "string"},
+    "pack_generated_at": {"type": "string", "description": "the pack's generated_at, so a later pack can't silently replace the evidence"},
+    "status": {"enum": ["answered", "INSUFFICIENT DATA"]},
+    "summary": {"type": "string", "minLength": 1},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "kind", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "claim": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["reported", "calculated", "estimated", "opinion"],
+                   "description": "reported: as filed; calculated: by the app from filings; estimated: a model's scenario or tax estimate; opinion: interpretation, no figures"},
+          "evidence": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {"type": "object", "required": ["path", "value"], "additionalProperties": false,
+                 "properties": {"path": {"type": "string", "pattern": "^/"}, "value": {},
+                                "label": {"type": "string"}}},
+                {"type": "object", "required": ["derived", "value"], "additionalProperties": false,
+                 "properties": {
+                   "derived": {"type": "object", "required": ["op", "of"], "additionalProperties": false,
+                               "properties": {"op": {"enum": ["sum", "difference", "ratio", "pct_change", "count", "max", "min", "mean"]},
+                                              "of": {"type": "array", "items": {"type": "string", "pattern": "^/"}, "minItems": 1}}},
+                   "value": {"type": "number"}, "label": {"type": "string"}}}
+              ]
+            }
+          }
+        }
+      }
+    },
+    "missing": {"type": "array", "items": {"type": "string"}, "description": "what the pack lacks (required when status is INSUFFICIENT DATA)"},
+    "stale_data_used": {"type": "array", "items": {"type": "string"}, "description": "pack paths of stale figures the answer relies on"},
+    "governance_flags": {"type": "array", "items": {"type": "object", "required": ["symbol", "flag"],
+                         "properties": {"symbol": {"type": "string"}, "flag": {"type": "string"}}}},
+    "caveats": {"type": "array", "items": {"type": "string"}},
+    "not_advice": {"const": true}
+  }
+}

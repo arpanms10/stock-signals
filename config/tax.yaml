@@ -1,0 +1,47 @@
+# Capital gains on listed equity and the costs of selling (strategy/capgains.py,
+# strategy/transition.py, docs/tax.md). Estimates, not tax advice.
+#
+# Rates are dated: a sale is taxed under the regime in force on its date.
+# Checked 2026-11-21: Finance Act 2026 left the listed-equity rates and the
+# exemption unchanged (Budget 2026 raised STT on futures and options only).
+# From 1 April 2026 the Income-tax Act 2025 replaces the 1961 Act; the old
+# section numbers (111A, 112A) are kept here as the familiar names.
+regimes:
+  - from: "2024-07-23"           # Finance (No. 2) Act 2024
+    stcg_pct: 20.0               # s.111A, STT-paid listed equity, held <= 12 months
+    ltcg_pct: 12.5               # s.112A, held > 12 months, above the exemption
+    ltcg_exemption: 125000       # per financial year
+  - from: "2018-04-01"
+    stcg_pct: 15.0
+    ltcg_pct: 10.0
+    ltcg_exemption: 100000
+
+long_term_after_days: 365        # held MORE than 12 months
+cess_pct: 4.0                    # health & education cess, on the tax
+surcharge_pct: 0.0               # depends on your income: 10/15% above 50 lakh/1 crore
+                                 # (capital-gains surcharge is capped at 15%)
+
+# Costs of a delivery sale. Defaults are Zerodha's published charges for
+# equity delivery; check them against a contract note.
+costs:
+  brokerage_per_order: 0.0       # Zerodha delivery: free
+  stt_delivery_pct: 0.1          # STT on delivery, buy and sell (unchanged by Budget 2026)
+  exchange_txn_pct: 0.00297      # NSE transaction charge
+  sebi_per_crore: 10.0
+  gst_pct: 18.0                  # on brokerage + exchange + SEBI + DP
+  dp_per_scrip_day: 13.5         # depository charge, per stock per day sold (before GST)
+  stamp_buy_pct: 0.015           # stamp duty on buys (for the harvest round trip)
+
+# The transition schedule (3 / 6 / 12 months).
+transition:
+  horizons: [3, 6, 12]
+  min_saving_to_wait: 500        # delay a trim only if waiting saves at least this (₹)
+  max_brute_force_trims: 8       # beyond this, holdings are timed one at a time
+
+# Gains you realised this financial year outside the tradebooks you imported
+# (Console > Reports > Tax P&L), e.g. sales whose purchase predates them.
+# Leave blank to use only what the tradebooks show.
+realised_override:
+  fy: ""                         # e.g. "2026-27"
+  stcg: null                     # net ₹, negative for a loss
+  ltcg: null
