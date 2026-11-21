@@ -253,7 +253,7 @@ def _is_consolidated(rec: dict) -> bool:
 
 
 def history(symbol: str, quarters: int = 8, filings: list[dict] | None = None,
-            log=None) -> list[dict]:
+            log=None, prefer_consolidated: bool = False) -> list[dict]:
     """The last `quarters` quarters for one symbol, newest first.
 
     One basis for the whole series -- a growth rate from a standalone quarter
@@ -289,6 +289,10 @@ def history(symbol: str, quarters: int = 8, filings: list[dict] | None = None,
     n_cons = sum(True in by_end[e] for e in ends)
     n_sa = sum(False in by_end[e] for e in ends)
     consolidated = n_cons >= n_sa
+    # The holding-data view wants the group, as investors are paid by it,
+    # whenever there is a usable consolidated series.
+    if prefer_consolidated and n_cons >= 4:
+        consolidated = True
     latest = by_end[ends[0]]
     probe = latest.get(consolidated) or latest.get(not consolidated)
     first = read(probe, ends[0]) if probe else None

@@ -25,7 +25,7 @@ In `data/`, never in git.
 | | | Splits, bonuses, demergers, trade-for-trade spells | `market_actions`, `market_demergers`, `market_t2t` | weekly job |
 | `fo_history.db` | 100+ MB | Daily option chains and their prices, index highs and lows, results-meeting dates | `fo_chain`, `fo_spot`, `fo_index_ohlc`, `fo_results`, `fo_days` | weekly and daily jobs |
 | `mf/mf.db` | ~10 MB | Month-end NAV of every Direct Growth fund since 2013 | `nav`, `schemes`, `fetched` | monthly job |
-| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close` | Overview and Import pages |
+| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices, each holding's financial and market figures with provenance, and the log of every retrieval | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close`, `financial_metric`, `retrieval_log` | Overview, Import and Holding data pages |
 
 Everything here comes from free public sources (NSE, AMFI; see
 [data](data.md)). If a database is lost, `setup_project.py` downloads it
@@ -72,7 +72,7 @@ in `backtests/`, and the weekly job's dated report and logs.
 ## What to back up
 
 Only your input files in `config/` (holdings, mutual funds, watch list),
-`data/research.db` (your snapshots and audit log) and the `history/` records
+`data/research.db` (your snapshots and audit log; the holding data can be re-fetched) and the `history/` records
 can't be rebuilt. Commit `history/` now and then, or
 copy it with your `config/` files; everything else can be downloaded or
 recomputed.

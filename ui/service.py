@@ -341,6 +341,8 @@ def freshness_checks(con=None, mkt=None) -> list[dict]:
 SCRIPTS = {
     "Refresh prices (watchlist + holdings)": ["scripts/run_backfill.py", "--years", "10"],
     "Refresh fundamentals (NSE + Yahoo)": ["scripts/fetch_fundamentals.py"],
+    "Refresh holding data (filings, statements, market stats)":
+        ["scripts/refresh_holding_data.py"],
     "Update full-market data": ["scripts/run_market_ingest.py", "--years", "10"],
     "Suggest buckets": ["scripts/set_buckets.py"],
     # F&O: the bhavcopy history behind IV percentile, realised vol and the

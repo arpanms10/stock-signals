@@ -67,7 +67,7 @@ overwrite without confirm; `research.db` with portfolio snapshots + audit log;
 Overview page (value, P/L, 70:30 vs target, REIT sleeve, market-cap and sector
 split, top-5/10). Decimal for money.
 
-**P2 · Data with provenance.** `FinancialMetric` rows (value, period, unit,
+**P2 · Data with provenance.** *(done: [holding data](holding_data.md); cap band still the NSE-index proxy, AMFI file unreachable)* `FinancialMetric` rows (value, period, unit,
 source, retrieved_at, reported|calculated|estimated, confidence) wrapping the
 existing NSE/Yahoo fetchers; market cap & cap bucket (SEBI AMFI list: top 100
 large, 101–250 mid, rest small, from the half-yearly AMFI file); beta, 52-wk,

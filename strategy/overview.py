@@ -69,6 +69,8 @@ class Position:
     cap_band: str = ""
     name: str = ""
     review: str = ""
+    market_cap_cr: Decimal | None = None   # from research.db (Phase 2), if refreshed
+    data_state: str = ""                   # fresh | stale | none
     # filled by build()
     market_value: Decimal | None = None
     invested: Decimal | None = None

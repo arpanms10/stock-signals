@@ -52,7 +52,27 @@ def positions(holdings: list[dict], mcon, rcon, ref: dict,
             name=ref["name"].get(s.base, ""), review=s.review))
     if ref.get("note"):
         notes.append(ref["note"].rstrip("; "))
+    _attach_data(out, secs, rcon, mcon)
     return out, notes
+
+
+def _attach_data(ps: list[ov.Position], secs, rcon, mcon) -> None:
+    """Market cap and a data-freshness flag from research.db, when refreshed."""
+    import datetime as dt
+    from data import financials as fin
+    session = (mk.sessions(mcon, 1) or [None])[0]
+    today = dt.date.today()
+    for p, s in zip(ps, secs):
+        rows = rdb.metrics(rcon, s.base if s.kind == sec.EQUITY else s.symbol)
+        if not rows:
+            p.data_state = "none"
+            continue
+        mc = next((r for r in rows if r["metric"] == "market_cap"), None)
+        p.market_cap_cr = mc["value"] if mc else None
+        states = {fin.freshness(r, today, session)[0] for r in fin.latest_rows(rows)
+                  if r["metric"] in ("market_cap", "revenue", "pat", "close_adjusted",
+                                     "dps_ttm") and r["period"] in ("ttm", "point")}
+        p.data_state = "stale" if "stale" in states else "fresh" if states else "none"
 
 
 def load(refresh: bool = True, fetch=None) -> tuple[ov.Overview | None, list[str]]:

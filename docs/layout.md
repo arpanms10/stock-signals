@@ -49,6 +49,10 @@ ops/jobs.py                the scheduled jobs, for launchd, cron and Task Schedu
 scripts/install_schedule.py   --list / --status / --install / --remove for those jobs
 scoring/fundamentals.py    quality score, incl. the lender rubric
 data/instruments.py        equity vs fund vs DVR classification
+data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
+data/market_stats.py       52w, volume, beta, returns, market cap, free float
+data/enrich.py             refresh one holding: fetch, compute, store, log
+scripts/refresh_holding_data.py  each holding's filings, statements and market stats -> research.db
 scripts/import_holdings.py broker .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;
                            --trade SYMBOL... marks positions bought to trade
 scripts/set_buckets.py     pre-fill the core/satellite column

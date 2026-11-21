@@ -381,6 +381,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Glossary**](docs/glossary.md) | Every term the dashboard uses, in plain language |
 | [**Troubleshooting**](docs/troubleshooting.md) | NSE not answering, stale data, jobs, errors |
 | [**Portfolio overview**](docs/overview.md) | Value, REIT sleeve, Core vs Satellite against 70:30, caps, sectors, import preview, snapshots |
+| [**Holding data**](docs/holding_data.md) | Each holding's financials and market figures, with source, period, confidence and freshness |
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
 | [**Dashboard**](docs/dashboard.md) | Two sections, badges, the two target frames |
 | [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |

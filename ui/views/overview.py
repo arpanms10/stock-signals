@@ -90,6 +90,8 @@ def _positions_table(o) -> pd.DataFrame:
             "Weight %": _f(p.weight_pct), "Guideline %": _f(p.limit_pct),
             "Over guideline": "over" if p.over_limit else "",
             "P/L": _f(p.pnl), "P/L %": _f(p.pnl_pct),
+            "Mkt cap ₹cr": _f(p.market_cap_cr),
+            "Data": p.data_state or "none",
             "Price source": p.price_source})
     return pd.DataFrame(rows)
 
@@ -175,6 +177,10 @@ def render() -> None:
             "Guideline %": st.column_config.NumberColumn(format="%.0f"),
             "P/L": st.column_config.NumberColumn(format="₹%.0f"),
             "P/L %": st.column_config.NumberColumn(format="%+.1f"),
+            "Mkt cap ₹cr": st.column_config.NumberColumn(format="%.0f"),
+            "Data": st.column_config.TextColumn(
+                help="Holding data freshness (Portfolio › Holding data): fresh, "
+                     "stale, or none yet"),
         })
 
     if o.disclosures:

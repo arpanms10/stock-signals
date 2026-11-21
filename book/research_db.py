@@ -174,3 +174,113 @@ def latest_listed_close(con, symbol: str, series: str) -> dict | None:
 def listed_close_dates(con) -> list[str]:
     return [r[0] for r in con.execute(
         "SELECT DISTINCT date FROM listed_close ORDER BY date DESC")]
+
+
+# ------------------------------------------------- financial metrics (P2)
+#
+# One row per value. Every value keeps where it came from and how it was
+# made, so a figure on screen can always be traced:
+#
+#   period      quarter | half | fy | ttm | instant | point (a market stat)
+#   method      reported (as filed / as the provider gives it) | calculated
+#               (from other rows, named in `note`) | estimated
+#   status      ok | missing (looked for, not found) | not_applicable
+#               (e.g. debt/equity for a bank). value is NULL unless ok, so
+#               a missing number is never read as zero.
+#   confidence  high (exchange filing, or two sources agree) | medium (one
+#               secondary source) | low (approximation, stated in note)
+
+METRIC_SCHEMA = """
+CREATE TABLE IF NOT EXISTS financial_metric (
+    symbol TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    period TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    source TEXT NOT NULL,
+    value TEXT,
+    unit TEXT NOT NULL,
+    basis TEXT NOT NULL DEFAULT '',
+    method TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ok',
+    confidence TEXT NOT NULL,
+    ref TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    retrieved_at TEXT NOT NULL,
+    PRIMARY KEY (symbol, metric, period, period_end, source)
+);
+CREATE INDEX IF NOT EXISTS idx_metric_symbol ON financial_metric(symbol, metric);
+CREATE TABLE IF NOT EXISTS retrieval_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    source TEXT NOT NULL,
+    dataset TEXT NOT NULL,
+    status TEXT NOT NULL,
+    rows INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_retrieval_symbol ON retrieval_log(symbol, dataset, id);
+"""
+
+METRIC_COLS = ("symbol", "metric", "period", "period_end", "source", "value", "unit",
+               "basis", "method", "status", "confidence", "ref", "note",
+               "retrieved_at")
+
+
+def _ensure_metrics(con) -> None:
+    con.executescript(METRIC_SCHEMA)
+
+
+def save_metrics(con, rows: list[dict], replace_source: tuple[str, str] | None = None) -> int:
+    """Upsert metric rows. replace_source=(symbol, source) first deletes that
+    source's rows for the symbol, so a value the provider no longer reports
+    does not linger as if current."""
+    _ensure_metrics(con)
+    if replace_source:
+        con.execute("DELETE FROM financial_metric WHERE symbol = ? AND source = ?",
+                    replace_source)
+    now = _now()
+    con.executemany(
+        f"INSERT OR REPLACE INTO financial_metric ({','.join(METRIC_COLS)}) "
+        f"VALUES ({','.join('?' * len(METRIC_COLS))})",
+        [tuple(_dec(r.get("value")) if c == "value" else
+               (r.get(c) or (now if c == "retrieved_at" else
+                             "ok" if c == "status" else ""))
+               for c in METRIC_COLS) for r in rows])
+    con.commit()
+    return len(rows)
+
+
+def metrics(con, symbol: str, metric: str | None = None) -> list[dict]:
+    _ensure_metrics(con)
+    q, args = "SELECT * FROM financial_metric WHERE symbol = ?", [symbol]
+    if metric:
+        q += " AND metric = ?"
+        args.append(metric)
+    out = []
+    for r in con.execute(q + " ORDER BY metric, period, period_end", args):
+        d = dict(r)
+        d["value"] = Decimal(d["value"]) if d["value"] is not None else None
+        out.append(d)
+    return out
+
+
+def log_retrieval(con, symbol: str, source: str, dataset: str, status: str,
+                  rows: int = 0, message: str = "") -> None:
+    _ensure_metrics(con)
+    con.execute("INSERT INTO retrieval_log (at, symbol, source, dataset, status, rows, "
+                "message) VALUES (?,?,?,?,?,?,?)",
+                (_now(), symbol, source, dataset, status, rows, message[:500]))
+    con.commit()
+
+
+def last_retrievals(con, symbol: str | None = None) -> list[dict]:
+    """The most recent attempt per (symbol, source, dataset)."""
+    _ensure_metrics(con)
+    q = ("SELECT r.* FROM retrieval_log r JOIN (SELECT MAX(id) id FROM retrieval_log "
+         "GROUP BY symbol, source, dataset) m ON r.id = m.id")
+    args = []
+    if symbol:
+        q += " WHERE r.symbol = ?"
+        args.append(symbol)
+    return [dict(r) for r in con.execute(q + " ORDER BY r.symbol, r.dataset", args)]
