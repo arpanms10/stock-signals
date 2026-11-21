@@ -89,10 +89,9 @@ stays fresh.
 
 ## Updating
 
-**`git pull` complains about files in `history/`.** The daily and weekly jobs
-add records there (the forward logs). Keep yours and take the update:
-`git stash`, then `git pull`, then `git stash pop`. If you don't need the
-records in git, download the ZIP instead.
+**Your records and files survive an update.** `config/` inputs, `data/` and
+`history/` are git-ignored, so `git pull` never touches them. With the ZIP,
+copy `config/`, `data/` and `history/` across from the old folder.
 
 ## Still stuck
 

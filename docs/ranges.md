@@ -51,7 +51,7 @@ a note.
 1. Catches the F&O bhavcopy up to the latest close.
 2. Records every F&O underlying's bands for that close to
    `history/ranges/YYYY-MM.csv`. That's both methods and both horizons for all
-   ~220 names. Your holdings aren't recorded, so nothing private reaches git.
+   ~220 names. Your holdings aren't recorded.
 3. Scores every recorded band whose close is now in.
 
 Two rules keep the log honest:

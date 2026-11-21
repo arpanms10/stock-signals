@@ -14,7 +14,7 @@ run_ui.py          open the dashboard
 scripts/           everything you or the scheduled jobs run: refreshes, records, reports
 research/          backtests and experiments (see docs/validation.md)
 config/            settings, and the files you fill in (holdings, MF book, watch list)
-data/ history/     downloaded data (not in git) / forward records (in git); see docs/storage.md
+data/ history/     downloaded data / forward records (neither in git); see docs/storage.md
 docs/              how each part works
 tests/             the test suite (pytest)
 
@@ -56,7 +56,7 @@ scripts/record_momentum.py monthly momentum picks -> history/momentum_picks.xlsx
 scripts/record_fno.py      monthly F&O ranges -> history/fno_ranges.xlsx, scored at expiry
 scripts/record_swing.py    every swing scan -> history/swing/ (records/swing_store.py)
 scripts/record_ranges.py   daily Today ranges -> history/ranges/ (records/ranges_store.py)
-history/                   records kept in git (momentum picks, F&O, swing, ranges)
+history/                   forward records, local only (momentum picks, F&O, swing, ranges)
 
 data/sources/prices.py     OHLCV via jugaad-data
 data/sources/nse_fundamentals.py   results, shareholding and pledge from XBRL
