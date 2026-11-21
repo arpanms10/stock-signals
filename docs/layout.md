@@ -52,6 +52,9 @@ data/instruments.py        equity vs fund vs DVR classification
 strategy/scorecard.py      the 100-point scorecard: criteria, sector models, override, role (pure)
 strategy/valuation.py      valuation methods, reverse DCF, scenarios (pure)
 book/valuations.py         values your holdings from data on disk; peers from the Nifty 200 filings
+strategy/portfolio_risk.py historical risk of the current mix, themes, overlaps, flags (pure)
+strategy/optimiser.py      the Core–Satellite plan for new money: targets, buys, trims (pure)
+book/risk_view.py          risk and plan inputs from your book, scorecards, valuations, prices
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
 data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
 data/market_stats.py       52w, volume, beta, returns, market cap, free float

@@ -1,0 +1,64 @@
+# Portfolio risk and the Core–Satellite plan (strategy/portfolio_risk.py,
+# strategy/optimiser.py, docs/risk.md). 70:30 targets, position caps and the
+# sector limit live in config/core_satellite.yaml; this file adds the rest.
+#
+# Every number is a review trigger or a planning convention, not a trading
+# rule. The plan is a proposal you read; nothing here places an order or
+# edits your holdings file.
+
+# ---------------------------------------------------------------- history
+# Historical risk: your CURRENT weights held constant over this window.
+# Backward-looking: what this mix would have done, not what it will do.
+history_years: 3
+benchmark: "NIFTY 500"
+correlation_years: 1
+correlation_top_n: 10          # largest holdings in the correlation table
+correlation_flag: 0.70         # pairs above this move together: one risk, two names
+
+# ---------------------------------------------------------------- liquidity
+# Days to sell a position trading at most this share of its average daily
+# value (20 sessions). Above max_exit_days it is flagged, and the plan adds
+# no new money beyond that size.
+liquidity:
+  participation_pct: 20
+  max_exit_days: 5
+
+# ---------------------------------------------------------------- themes
+# Exposures that cut across NSE sectors (spec §8.4). Sector groups as in
+# analysis/sector.py. Conventions: a bank is rate-sensitive, a metal maker is
+# a commodity business, and so on.
+themes:
+  rate_sensitive: {groups: [bank, nbfc, real_estate, auto, power], warn_pct: 40,
+                   label: "Interest-rate sensitive"}
+  cyclical: {groups: [cement, metals, chemicals, energy, auto, capital_goods], warn_pct: 35,
+             label: "Economic-cycle sensitive"}
+  commodity: {groups: [metals, energy, cement, chemicals], warn_pct: 25,
+              label: "Commodity-price exposed"}
+  export: {groups: [it, pharma, chemicals], warn_pct: 35,
+           label: "Export / currency exposed"}
+  regulated: {groups: [bank, nbfc, insurance, power, telecom, energy], warn_pct: 45,
+              label: "Regulator-set economics"}
+  consumer: {groups: [fmcg, consumer, auto], warn_pct: 45,
+             label: "Domestic consumer demand"}
+
+# ---------------------------------------------------------------- flags
+valuation_rich:                # weight in holdings that look expensive on both
+  own_band_pct: 80             # own 5-year band percentile at or above
+  peer_relative: 1.3           # and peer multiple / median at or above
+concentration:
+  effective_names_warn: 12     # 1 / sum(w^2) below this: a concentrated book
+
+# ---------------------------------------------------------------- the plan
+plan:
+  # Hold-but-don't-add: no new money into a holding with any of these.
+  no_new_money:
+    tiers: [exit_candidate]            # scorecard quality tier
+    governance_flags: true             # any governance flag
+    valuation_rich: true               # rich on own band AND peers (above)
+    illiquid: true                     # over max_exit_days after the buy
+  # Trims are proposed only to bring a holding back under its position cap or
+  # its sector under the sector limit -- never on rank or score -- and only
+  # when new money alone can't fix it within `fix_by_contributions_months`.
+  fix_by_contributions_months: 12
+  trim_tolerance_pts: 0.5      # ignore breaches smaller than this (turnover)
+  min_trade_rupees: 2000       # skip buys and trims smaller than this

@@ -88,7 +88,7 @@ config assumptions, DCF only where FCF is stable and positive, P/B for
 lenders, NAV/yield for REITs; margin of safety. Labelled "scenario, not a
 target".
 
-**P5 · Risk & optimisation.** Portfolio vol, beta, max drawdown, correlation
+**P5 · Risk & optimisation.** *(done: [risk & plan](risk.md); scorecard used as a no-new-money gate, not a tilt, until backtested)* Portfolio vol, beta, max drawdown, correlation
 of top holdings (historical, labelled as such); position caps 8/4/2%; sector
 25%; constrained optimiser (contributions-first, turnover + tax penalty,
 quality/valuation tilt) producing target weights with per-constraint
