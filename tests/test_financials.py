@@ -1,5 +1,6 @@
 """Financials with provenance: filings -> rows, Yahoo, cross-check, ratios."""
 import datetime as dt
+import pytest
 from decimal import Decimal as D
 
 import pandas as pd
@@ -198,3 +199,12 @@ def test_payout_ttm_judged_by_retrieval_not_period():
     assert fin.freshness(r, today, "2026-11-20")[0] == "fresh"
     r["retrieved_at"] = "2026-10-01T10:00"
     assert fin.freshness(r, today, "2026-11-20")[0] == "stale"
+
+
+def test_npa_ratio_filed_as_fraction_is_stored_as_percent():
+    import datetime as dt
+    f = {"to_date": dt.date(2026, 9, 30), "kind": "bank", "gnpa_pct": 0.0111,
+         "nnpa_pct": 0.0037, "basis": "standalone"}
+    rows = {r["metric"]: r for r in fin.from_filings("B", [f])}
+    assert float(rows["gnpa_pct"]["value"]) == pytest.approx(1.11)
+    assert float(rows["nnpa_pct"]["value"]) == pytest.approx(0.37)

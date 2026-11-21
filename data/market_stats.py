@@ -127,6 +127,26 @@ def free_float(symbol: str, promoter: list[dict]) -> list[dict]:
     return out
 
 
+def pledge(symbol: str, latest: dict | None, earliest: dict | None) -> list[dict]:
+    """latest / earliest: {"date", "pledge_pct", "pledged"} from the
+    shareholding-pattern filings (pledged shares as % of promoter holding).
+    An unreadable filing is missing, never zero."""
+    if not latest:
+        return []
+    src = "NSE shareholding pattern"
+    if latest.get("pledge_pct") is None:
+        return [row(symbol, "pledge_pct", "instant", latest["date"], None, PCT, src,
+                    status="missing", confidence=HIGH, note="filing unreadable")]
+    out = [row(symbol, "pledge_pct", "instant", latest["date"], latest["pledge_pct"], PCT,
+               src, confidence=HIGH, note="pledged shares as % of promoter holding")]
+    if earliest and earliest.get("pledge_pct") is not None and earliest["date"] != latest["date"]:
+        out.append(row(symbol, "pledge_change_pct", "instant", latest["date"],
+                       float(latest["pledge_pct"]) - float(earliest["pledge_pct"]), PCT,
+                       CALC, method="calculated", confidence=HIGH,
+                       note=f"change since {earliest['date']}"))
+    return out
+
+
 def dividend_yield(symbol: str, dps: dict | None, price: float | None,
                    price_date: str | None) -> list[dict]:
     if not dps or dps.get("value") is None or not price:

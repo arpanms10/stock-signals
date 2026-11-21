@@ -284,3 +284,44 @@ def last_retrievals(con, symbol: str | None = None) -> list[dict]:
         q += " WHERE r.symbol = ?"
         args.append(symbol)
     return [dict(r) for r in con.execute(q + " ORDER BY r.symbol, r.dataset", args)]
+
+
+# ------------------------------------------------------------------ scorecards
+
+SCORECARD_SCHEMA = """
+CREATE TABLE IF NOT EXISTS scorecard (
+    symbol       TEXT NOT NULL,
+    as_of        TEXT NOT NULL,
+    model        TEXT NOT NULL DEFAULT '',
+    score        REAL,
+    earned       REAL,
+    available    REAL,
+    coverage_pct REAL,
+    tier         TEXT,
+    raw_tier     TEXT,
+    role         TEXT,
+    flags        TEXT NOT NULL DEFAULT '[]',
+    detail       TEXT NOT NULL,           -- the whole card as JSON
+    config_hash  TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (symbol, as_of)
+);
+"""
+
+
+def save_scorecard(con, summary: dict, detail: dict, config_hash: str = "") -> None:
+    """One card per symbol per day; a re-run the same day replaces it."""
+    con.executescript(SCORECARD_SCHEMA)
+    con.execute("INSERT OR REPLACE INTO scorecard VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (summary["symbol"], summary["as_of"], summary.get("model", ""),
+                 summary.get("score"), summary.get("earned"), summary.get("available"),
+                 summary.get("coverage_pct"), summary.get("tier"), summary.get("raw_tier"),
+                 summary.get("role"), _json(summary.get("flags", [])), _json(detail),
+                 config_hash))
+    con.commit()
+
+
+def scorecard_history(con, symbol: str | None = None) -> list[dict]:
+    con.executescript(SCORECARD_SCHEMA)
+    q = "SELECT * FROM scorecard" + (" WHERE symbol = ?" if symbol else "") + \
+        " ORDER BY symbol, as_of"
+    return [dict(r) for r in con.execute(q, (symbol,) if symbol else ())]

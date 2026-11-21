@@ -127,7 +127,70 @@ WATCHING = Spec(
      Column("notes", False, "Anything for yourself.", "")],
     ["Columns marked 'Filled by the app' can be left blank."])
 
-SPECS = {s.stem: s for s in (HOLDINGS, MF_HOLDINGS, WATCHING)}
+RESEARCH = Spec(
+    "research_inputs", "Research inputs", "Your evidence for the scorecard's judgment items",
+    ["One row per company. The scorecard computes most of its points from filings; "
+     "competitive advantage and governance also need judgment no free source "
+     "publishes. Put it here, with the evidence, and the scorecard uses it.",
+     "Points without evidence are ignored: an unsupported opinion scores nothing. "
+     "Blank rows and blank cells are fine -- the scorecard shows those points as "
+     "not assessed and scores out of what is assessed."],
+    [Column("symbol", True, "NSE symbol.", "TCS"),
+     Column("moat_points", False, "Competitive advantage, 0 to 8: market share, brand, "
+            "switching costs, distribution, cost edge, network effects, IP, pricing "
+            "power. 8 = durable and evidenced on several of these; 4 = one real edge; "
+            "0 = none.", "6"),
+     Column("moat_evidence", False, "What supports the points: figures and where they "
+            "came from. Required for moat_points to count.",
+            "No.1 share in X (industry report 2026); price rises held volumes (FY26 AR p.12)",
+            "Annual report, investor presentation, industry body data"),
+     Column("governance_points", False, "Capital allocation, related-party dealings, "
+            "disclosure quality and guidance credibility, 0 to 6. 6 = clean record.",
+            "5", "Annual report: RPT note, auditor's report; concall transcripts"),
+     Column("governance_evidence", False, "What supports governance_points. Required "
+            "for them to count.", "RPTs < 1% of revenue; buybacks at sensible prices"),
+     Column("auditor_resigned", False, "yes if the statutory auditor resigned mid-term "
+            "in the last 3 years. Caps the tier.", "", "NSE corporate announcements"),
+     Column("qualified_opinion", False, "yes if the latest audit report is qualified, "
+            "adverse or a disclaimer. Caps the tier.", "", "Annual report: auditor's report"),
+     Column("regulatory_action", False, "yes for a live SEBI / RBI / SFIO / ED action "
+            "against the company or promoters. Caps the tier.", "", "SEBI orders, news"),
+     Column("related_party_concern", False, "yes if related-party dealings look "
+            "material or off-market. Lowers the tier cap to Satellite candidate.", ""),
+     Column("sector_group", False, "Override the sector model when NSE has no sector "
+            "for the company (it shows as General): bank, nbfc, insurance, amc, it, fmcg, "
+            "pharma, auto, capital_goods, cement, metals, chemicals, energy, power, "
+            "telecom, real_estate or consumer.", "fmcg"),
+     Column("satellite_category", False, "Override the suggested satellite category: "
+            "midcap_growth, smallcap_growth, emerging, cyclical or special_situations.",
+            ""),
+     Column("as_of", False, "When you last reviewed this row (YYYY-MM-DD). Older than "
+            "a year shows as stale.", "2026-11-21"),
+     Column("notes", False, "Anything for yourself.", "")],
+    [PRIVACY,
+     "The yes/no columns are the governance override: any one caps the quality "
+     "tier however high the score, because a high total must never hide a serious "
+     "governance problem."])
+
+SECTOR_OUTLOOK = Spec(
+    "sector_outlook", "Sector outlook", "Your view of each industry, with evidence",
+    ["One row per sector group (the scorecard's sector models: bank, nbfc, it, "
+     "fmcg, pharma, auto, capital_goods, cement, metals, chemicals, energy, power, "
+     "telecom, real_estate, consumer, insurance, amc, other).",
+     "Industry outlook is 10 of the 100 points. No free source rates it, so it is "
+     "yours to give -- with evidence, or it scores nothing."],
+    [Column("sector", True, "Sector group, as listed above.", "it"),
+     Column("outlook_points", False, "0 to 10: industry growth, demand, regulation, "
+            "competition, disruption, cyclicality, commodity and export exposure. "
+            "10 = structural tailwind; 5 = neutral; 0 = structural decline.", "6"),
+     Column("evidence", False, "What supports the points. Required for them to count.",
+            "Industry revenue +6% cc (NASSCOM FY26); AI deflation on legacy work",
+            "Industry bodies, regulator data, company commentary"),
+     Column("as_of", False, "When you last reviewed this row (YYYY-MM-DD).", "2026-11-21"),
+     Column("notes", False, "Anything for yourself.", "")],
+    ["Sector views go stale quickly: review them at least once a year."])
+
+SPECS = {s.stem: s for s in (HOLDINGS, MF_HOLDINGS, WATCHING, RESEARCH, SECTOR_OUTLOOK)}
 
 
 # ------------------------------------------------------------------ paths

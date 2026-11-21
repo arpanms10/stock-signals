@@ -14,6 +14,8 @@ config/holdings*.csv
 # The watch list: what you are watching is yours too (config/*.xlsx above
 # already covers watching.xlsx).
 config/watching.csv
+config/research_inputs.csv
+config/sector_outlook.csv
 !config/holdings.example.csv
 # Your MF book as percentages (run_mf.py).
 config/mf_holdings.csv

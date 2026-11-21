@@ -71,7 +71,7 @@ def _attempt(rcon, symbol, source, dataset, fn, log):
 
 def refresh_equity(symbol: str, rcon, mcon, scon, log=print,
                    fetch_nse=fin.fetch_nse, fetch_yahoo=fin.fetch_yahoo,
-                   fetch_promoter=None) -> dict:
+                   fetch_promoter=None, fetch_pledge=None) -> dict:
     """All rows for one company share. Returns a small summary."""
     from data import store
     rows: list[dict] = []
@@ -109,6 +109,7 @@ def refresh_equity(symbol: str, rcon, mcon, scon, log=print,
                     lambda: fetch_promoter(symbol), log)
     if prom:
         rows += ms.free_float(symbol, prom)
+        rows += _pledge(rcon, symbol, prom, fetch_pledge, log)
     else:
         rows += [r for r in _kept(rcon, symbol, "NSE shareholding pattern")]
     dps = next((r for r in rows if r["metric"] == "dps_ttm"), None)
@@ -117,6 +118,23 @@ def refresh_equity(symbol: str, rcon, mcon, scon, log=print,
     _store(rcon, symbol, rows)
     return {"symbol": symbol, "rows": len(rows), "quarters": len(filings or []),
             "lender": lender, "mismatches": issues}
+
+
+def _pledge(rcon, symbol, prom, fetch_pledge, log) -> list[dict]:
+    """Pledge % in the latest and the oldest of the fetched filings."""
+    if fetch_pledge is None:
+        from data.sources import nse_fundamentals as nsef
+        fetch_pledge = nsef.pledge_from_shp
+    have = [p for p in prom if p.get("xbrl") and p.get("promoter_pct") is not None]
+    if not have:
+        return []
+    got = []
+    for p in (have[0], have[-1]) if len(have) > 1 else (have[0],):
+        r = _attempt(rcon, symbol, "NSE shareholding pattern", f"pledge {p.get('date')}",
+                     lambda p=p: [fetch_pledge(p["xbrl"], float(p["promoter_pct"]))], log)
+        got.append({"date": ms.iso_date(p.get("date")),
+                    **(r[0] if r else {"pledge_pct": None})})
+    return ms.pledge(symbol, got[0], got[1] if len(got) > 1 else None)
 
 
 def refresh_listed(s: sec.Security, rcon, log=print, fetch_yahoo=fin.fetch_yahoo) -> dict:

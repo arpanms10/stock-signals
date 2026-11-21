@@ -25,7 +25,7 @@ In `data/`, never in git.
 | | | Splits, bonuses, demergers, trade-for-trade spells | `market_actions`, `market_demergers`, `market_t2t` | weekly job |
 | `fo_history.db` | 100+ MB | Daily option chains and their prices, index highs and lows, results-meeting dates | `fo_chain`, `fo_spot`, `fo_index_ohlc`, `fo_results`, `fo_days` | weekly and daily jobs |
 | `mf/mf.db` | ~10 MB | Month-end NAV of every Direct Growth fund since 2013 | `nav`, `schemes`, `fetched` | monthly job |
-| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices, each holding's financial and market figures with provenance, and the log of every retrieval | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close`, `financial_metric`, `retrieval_log` | Overview, Import and Holding data pages |
+| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices, each holding's financial and market figures with provenance, the log of every retrieval, and dated scorecards | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close`, `financial_metric`, `retrieval_log`, `scorecard` | Overview, Import, Holding data and Scorecard pages |
 
 Everything here comes from free public sources (NSE, AMFI; see
 [data](data.md)). If a database is lost, `setup_project.py` downloads it
@@ -43,6 +43,8 @@ read while a job writes.
 | `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](../README.md#recording-what-you-own)) |
 | `mf_holdings.xlsx` | Your mutual funds, as a percentage of your fund portfolio. No rupee amounts |
 | `watching.xlsx` | Stocks you're keeping an eye on. The app adds to it when you press *Watch* |
+| `research_inputs.xlsx` | Your evidence for the [scorecard](scorecard.md)'s judgment items, per company: competitive advantage, governance, the yes/no governance flags |
+| `sector_outlook.xlsx` | Your outlook for each sector group, with evidence (10 scorecard points) |
 
 **Records.** In `history/`, meant for git. Each is written before the outcome
 is known, so how things turned out can be checked later.

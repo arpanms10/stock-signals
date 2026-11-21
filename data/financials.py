@@ -42,6 +42,7 @@ Q_FIELDS = {"revenue": CR, "other_income": CR, "pbt": CR, "tax": CR,
             "finance_costs": CR, "depreciation": CR, "exceptional": CR,
             "interest_earned": CR, "interest_expended": CR, "ppop": CR,
             "provisions": CR, "gnpa_pct": PCT, "nnpa_pct": PCT}
+NPA_FIELDS = {"gnpa_pct", "nnpa_pct"}
 INSTANT_FIELDS = {"assets": CR, "cash": CR, "deposits": CR, "advances": CR,
                   "loans": CR}
 
@@ -146,7 +147,13 @@ def from_filings(symbol: str, filings: list[dict], actions=None) -> list[dict]:
         q = lambda metric, v, unit=CR, **x: out.append(  # noqa: E731
             row(symbol, metric, "quarter", end, v, unit, NSE, **{**kw, **x}))
         for field, unit in Q_FIELDS.items():
-            if f.get(field) is not None:
+            if f.get(field) is None:
+                continue
+            if field in NPA_FIELDS:
+                # XBRL files the NPA ratio as a fraction (0.0111 = 1.11%).
+                q(field, D(f[field]) * 100, unit, method="calculated",
+                  note="filed as a fraction; x 100")
+            else:
                 q(field, f[field], unit)
         pat = _first(f, "pat_owners", "pat", "pat_bank_owners", "pat_bank")
         eps = _first(f, "eps", "eps_bank")

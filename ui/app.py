@@ -8,6 +8,7 @@ market to be ranked.
   Portfolio  Overview      value, sleeves, Core vs Satellite, caps   (ui/views/overview.py)
              Stocks        holdings with verdicts, and the watch list (ui/views/stocks.py)
              Mutual funds  your MF book against each category (ui/mf_tab.py)
+             Scorecard     100-point fundamental scorecard, descriptive (ui/views/scorecard.py)
              Holding data  financials and market figures, with sources (ui/views/holding_data.py)
              Import holdings  broker file -> preview -> confirm  (ui/views/import_page.py)
   Ideas      Momentum      top band on both lookbacks (ui/views/momentum.py)
@@ -49,6 +50,11 @@ def _today():
 def _overview():
     from ui.views import overview
     overview.render()
+
+
+def _scorecard():
+    from ui.views import scorecard
+    scorecard.render()
 
 
 def _holding_data():
@@ -136,6 +142,7 @@ P.update(
     overview=st.Page(_overview, title="Overview", url_path="overview"),
     stocks=st.Page(_stocks, title="Stocks", url_path="stocks"),
     importer=st.Page(_import, title="Import holdings", url_path="import"),
+    scorecard=st.Page(_scorecard, title="Scorecard", url_path="scorecard"),
     holding_data=st.Page(_holding_data, title="Holding data", url_path="holding-data"),
     funds=st.Page(_funds, title="Mutual funds", url_path="mutual-funds"),
     momentum=st.Page(_momentum, title="Momentum", url_path="momentum"),
@@ -152,7 +159,7 @@ P.update(
 
 nav = st.navigation({
     "": [P["today"]],
-    "Portfolio": [P["overview"], P["stocks"], P["holding_data"], P["funds"],
+    "Portfolio": [P["overview"], P["stocks"], P["scorecard"], P["holding_data"], P["funds"],
                   P["importer"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],

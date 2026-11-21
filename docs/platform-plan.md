@@ -73,7 +73,7 @@ existing NSE/Yahoo fetchers; market cap & cap bucket (SEBI AMFI list: top 100
 large, 101–250 mid, rest small, from the half-yearly AMFI file); beta, 52-wk,
 avg volume from market.db; dividends where Yahoo has them; freshness per value.
 
-**P3 · Scorecard.** 100-pt framework per §5 with configurable weights in
+**P3 · Scorecard.** *(done: [scorecard](scorecard.md); valuation's 15 points pending P4; judgment items from config/research_inputs + sector_outlook)* 100-pt framework per §5 with configurable weights in
 `config/scorecard.yaml`; each component's methodology documented and unit-
 tested; sector-specific models (bank, NBFC, insurance, IT, FMCG, industrials,
 pharma, real estate/hotels, cyclicals) reusing `sector.py` + lender rubric;
