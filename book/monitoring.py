@@ -9,7 +9,9 @@ Tables in data/research.db (local only):
   review_snapshot     a dated copy of scores, tiers, roles, weights, flags,
                       shareholding and plan actions, so reviews can diff
 
-Reports are written to data/reviews/<date>.md (never committed).
+Reports are written to data/reviews/ (never committed): review-<date>.md
+(events and changes) and holdings-<date>.md (every holding, from the research
+pack; book/holdings_report.py).
 """
 from __future__ import annotations
 
@@ -305,6 +307,16 @@ def write_report(text: str, as_of: str, d: Path = REPORTS) -> Path:
     return p
 
 
+def holdings_report(today: dt.date | None = None) -> Path:
+    """Rebuild the research pack and render the holdings report from it, so
+    the report, the pages and /research all read the same figures."""
+    from book import holdings_report as hr
+    from book import research_pack as rp
+    pack = rp.build(today=today)
+    rp.write(pack)
+    return hr.write(hr.render(pack), pack["as_of"]["today"])
+
+
 def run(today: dt.date | None = None, fetch: bool = True, save_scores: bool = True) -> dict:
     """The whole review: fetch, detect, snapshot, diff, report."""
     from book import risk_view as rv
@@ -331,7 +343,9 @@ def run(today: dt.date | None = None, fetch: bool = True, save_scores: bool = Tr
         since = (today - dt.timedelta(days=cfg["lookback_days"])).isoformat()
         evs = events(con, symbols, severities=(mon.THESIS, mon.WATCH), since=since)
         path = write_report(report(snap, prev, evs, changes, problems), snap["as_of"])
+        holdings = holdings_report(today)
         return {"as_of": snap["as_of"], "previous": prev["as_of"] if prev else None,
+                "holdings_report": holdings,
                 "new_announcements": new_ann, "new_events": new_ev, "changes": changes,
                 "events": evs, "problems": problems, "report": path}
     finally:

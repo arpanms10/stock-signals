@@ -48,7 +48,8 @@ def _run_bar(con) -> None:
             r = bm.run(fetch=not offline)
         st.success(f"Review {r['as_of']}: {r['new_announcements']} new announcements, "
                    f"{r['new_events']} new events, {len(r['changes'])} changes. "
-                   f"Report: data/reviews/{r['report'].name}")
+                   f"Reports: data/reviews/{r['report'].name} and "
+                   f"{r['holdings_report'].name}")
         for p in r["problems"]:
             st.caption("⚠ " + p)
 
@@ -130,12 +131,24 @@ def _changes(con, cfg) -> None:
 
 
 def _reports() -> None:
-    st.markdown("**Review reports**")
-    files = sorted(bm.REPORTS.glob("review-*.md"), reverse=True) if bm.REPORTS.exists() else []
+    st.markdown("**Reports**")
+    st.caption("Holdings report: every current company holding (position, scorecard, "
+               "valuation, latest quarter, shareholding, risk, plan, unrealised gains, open "
+               "checks) plus the book and this year's tax, rendered from the research pack "
+               "with no model in the loop. Review report: events and what changed. Both are "
+               "written by Run review; the button here rebuilds only the holdings report.")
+    if st.button("Build holdings report now"):
+        with st.spinner("Rebuilding the research pack and the report…"):
+            p = bm.holdings_report()
+        st.success(f"Wrote data/reviews/{p.name}")
+    files = sorted(bm.REPORTS.glob("*.md"), key=lambda p: (p.stem.split("-", 1)[1], p.stem),
+                   reverse=True) if bm.REPORTS.exists() else []
     if not files:
-        st.caption("None yet. Run a review to write data/reviews/review-<date>.md.")
+        st.caption("None yet.")
         return
-    f = st.selectbox("Report", files, format_func=lambda p: p.stem, key="rv_report")
+    f = st.selectbox("Report", files, key="rv_report",
+                     format_func=lambda p: ("Holdings " if p.stem.startswith("holdings")
+                                           else "Review ") + p.stem.split("-", 1)[1])
     text = f.read_text()
     st.download_button("Download", text, file_name=f.name, mime="text/markdown")
     with st.expander("Show report"):

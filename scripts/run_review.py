@@ -3,11 +3,13 @@
 Fetches NSE announcements for your company holdings, turns announcements,
 shareholding and results into dated events (thesis check / watch / info),
 saves today's scorecards and a review snapshot, compares it with the last
-review, and writes data/reviews/review-<date>.md.
+review, and writes data/reviews/review-<date>.md (events and changes) and
+data/reviews/holdings-<date>.md (every current holding, from the research pack).
 
     PYTHONPATH=. .venv/bin/python scripts/run_review.py              # full review
     PYTHONPATH=. .venv/bin/python scripts/run_review.py --offline    # no NSE fetch
     PYTHONPATH=. .venv/bin/python scripts/run_review.py --events     # list open events
+    PYTHONPATH=. .venv/bin/python scripts/run_review.py --holdings   # holdings report only
 
 Run scripts/refresh_holding_data.py first so shareholding and results are current.
 """
@@ -28,7 +30,12 @@ def main() -> int:
     ap.add_argument("--no-save-scores", action="store_true",
                     help="don't store today's scorecards")
     ap.add_argument("--events", action="store_true", help="list open events and stop")
+    ap.add_argument("--holdings", action="store_true",
+                    help="only rebuild the pack and write the holdings report")
     a = ap.parse_args()
+    if a.holdings:
+        print("wrote", bm.holdings_report())
+        return 0
     if a.events:
         con = bm.connect()
         for e in bm.events(con, status="open", severities=(mon.THESIS, mon.WATCH)):
@@ -47,6 +54,7 @@ def main() -> int:
     for p in r["problems"]:
         print("  problem:", p)
     print("wrote", r["report"])
+    print("wrote", r["holdings_report"])
     return 0
 
 

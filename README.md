@@ -385,7 +385,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Valuation**](docs/valuation.md) | Own 5-year band, peers, reverse DCF, bear/base/bull scenarios; not price targets |
 | [**Risk & plan**](docs/risk.md) | Historical risk of today's mix, exposures, and a 70:30 plan for new money; a simulation |
 | [**Tax & transition**](docs/tax.md) | Tax lots from your tradebooks, this year's gains, trims timed for tax over 3/6/12 months |
-| [**Monitoring & reviews**](docs/monitoring.md) | Thesis-check events from NSE announcements, shareholding and results, each with its filing; what changed between reviews |
+| [**Monitoring & reviews**](docs/monitoring.md) | Thesis-check events from NSE announcements, shareholding and results, each with its filing; what changed between reviews; a holdings report covering every current holding |
 | [**Research assistant**](docs/research.md) | `/research` in Claude Code: answers from a pack of the app's own figures, every figure cited and checked |
 | [**Holding data**](docs/holding_data.md) | Each holding's financials and market figures, with source, period, confidence and freshness |
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |

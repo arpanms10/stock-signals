@@ -1,8 +1,11 @@
 # Monitoring & reviews
 
 **Portfolio › Reviews** lists events that might change why you hold a
-company, and what moved between two reviews. A review also writes a report
-to `data/reviews/review-<date>.md`.
+company, and what moved between two reviews. Each review writes two reports
+to `data/reviews/`:
+
+- `review-<date>.md`: events and changes;
+- `holdings-<date>.md`: every current holding in full ([below](#the-holdings-report)).
 
 ```text
 PYTHONPATH=. .venv/bin/python scripts/refresh_holding_data.py   # shareholding and results first
@@ -76,6 +79,30 @@ research pack fills in.
 - watch items;
 - what you reviewed, with your notes;
 - any data problems, such as a holding whose announcements couldn't be fetched.
+
+## The holdings report
+
+`data/reviews/holdings-<date>.md` covers every current company holding on one
+page. It's rendered from the research pack, so its figures are the ones the
+pages show and `/research` cites. It's deterministic: the same pack always
+gives the same report, with no model writing it.
+
+| Section | Contents |
+|---|---|
+| The book | Value, P/L, Core : Satellite by your buckets and by suggested roles against 70 : 30, concentration, historical risk, largest sectors, risk flags |
+| At a glance | One row per holding, largest first: weight, P/L, score and how much was assessable, tier, suggested role, bucket, position in its own 5-year range, the plan's action under both plans, open thesis checks |
+| Each holding | Position; scorecard and role reasons; governance flags; valuation (multiple, own range, peers, implied vs delivered growth, scenarios); latest quarter year on year; shareholding; risk; plan; unrealised short- and long-term gains; open thesis checks with links; change since the last saved scorecard |
+| Tax this year | Realised gains, estimated tax, exemption left, sales with unknown cost, harvest options |
+| Monitoring | Open thesis checks and changes from the last review |
+
+Plans assume no new money. Every review writes the holdings report. To write
+only the report, use **Build holdings report now** on the page, or:
+
+```text
+PYTHONPATH=. .venv/bin/python scripts/run_review.py --holdings
+```
+
+Building only the report rebuilds the research pack first (about 8 seconds).
 
 ## The research assistant
 

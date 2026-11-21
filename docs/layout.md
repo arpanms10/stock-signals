@@ -65,6 +65,7 @@ strategy/answer_check.py   checks an assistant's answer against the pack (§14.1
 scripts/research.py        pack / check / path / list for the /research skill
 strategy/monitor.py        announcements, shareholding, results -> thesis-check events; review diffs (pure)
 book/monitoring.py         event store, review snapshots, the review report (research.db, data/reviews/)
+book/holdings_report.py    every current holding on one page, rendered from the research pack
 data/sources/nse_announcements.py  NSE corporate announcements for one company
 scripts/run_review.py      fetch announcements, detect events, snapshot, diff, write the report
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
