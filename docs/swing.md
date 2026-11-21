@@ -58,8 +58,8 @@ historical backtest.
 **Keeping it gap-free.** `scripts/install_schedule.py --install daily` runs
 `scripts/run_swing_daily.py` every weekday at 19:30. It catches Nifty 500 prices up
 and records each universe. A missed run (Mac asleep) fires on wake, and a
-holiday or second run writes nothing new. The job never touches git: commit
-`history/swing/` yourself, for example with each week's other changes.
+holiday or second run writes nothing new. `history/` is git-ignored, so back
+it up yourself ([data storage](storage.md#what-to-back-up)).
 
 ## How a suggestion is made
 

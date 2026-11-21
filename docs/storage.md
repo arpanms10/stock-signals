@@ -40,15 +40,15 @@ read while a job writes.
 
 | File | Contents |
 |---|---|
-| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](../README.md#recording-what-you-own)) |
+| `holdings.xlsx` | Your shares: symbol, quantity, average price, long/short-term split, bucket, notes ([recording what you own](holdings.md)) |
 | `mf_holdings.xlsx` | Your mutual funds, as a percentage of your fund portfolio. No rupee amounts |
 | `watching.xlsx` | Stocks you're keeping an eye on. The app adds to it when you press *Watch* |
 | `research_inputs.xlsx` | Your evidence for the [scorecard](scorecard.md)'s judgment items, per company: competitive advantage, governance, the yes/no governance flags |
 | `tradebooks/` | Your broker tradebooks (every trade: date, quantity, price) for [tax lots](tax.md). Never committed: the folder carries its own `.gitignore` |
 | `sector_outlook.xlsx` | Your outlook for each sector group, with evidence (10 scorecard points) |
 
-**Records.** In `history/`, meant for git. Each is written before the outcome
-is known, so how things turned out can be checked later.
+**Records.** In `history/`, on your computer only (git-ignored). Each is
+written before the outcome is known, so how things turned out can be checked later.
 
 | File | Contents |
 |---|---|
@@ -64,20 +64,22 @@ in `backtests/`, and the weekly job's dated report and logs.
 
 | Where | Contents | In git |
 |---|---|---|
-| `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | yes |
-| `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | yes |
+| `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | no |
+| `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | no |
 | `data/results/` | Quarterly results per company, scorecards, backtest working files | no |
 | `data/research/` | The research pack (`pack.json`) and the assistant's checked answers ([research assistant](research.md)) | no |
 | `data/reviews/` | Review reports (`review-<date>.md`) and holdings reports (`holdings-<date>.md`) ([monitoring](monitoring.md)) | no |
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |
 | `config/equities.csv`, `config/etfs.csv`, `config/fundamentals.csv` | Derived lists and fundamentals, rebuilt by the jobs | no |
-| `config/scoring.yaml`, `config/mf_rules.yaml`, `config/core_satellite.yaml` | Settings and thresholds you can change | yes |
+| `data/mf/` | Mutual fund NAV database and the PPFAS disclosures it downloads | no |
+| `config/scoring.yaml`, `config/mf_rules.yaml`, `config/core_satellite.yaml`, and the other rule files (`scorecard`, `valuation`, `risk`, `tax`, `monitoring`) | Settings and thresholds you can change | yes |
 
 ## What to back up
 
-Only your input files in `config/` (holdings, mutual funds, watch list),
-`data/research.db` (your snapshots and audit log; the holding data can be re-fetched) and the `history/` records
-can't be rebuilt. Commit `history/` now and then, or
-copy it with your `config/` files; everything else can be downloaded or
-recomputed.
+Only your input files in `config/` (holdings, mutual funds, watch list,
+tradebooks), `data/research.db` (snapshots, audit log, scorecard history and
+your review notes; the holding data can be re-fetched) and the `history/`
+records can't be rebuilt, and none of them is in git. Copy them somewhere
+safe now and then (an external drive or a cloud folder); everything else can
+be downloaded or recomputed.
