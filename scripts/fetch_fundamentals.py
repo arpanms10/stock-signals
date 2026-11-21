@@ -220,6 +220,28 @@ def fetch_rows(sym: str, quarter: str, quarters: int = 6, yahoo_only: bool = Fal
     return [r] + history, meta
 
 
+def default_symbols(existing) -> list[str]:
+    """What to fetch when --symbols is not given.
+
+    The symbols already in the sheet, plus every current holding and the
+    watch list. Using the sheet alone meant an empty sheet fetched nothing,
+    so the first run (and the UI's Refresh fundamentals) could never fill it.
+    """
+    from book import portfolio, watching
+    syms = set(existing["symbol"].dropna().astype(str))
+    try:
+        syms |= {str(h.get("tradingsymbol") or h.get("symbol")).strip().upper()
+                 for h in portfolio.load_holdings()
+                 if h.get("tradingsymbol") or h.get("symbol")}
+    except Exception as exc:  # a broken holdings file should not stop the fetch
+        print(f"Holdings not read ({type(exc).__name__}: {exc})")
+    try:
+        syms |= {s.strip().upper() for s in watching.symbols()}
+    except Exception as exc:
+        print(f"Watch list not read ({type(exc).__name__}: {exc})")
+    return sorted(s for s in syms if s)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", default=str(fu.FUNDAMENTALS_PATH))
@@ -243,7 +265,7 @@ def main() -> None:
 
     path = Path(args.path)
     existing = fu.load(path)
-    symbols = args.symbols or sorted(existing["symbol"].unique())
+    symbols = args.symbols or default_symbols(existing)
     # Fiscal, like NSE's history rows, so the snapshot sorts as the newest.
     quarter = fu.fiscal_quarter(dt.date.today())
 

@@ -67,40 +67,11 @@ def _holdings(snap) -> None:
         c.legend()
         st.divider()
 
+        _bucket_tables(h, snap.book_value)
+
+        st.divider()
         left, right = st.columns([3, 2])
         with left:
-            st.subheader("Core / Satellite")
-            st.caption("Core: owned for a decade or more, held through momentum "
-                       "signals. Satellite: one to ten years -- red flags and "
-                       "sizing apply, and falling out of the ranking asks for a "
-                       "review, never a sale. Trade (bucket=trade in "
-                       "config/holdings.csv): rotates on rank and its stop.")
-            for b in ("core", "satellite", "trade"):
-                grp = h[h["bucket"] == b]
-                if grp.empty:
-                    continue
-                val = grp["value"].sum()
-                st.markdown(f"**{b.capitalize()}** — {len(grp)} holdings, "
-                            f"{c.money(val)} "
-                            f"({100 * val / snap.book_value:.0f}% of book)")
-                st.dataframe(
-                    state.with_results(state.with_quality_note(grp))[
-                        ["symbol", "value", "pct_of_book", "pnl_pct", "quality",
-                         "quality_note", "results", "rank"]]
-                    .rename(columns={"pct_of_book": "% book", "pnl_pct": "P&L %",
-                                     "quality": "Quality", "rank": "Rank"})
-                    .sort_values("value", ascending=False),
-                    hide_index=True, width='stretch',
-                    column_config={
-                        "value": st.column_config.NumberColumn("Value", format="₹%d"),
-                        "% book": st.column_config.NumberColumn(format="%.1f%%"),
-                        "P&L %": st.column_config.NumberColumn(format="%+.1f%%"),
-                        "Quality": st.column_config.ProgressColumn(
-                            min_value=0, max_value=100, format="%d"),
-                        "quality_note": state.QUALITY_NOTE,
-                        "results": state.RESULTS_COL,
-                    })
-        with right:
             st.subheader("Sector exposure")
             se = pd.DataFrame(snap.sector_exposure)
             if not se.empty:
@@ -237,6 +208,82 @@ def _holdings(snap) -> None:
                            "silently averaged in. Judge these separately.")
                 st.dataframe(pd.DataFrame(snap.uncovered), hide_index=True,
                              width='stretch')
+
+
+# One table per bucket, in this order. Core and Satellite always show, even
+# empty, so a book with no core says so instead of silently omitting it.
+BUCKET_TABLES = [
+    ("core", "Core holdings",
+     "Owned for a decade or more. Held through momentum signals; only a hard "
+     "red flag (pledge, interest cover, quality collapse) asks for an exit."),
+    ("satellite", "Satellite holdings",
+     "One to ten years. Red flags and sizing apply; falling out of the "
+     "ranking asks for a review, never a sale."),
+    ("trade", "Trade holdings",
+     "Bought to trade: rotates on rank and its stop."),
+]
+
+
+def _bucket_tables(h: pd.DataFrame, book_value: float) -> None:
+    """Core and Satellite as two separate, full-width tables.
+
+    The split is measured on your bucket labels (holdings.xlsx), against the
+    70:30 target in config/core_satellite.yaml."""
+    from strategy import overview as ov
+    target = ov.load_config().get("targets", {})
+    core_t, sat_t = target.get("core_pct", 70), target.get("satellite_pct", 30)
+    core_v = h.loc[h["bucket"] == "core", "value"].sum()
+    other_v = h.loc[h["bucket"] != "core", "value"].sum()
+    whole = core_v + other_v
+    st.subheader("Core and Satellite")
+    st.caption(
+        f"Target {core_t:.0f}:{sat_t:.0f}. Now "
+        f"{100 * core_v / whole:.0f}:{100 * other_v / whole:.0f} "
+        "(trade counts as satellite). Buckets come from the `bucket` column "
+        "of your holdings file; a label you set always wins over the "
+        "framework's suggestion." if whole else f"Target {core_t:.0f}:{sat_t:.0f}.")
+
+    for b, title, blurb in BUCKET_TABLES:
+        grp = h[h["bucket"] == b]
+        if b == "trade" and grp.empty:
+            continue
+        val = grp["value"].sum()
+        st.markdown(f"#### {title}")
+        m = st.columns(3)
+        m[0].metric("Holdings", f"{len(grp)}")
+        m[1].metric("Value", c.money(val))
+        m[2].metric("Share of book",
+                    f"{100 * val / book_value:.0f}%" if book_value else "--")
+        st.caption(blurb)
+        if grp.empty:
+            st.info(f"No holding is labelled **{b}**. Set `bucket` to `{b}` "
+                    "for the names you mean to hold that way in "
+                    "`config/holdings.xlsx`, then reload.")
+            continue
+        t = state.with_results(state.with_quality_note(grp)).copy()
+        t["pct_of_bucket"] = 100 * t["value"] / val if val else 0.0
+        st.dataframe(
+            t[["symbol", "action", "value", "pct_of_book", "pct_of_bucket",
+               "pnl_pct", "quality", "quality_note", "results", "rank",
+               "bucket_why"]]
+            .rename(columns={"symbol": "Symbol", "action": "Verdict",
+                             "pct_of_book": "% book", "pct_of_bucket": "% bucket",
+                             "pnl_pct": "P&L %", "quality": "Quality",
+                             "rank": "Rank", "bucket_why": "Why this bucket"})
+            .sort_values("value", ascending=False),
+            hide_index=True, width='stretch', key=f"bucket_table_{b}",
+            column_config={
+                "value": st.column_config.NumberColumn("Value", format="₹%d"),
+                "% book": st.column_config.NumberColumn(format="%.1f%%"),
+                "% bucket": st.column_config.NumberColumn(
+                    format="%.1f%%", help="Share of this bucket's value"),
+                "P&L %": st.column_config.NumberColumn(format="%+.1f%%"),
+                "Quality": st.column_config.ProgressColumn(
+                    min_value=0, max_value=100, format="%d"),
+                "quality_note": state.QUALITY_NOTE,
+                "results": state.RESULTS_COL,
+                "Why this bucket": st.column_config.TextColumn(width="medium"),
+            })
 
 
 def _watching(snap) -> None:

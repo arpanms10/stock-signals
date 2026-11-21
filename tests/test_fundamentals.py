@@ -219,3 +219,16 @@ def test_quality_note_explains_a_missing_score():
     assert fu.quality_note(
         fu.Quality("X", None, {}, ["no fundamentals on file"])) == "Not fetched"
     assert fu.quality_note(fu.Quality("X", None, {}, [])) == "Too little data"
+
+
+def test_fetch_defaults_cover_holdings_when_the_sheet_is_empty(monkeypatch):
+    """An empty sheet used to fetch nothing: the default list was the sheet."""
+    from scripts import fetch_fundamentals as ff
+    from book import portfolio, watching
+    monkeypatch.setattr(portfolio, "load_holdings",
+                        lambda: [{"tradingsymbol": "tcs"}, {"symbol": "INFY"}, {}])
+    monkeypatch.setattr(watching, "symbols", lambda: ["cupid"])
+    empty = pd.DataFrame(columns=fu.COLUMNS)
+    assert ff.default_symbols(empty) == ["CUPID", "INFY", "TCS"]
+    sheet = pd.DataFrame({"symbol": ["ITC"]})
+    assert "ITC" in ff.default_symbols(sheet)
