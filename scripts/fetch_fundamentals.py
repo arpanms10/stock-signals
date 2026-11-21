@@ -26,6 +26,7 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
+from book import securities as sec
 from scoring import fundamentals as fu
 from data.sources import nse_fundamentals as nsef
 
@@ -250,8 +251,9 @@ def main() -> None:
           f"({'Yahoo only' if args.yahoo_only else 'NSE primary, Yahoo fallback'})")
     rows, failed = [], []
     for i, sym in enumerate(symbols, 1):
-        if sym.endswith("-RR"):
-            failed.append(f"{sym} (REIT -- not an equity, cannot be scored)")
+        kind = sec.classify(sym).kind
+        if kind != sec.EQUITY:
+            failed.append(f"{sym} ({sec.KIND_LABEL[kind]} -- not an equity, cannot be scored)")
             continue
         try:
             got, meta = fetch_rows(sym, quarter, args.quarters, args.yahoo_only)

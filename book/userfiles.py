@@ -78,11 +78,15 @@ HOLDINGS = Spec(
      Column("bucket", False, "core = owned for a decade or more; satellite = one "
             "to ten years; trade = bought to trade (the only kind sold on momentum "
             "rank). Leave blank and the app suggests core or satellite.", "core"),
+     Column("isin", False, "The security's ISIN. The import fills it; it tells a "
+            "REIT, InvIT, ETF or bond apart from a company share.", "INE002A01018",
+            "Broker holdings statement"),
      Column("notes", False, "Anything for yourself.", "bought on results dip")],
     [PRIVACY,
      "Use the NSE symbol, not the company name: 'HDFCBANK', not 'HDFC Bank Ltd'.",
-     "Bonds, REITs, ETFs and gold bonds from a broker file are skipped on import; "
-     "the app covers company shares."])
+     "REITs, InvITs, ETFs, bonds and gold bonds are kept, each labelled with its "
+     "type: REITs and InvITs are reported as their own sleeve, and only company "
+     "shares are scored and ranked."])
 
 MF_HOLDINGS = Spec(
     "mf_holdings", "MF holdings", "Your mutual fund book, as percentages",

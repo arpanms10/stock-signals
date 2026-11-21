@@ -25,6 +25,7 @@ In `data/`, never in git.
 | | | Splits, bonuses, demergers, trade-for-trade spells | `market_actions`, `market_demergers`, `market_t2t` | weekly job |
 | `fo_history.db` | 100+ MB | Daily option chains and their prices, index highs and lows, results-meeting dates | `fo_chain`, `fo_spot`, `fo_index_ohlc`, `fo_results`, `fo_days` | weekly and daily jobs |
 | `mf/mf.db` | ~10 MB | Month-end NAV of every Direct Growth fund since 2013 | `nav`, `schemes`, `fetched` | monthly job |
+| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close` | Overview and Import pages |
 
 Everything here comes from free public sources (NSE, AMFI; see
 [data](data.md)). If a database is lost, `setup_project.py` downloads it
@@ -66,11 +67,12 @@ in `backtests/`, and the weekly job's dated report and logs.
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |
 | `config/equities.csv`, `config/etfs.csv`, `config/fundamentals.csv` | Derived lists and fundamentals, rebuilt by the jobs | no |
-| `config/scoring.yaml`, `config/mf_rules.yaml` | Settings and thresholds you can change | yes |
+| `config/scoring.yaml`, `config/mf_rules.yaml`, `config/core_satellite.yaml` | Settings and thresholds you can change | yes |
 
 ## What to back up
 
-Only your input files in `config/` (holdings, mutual funds, watch list) and
-the `history/` records can't be rebuilt. Commit `history/` now and then, or
+Only your input files in `config/` (holdings, mutual funds, watch list),
+`data/research.db` (your snapshots and audit log) and the `history/` records
+can't be rebuilt. Commit `history/` now and then, or
 copy it with your `config/` files; everything else can be downloaded or
 recomputed.

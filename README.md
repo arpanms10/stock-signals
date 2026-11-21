@@ -105,9 +105,12 @@ Most broker downloads already carry these columns under other names, and the
 importer recognises the common ones: *Instrument / Scrip / Stock* for the
 symbol, *Qty. / Shares / Holding Qty* for quantity, *Avg. cost / Average
 Price / Buy Avg* for the price, *Long Term Qty / Short Term Qty* for the tax
-split. It finds the header row even below a client-details preamble, skips
-ETFs, bonds, REITs and InvITs (and lists them), and merges a stock that
-appears twice.
+split. It finds the header row even below a client-details preamble, keeps
+REITs, InvITs, ETFs and bonds labelled with their type (REITs and InvITs are a
+separate sleeve; only company shares are scored), and merges a stock that
+appears twice. It shows a preview with every validation finding and asks
+before writing; `--dry-run` only previews. The dashboard's **Import
+holdings** page does the same from an upload ([overview](docs/overview.md)).
 
 Put the downloaded `.xlsx` or `.csv` in `config/` and run:
 
@@ -132,9 +135,10 @@ into `config/holdings.xlsx` (or a `.csv` with the header above):
 2. Replace company names with NSE symbols. Search the name on
    [nseindia.com](https://www.nseindia.com) if unsure; the dashboard's search
    box also resolves names and ISINs.
-3. Remove mutual funds, ETFs, bonds, gold bonds, REITs and InvITs: only NSE
-   equities are ranked. Mutual funds go in `config/mf_holdings.xlsx` instead
-   (see [Mutual funds](#mutual-funds)).
+3. Mutual funds go in `config/mf_holdings.xlsx` instead (see
+   [Mutual funds](#mutual-funds)). REITs (`EMBASSY-RR`), InvITs (`PGINVIT-IV`),
+   ETFs and bonds can stay; fill the optional `isin` column so their type is
+   certain. Only NSE equities are ranked.
 4. Numbers only in the number columns. `₹` and thousands commas are fine;
    text like "40 shares" is not.
 5. If your broker shows only total quantity, leave `lt_quantity` and
@@ -376,6 +380,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Getting started**](GETTING_STARTED.md) | Install, set up and open the dashboard, in plain steps |
 | [**Glossary**](docs/glossary.md) | Every term the dashboard uses, in plain language |
 | [**Troubleshooting**](docs/troubleshooting.md) | NSE not answering, stale data, jobs, errors |
+| [**Portfolio overview**](docs/overview.md) | Value, REIT sleeve, Core vs Satellite against 70:30, caps, sectors, import preview, snapshots |
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
 | [**Dashboard**](docs/dashboard.md) | Two sections, badges, the two target frames |
 | [**Strategy**](docs/strategy.md) | Momentum ranking, fundamentals, the lender rubric |

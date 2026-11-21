@@ -38,6 +38,16 @@ def nifty500() -> pd.DataFrame:
     return _index_list(nse.NIFTY500_LIST_URL, "ind_nifty500list.csv")
 
 
+def nifty100() -> pd.DataFrame:
+    """The 100 largest companies -- the large-cap band."""
+    return _index_list(nse.NIFTY100_LIST_URL, "ind_nifty100list.csv")
+
+
+def midcap150() -> pd.DataFrame:
+    """Ranks 101-250 by full market cap -- the mid-cap band."""
+    return _index_list(nse.MIDCAP150_LIST_URL, "ind_niftymidcap150list.csv")
+
+
 def equity_master() -> pd.DataFrame:
     """Every symbol listed on NSE's equity segment."""
     df = nse.fetch_csv(nse.EQUITY_LIST_URL, cache_path=CACHE_DIR / "EQUITY_L.csv",

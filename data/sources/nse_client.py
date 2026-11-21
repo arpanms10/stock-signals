@@ -27,6 +27,8 @@ BROWSER_HEADERS = {
 NIFTY50_LIST_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv"
 NIFTY200_LIST_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty200list.csv"
 NIFTY500_LIST_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv"
+NIFTY100_LIST_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv"
+MIDCAP150_LIST_URL = "https://nsearchives.nseindia.com/content/indices/ind_niftymidcap150list.csv"
 EQUITY_LIST_URL = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
 
 _session: requests.Session | None = None

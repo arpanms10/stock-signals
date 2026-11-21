@@ -5,8 +5,10 @@ own data, so opening Mutual funds or Analyze no longer waits for the whole
 market to be ranked.
 
   Today                    everything that wants a decision (ui/views/today.py)
-  Portfolio  Stocks        holdings with verdicts, and the watch list (ui/views/stocks.py)
+  Portfolio  Overview      value, sleeves, Core vs Satellite, caps   (ui/views/overview.py)
+             Stocks        holdings with verdicts, and the watch list (ui/views/stocks.py)
              Mutual funds  your MF book against each category (ui/mf_tab.py)
+             Import holdings  broker file -> preview -> confirm  (ui/views/import_page.py)
   Ideas      Momentum      top band on both lookbacks (ui/views/momentum.py)
              Swing         pullback / breakout setups with a plan (ui/swing_tab.py)
              Quarterly results                                    (ui/results_tab.py)
@@ -41,6 +43,16 @@ P: dict = {}
 def _today():
     from ui.views import today
     today.render(P)
+
+
+def _overview():
+    from ui.views import overview
+    overview.render()
+
+
+def _import():
+    from ui.views import import_page
+    import_page.render()
 
 
 def _stocks():
@@ -115,7 +127,9 @@ def _search():
 P.update(
     today=st.Page(_today, title="Today", icon=":material/today:", url_path="today",
                   default=True),
+    overview=st.Page(_overview, title="Overview", url_path="overview"),
     stocks=st.Page(_stocks, title="Stocks", url_path="stocks"),
+    importer=st.Page(_import, title="Import holdings", url_path="import"),
     funds=st.Page(_funds, title="Mutual funds", url_path="mutual-funds"),
     momentum=st.Page(_momentum, title="Momentum", url_path="momentum"),
     swing=st.Page(_swing, title="Swing", url_path="swing"),
@@ -131,7 +145,7 @@ P.update(
 
 nav = st.navigation({
     "": [P["today"]],
-    "Portfolio": [P["stocks"], P["funds"]],
+    "Portfolio": [P["overview"], P["stocks"], P["funds"], P["importer"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],
     "Research": [P["analyze"], P["compare"]],

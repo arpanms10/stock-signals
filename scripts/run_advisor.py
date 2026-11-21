@@ -14,6 +14,7 @@ from book import decision_log as dlog
 from scoring import fundamentals as fu
 from data import instruments as ins
 from book import portfolio as pf
+from book import securities as sec
 from data import bhavcopy as bc
 from data import freshness as fr
 from data import store
@@ -81,9 +82,11 @@ def main() -> None:
     prices, values, tradeable = {}, {}, {}
     untradeable = []
     for sym, h in holdings.items():
-        if sym in excluded or sym.endswith("-RR") or sym not in frames:
-            why = ("fund/ETF or REIT -- not company equity"
-                   if sym in excluded or sym.endswith("-RR")
+        kind = sec.classify(sym, h.get("isin", "")).kind
+        if sym in excluded or kind != sec.EQUITY or sym not in frames:
+            why = (f"{sec.KIND_LABEL[kind] if kind != sec.EQUITY else 'fund/ETF'} "
+                   "-- not company equity"
+                   if sym in excluded or kind != sec.EQUITY
                    else "no price history on file")
             untradeable.append((sym, why, h))
             continue

@@ -10,6 +10,8 @@ list with a note, never takes the others down with it.
 """
 from __future__ import annotations
 
+from book import securities as sec
+
 import json
 from pathlib import Path
 
@@ -66,7 +68,7 @@ def symbols(log=None) -> dict[str, list[str]]:
         for sym in found:
             sym = str(sym).strip().upper()
             # REITs and InvITs file no Ind-AS results.
-            if sym and not sym.endswith("-RR") and not sym.endswith("-IV"):
+            if sym and sec.classify(sym).kind == sec.EQUITY:
                 out.setdefault(sym, [])
                 if name not in out[sym]:
                     out[sym].append(name)
