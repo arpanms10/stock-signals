@@ -60,6 +60,9 @@ strategy/lots.py           tax lots from tradebooks: opening lot, splits, bonuse
 strategy/transition.py     times each trim to the cheapest date in 3/6/12 months; gain harvesting (pure)
 book/tradebook.py          reads config/tradebooks/ (Zerodha tradebook xlsx/csv), merges by trade ID
 book/tax_view.py           lots, this year's realised gains and the timed plans from your book
+book/research_pack.py      the research pack: every engine's figures with source, period, kind, freshness
+strategy/answer_check.py   checks an assistant's answer against the pack (§14.1 rules)
+scripts/research.py        pack / check / path / list for the /research skill
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
 data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
 data/market_stats.py       52w, volume, beta, returns, market cap, free float

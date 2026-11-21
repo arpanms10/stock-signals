@@ -26,6 +26,8 @@ data/holdings.json
 # Results scorecards (run_results.py). The figures are public, but the list of
 # symbols covered includes your holdings.
 data/results/
+# The research pack and the assistant's saved answers (Phase 7): your positions.
+data/research/
 
 # --- Large generated data ----------------------------------------------
 # market.db is ~450MB; GitHub rejects files over 100MB and this is entirely

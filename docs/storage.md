@@ -67,6 +67,7 @@ in `backtests/`, and the weekly job's dated report and logs.
 | `history/swing/` (`runs.csv`, `scans/YYYY-MM.csv`, `members.csv`) | Every swing scan, in full, append-only ([swing](swing.md#the-forward-record)) | yes |
 | `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | yes |
 | `data/results/` | Quarterly results per company, scorecards, backtest working files | no |
+| `data/research/` | The research pack (`pack.json`) and the assistant's checked answers ([research assistant](research.md)) | no |
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |
 | `config/equities.csv`, `config/etfs.csv`, `config/fundamentals.csv` | Derived lists and fundamentals, rebuilt by the jobs | no |

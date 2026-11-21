@@ -21,6 +21,7 @@ market to be ranked.
   Market     Overview      the ranked universe, entry levels      (ui/views/market.py)
              F&O           expected range to expiry, experimental (ui/fno_tab.py)
   Research   Analyze a stock                                      (ui/analyze_tab.py)
+             Research assistant  the pack, how to ask, checked answers (ui/views/assistant.py)
              Compare funds                                        (ui/mf_tab.py)
 
 Under the bar, on every page: search (ui/views/search.py) and the data chip,
@@ -68,6 +69,11 @@ def _valuation():
 def _risk():
     from ui.views import risk
     risk.render()
+
+
+def _assistant():
+    from ui.views import assistant
+    assistant.render()
 
 
 def _tax():
@@ -164,6 +170,7 @@ P.update(
     valuation=st.Page(_valuation, title="Valuation", url_path="valuation"),
     risk=st.Page(_risk, title="Risk & plan", url_path="risk"),
     tax=st.Page(_tax, title="Tax & transition", url_path="tax"),
+    assistant=st.Page(_assistant, title="Research assistant", url_path="assistant"),
     holding_data=st.Page(_holding_data, title="Holding data", url_path="holding-data"),
     funds=st.Page(_funds, title="Mutual funds", url_path="mutual-funds"),
     momentum=st.Page(_momentum, title="Momentum", url_path="momentum"),
@@ -184,7 +191,7 @@ nav = st.navigation({
                   P["importer"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],
-    "Research": [P["analyze"], P["compare"]],
+    "Research": [P["analyze"], P["compare"], P["assistant"]],
     "More": [P["data"], P["search"]],
 }, position="top")
 
