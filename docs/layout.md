@@ -50,10 +50,13 @@ scripts/install_schedule.py   --list / --status / --install / --remove for those
 scoring/fundamentals.py    quality score, incl. the lender rubric
 data/instruments.py        equity vs fund vs DVR classification
 strategy/scorecard.py      the 100-point scorecard: criteria, sector models, override, role (pure)
+strategy/valuation.py      valuation methods, reverse DCF, scenarios (pure)
+book/valuations.py         values your holdings from data on disk; peers from the Nifty 200 filings
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
 data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
 data/market_stats.py       52w, volume, beta, returns, market cap, free float
 data/enrich.py             refresh one holding: fetch, compute, store, log
+scripts/value_holdings.py  own band, peers, reverse DCF, bear/base/bull scenarios
 scripts/score_holdings.py  the 100-point scorecard for each holding (print / save / export)
 scripts/refresh_holding_data.py  each holding's filings, statements and market stats -> research.db
 scripts/import_holdings.py broker .csv/.xlsx -> config/holdings.xlsx (or .csv), buckets kept;

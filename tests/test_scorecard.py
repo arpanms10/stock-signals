@@ -55,10 +55,16 @@ GOOD_RESEARCH = {"moat_points": "7", "moat_evidence": "No.1 share (industry body
 GOOD_OUTLOOK = {"outlook_points": "7", "evidence": "industry +10% (body)", "as_of": "2026-11-01"}
 
 
+FAIR_VALUE = {"method": "dcf", "band": {"metric": "pe", "percentile": 0.3, "months": 60},
+              "peers": {"relative": 0.9, "n": 6, "industry": "x"},
+              "margin_of_safety_pct": 10.0,
+              "reverse": {"gap_pts": 0.0, "implied_pct": 10.0, "delivered_pct": 10.0}}
+
+
 def card(rows=None, group="consumer", cap="large", research=None, outlook=None, bucket="",
-         cfg=CFG):
+         cfg=CFG, valuation=FAIR_VALUE):
     return sc.score("X", company() if rows is None else rows, group, cap, cfg,
-                    research, outlook, bucket, TODAY)
+                    research, outlook, bucket, TODAY, valuation=valuation)
 
 
 def crit(c, key):
@@ -99,7 +105,7 @@ def test_strong_company_with_research_is_core():
     c = card(research=GOOD_RESEARCH, outlook=GOOD_OUTLOOK)
     assert c.coverage_pct == 100 and c.score >= 85
     assert c.tier == "high_conviction_core" and c.role == "core"
-    assert crit(c, "valuation_engine").status == sc.PENDING
+    assert crit(c, "val_own_band").status == sc.SCORED
 
 
 def test_missing_data_is_not_assessed_not_zero():
@@ -188,7 +194,7 @@ def test_bank_model_swaps_leverage_and_drops_cash_flow():
     c = card(bank_rows(), group="bank")
     cf = next(x for x in c.components if x.key == "cash_flow")
     assert cf.criteria[0].status == sc.NA and cf.available == 0
-    assert c.applicable == 100 - 10 - 15        # cash flow n/a, valuation pending
+    assert c.applicable == 100 - 10             # cash flow n/a
     assert crit(c, "gnpa").points == pytest.approx(4 * (6 - 3.0) / (6 - 1.5), abs=0.01)
     assert crit(c, "credit_cost").value == pytest.approx(0.5)
     assert crit(c, "roa_latest").status == sc.SCORED

@@ -31,7 +31,7 @@ From the command line:
 | Cash-flow quality | 10 | Operating cash flow/PAT over 3 years; years of positive free cash flow; capex/operating cash flow |
 | Competitive advantage | 15 | 7 computed: years ROCE beat the sector hurdle; EBITDA margin stability. 8 from your evidence |
 | Management and governance | 10 | 4 computed: promoter holding trend; pledge. 6 from your evidence |
-| Valuation | 15 | Phase 4 (the valuation engine); shown as pending until then |
+| Valuation | 15 | Own-band percentile, peer multiple, margin of safety, implied vs delivered growth ([valuation](valuation.md)) |
 | Industry outlook | 10 | Your sector outlook, with evidence |
 
 Each computed criterion scores linearly between a `zero` and a `full`
@@ -45,14 +45,13 @@ threshold. For example, revenue CAGR scores 0 points at 0% and all 4 points at
 - **Score** = points earned / points assessed × 100.
 - **Assessed %** = points assessed / the points that apply to the business.
   - Points that don't apply (cash flow for a bank) are left out.
-  - Pending points (valuation, until Phase 4) are left out.
 - **No tier below 60% assessed.** The page says "Not enough data" instead.
 - **A loss year scores zero.** Growth across a loss year gets zero points; it
   is a fact, not missing data.
 
 With no research inputs filled in, a company with a full filing history can
-reach about 72% assessed. Banks reach about 57%, because some bank filings on
-file don't go back far enough for 5-year growth or EPS CAGR. Filling in your
+reach about 76% assessed, and a bank about 64%. Some bank filings on file
+don't go back far enough for 5-year growth or EPS CAGR. Filling in your
 research inputs raises both.
 
 ## Sector models

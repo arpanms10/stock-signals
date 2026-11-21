@@ -356,6 +356,30 @@ def compute(key: str, rows: list[dict], spec: dict, ctx: dict) -> tuple[float | 
         got = latest(rows, "pledge_pct")
         return (got[0], "NSE shareholding pattern", f"as of {got[2]}") if got else (None, "", "")
 
+    if key.startswith("val_"):
+        v = ctx.get("valuation") or {}
+        src = "valuation (config/valuation.yaml)"
+        if key == "val_own_band":
+            b = v.get("band") or {}
+            if b.get("percentile") is None:
+                return None, "", b.get("note", "no own-history band")
+            return b["percentile"], src, (f"{b['metric']} at the {b['percentile']*100:.0f}th "
+                                          f"percentile of {b['months']} months")
+        if key == "val_peers":
+            pr = v.get("peers") or {}
+            if pr.get("relative") is None:
+                return None, "", pr.get("note", "no peer comparison")
+            return pr["relative"], src, f"vs median of {pr['n']} {pr.get('industry', '')} peers"
+        if key == "val_margin_of_safety":
+            m = v.get("margin_of_safety_pct")
+            return (None, "", "no base scenario") if m is None else \
+                (m, src, f"{v.get('method', '')} base scenario")
+        if key == "val_implied_growth":
+            r = v.get("reverse") or {}
+            if r.get("gap_pts") is None:
+                return None, "", r.get("note", "no reverse valuation")
+            return r["gap_pts"], src, (f"price implies {r['implied_pct']:.1f}%, delivered "
+                                       f"{r['delivered_pct']:.1f}% ({r.get('delivered_basis', '')})")
     return None, "", f"no rule for {key}"
 
 
@@ -424,13 +448,15 @@ def manual(key: str, spec: dict, research: dict, outlook: dict, today: dt.date) 
 def score(symbol: str, rows: list[dict], group: str, cap_band: str, cfg: dict,
           research: dict | None = None, outlook: dict | None = None,
           bucket: str = "", today: dt.date | None = None,
-          manual_todo: list[str] | None = None) -> Scorecard:
+          manual_todo: list[str] | None = None, valuation: dict | None = None) -> Scorecard:
+    """valuation: the dict of a strategy.valuation.Valuation (band, peers,
+    reverse, margin_of_safety_pct, method), or None (valuation not assessed)."""
     today = today or dt.date.today()
     research, outlook = research or {}, outlook or {}
     crit = criteria_for(cfg, group)
     model = (cfg.get("sector_models") or {}).get(group, {}).get("label", "General")
     ctx = {"group": group, "hurdle": (cfg.get("hurdle_roce") or {}).get(
-        group, (cfg.get("hurdle_roce") or {}).get("default", 15))}
+        group, (cfg.get("hurdle_roce") or {}).get("default", 15)), "valuation": valuation}
     comps = []
     for comp, weight in cfg["weights"].items():
         cs = crit[comp]
@@ -461,7 +487,7 @@ def score(symbol: str, rows: list[dict], group: str, cap_band: str, cfg: dict,
     earned = round(sum(c.earned for c in comps), 2)
     available = sum(c.available for c in comps)
     # Points that apply to this business and that the platform can assess today:
-    # n/a (e.g. cash flow for a bank) and pending (valuation, until Phase 4)
+    # n/a (e.g. cash flow for a bank) and pending (a criterion marked `pending:` in the config)
     # are left out, so neither counts against coverage.
     applicable = sum(cr.max_points for c in comps for cr in c.criteria
                      if cr.status not in (NA, PENDING))

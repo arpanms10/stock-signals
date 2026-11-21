@@ -73,7 +73,7 @@ existing NSE/Yahoo fetchers; market cap & cap bucket (SEBI AMFI list: top 100
 large, 101–250 mid, rest small, from the half-yearly AMFI file); beta, 52-wk,
 avg volume from market.db; dividends where Yahoo has them; freshness per value.
 
-**P3 · Scorecard.** *(done: [scorecard](scorecard.md); valuation's 15 points pending P4; judgment items from config/research_inputs + sector_outlook)* 100-pt framework per §5 with configurable weights in
+**P3 · Scorecard.** *(done: [scorecard](scorecard.md); valuation points from P4; judgment items from config/research_inputs + sector_outlook)* 100-pt framework per §5 with configurable weights in
 `config/scorecard.yaml`; each component's methodology documented and unit-
 tested; sector-specific models (bank, NBFC, insurance, IT, FMCG, industrials,
 pharma, real estate/hotels, cyclicals) reusing `sector.py` + lender rubric;
@@ -81,7 +81,7 @@ governance override (pledge rise, auditor resignation, qualified opinion,
 promoter selling) that caps the tier regardless of score; two-axis
 classification; research inputs file for the manual components.
 
-**P4 · Valuation.** Multiple vs the stock's own 5-yr band (from market.db
+**P4 · Valuation.** *(done: [valuation](valuation.md); feeds the scorecard's 15 valuation points)* Multiple vs the stock's own 5-yr band (from market.db
 prices + filed EPS/BV), vs sector peers, and a **reverse DCF** (growth the
 price implies) as the main read; bear/base/bull fair values from explicit
 config assumptions, DCF only where FCF is stable and positive, P/B for

@@ -1,0 +1,62 @@
+# Valuation assumptions (strategy/valuation.py, docs/valuation.md).
+#
+# Every fair value on the Valuation page is a SCENARIO built from these
+# explicit assumptions, not a price target. Change a number here and every
+# scenario changes with it; the page shows which assumptions produced it.
+
+# Cost of equity = risk-free + equity risk premium. Update risk_free_pct when
+# the 10-year G-sec yield moves meaningfully (RBI / CCIL publish it daily).
+discount:
+  risk_free_pct: 6.5
+  equity_risk_premium_pct: 5.5
+  shift_pct: {bear: 1.5, base: 0.0, bull: -1.0}   # added to the base rate
+
+terminal_growth_pct: {bear: 4.0, base: 5.0, bull: 5.5}   # nominal, India
+horizon_years: 10          # explicit forecast; growth fades to terminal from year 6
+high_growth_years: 5
+
+# Revenue growth for years 1-5: the company's own record (5-year revenue
+# CAGR, else 3-year), capped, then scaled per scenario.
+growth:
+  cap_pct: 20
+  floor_pct: 0
+  scale: {bear: 0.5, base: 1.0, bull: 1.3}
+
+# Free-cash-flow margin (FCF / revenue): the 3-year average, scaled.
+fcf_margin_scale: {bear: 0.8, base: 1.0, bull: 1.1}
+
+# DCF only where free cash flow is dependable: positive in at least this many
+# of the last 5 years, and a positive 3-year average margin.
+dcf_min_positive_fcf_years: 4
+
+# Multiples: the stock's own 5-year band. Bear = 20th percentile, base =
+# median, bull = 80th, applied to next year's earnings (TTM x base growth).
+band:
+  years: 5
+  min_months: 24
+  percentiles: {bear: 20, base: 50, bull: 80}
+  max_pe: 200              # P/E above this (near-zero earnings) is left out
+
+# Results become public with a lag; a multiple on a date uses only figures
+# filed by then (no look-ahead).
+filing_lag_days: {quarter: 45, march_quarter: 60}
+
+# Lenders: justified P/B = (ROE - g) / (r - g), on the 3-year average ROE.
+lender:
+  roe_shift_pts: {bear: -3.0, base: 0.0, bull: 2.0}
+
+# Cyclicals: EV/EBITDA on mid-cycle (5-year average) EBITDA.
+cyclical_groups: [cement, metals, chemicals, energy]
+
+# REITs / InvITs: Gordon model on the trailing distribution,
+# fair = DPU x (1 + g) / (r - g), r = risk-free + premium. Rent escalations
+# grow distributions, so g is not zero.
+reit:
+  premium_pct: {bear: 3.5, base: 3.0, bull: 2.5}
+  growth_pct: {bear: 2.0, base: 3.0, bull: 4.0}
+
+# Peer comparison: same NSE industry in the Nifty 200 filings on file.
+peers:
+  min_peers: 3
+
+# Scorecard valuation points (15) — strategy/scorecard.py reads these values.

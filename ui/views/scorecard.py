@@ -39,8 +39,8 @@ def render() -> None:
     st.markdown("## Scorecard")
     st.caption("A 100-point summary of each company's filed record against stated "
                "conventions (config/scorecard.yaml). **Descriptive, not backtested**: it "
-               "explains, it does not rank or predict. Valuation (15 points) comes with "
-               "Phase 4.")
+               "explains, it does not rank or predict. Valuation's 15 points come from "
+               "Portfolio › Valuation.")
     cards, notes = _cards()
     if not cards:
         st.info("No company shares in your holdings file, or no holding data yet "

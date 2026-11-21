@@ -85,6 +85,14 @@ def build(holdings: list[dict] | None = None, rcon=None, cfg: dict | None = None
     mcon = sqlite3.connect(ROOT / "data" / "market.db") \
         if (ROOT / "data" / "market.db").exists() else None
     isins = mk.isin_map(mcon) if mcon else {}
+    from book import valuations as bv
+    try:
+        vals, vnotes = bv.build(holdings, ref=ref)
+        notes += vnotes
+        vals = {v.symbol: dataclasses.asdict(v) for v in vals}
+    except Exception as exc:                     # noqa: BLE001
+        vals = {}
+        notes.append(f"valuation not available ({exc}): its 15 points not assessed")
     cards = []
     try:
         for h in holdings:
@@ -102,7 +110,7 @@ def build(holdings: list[dict] | None = None, rcon=None, cfg: dict | None = None
             card = sc.score(s.base, rows, group, mk.cap_band(s.base, s.kind, ref), cfg,
                             research.get(s.base), outlook.get(group),
                             h.get("bucket") or "", today,
-                            sector_mod.MANUAL.get(group, []))
+                            sector_mod.MANUAL.get(group, []), vals.get(s.base))
             cards.append(card)
             if save:
                 rdb.save_scorecard(rcon, card.summary(), card_dict(card), config_hash(cfg))

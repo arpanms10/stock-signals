@@ -23,7 +23,7 @@ weights:
   cash_flow: 10
   moat: 15
   governance: 10
-  valuation: 15        # Phase 4 (valuation engine); not assessed until then
+  valuation: 15        # from strategy/valuation.py (Portfolio › Valuation)
   industry: 10
 
 # Score -> fundamental quality tier (spec §7). Starting points, not rules.
@@ -67,7 +67,12 @@ criteria:
     pledge:            {points: 2, zero: 20, full: 0, label: "Promoter shares pledged (% of promoter holding)"}
     governance_evidence: {points: 6, manual: true, label: "Capital allocation, RPTs, disclosure (research inputs)"}
   valuation:
-    valuation_engine:  {points: 15, pending: "Phase 4 valuation engine", label: "Valuation vs own history, peers and growth"}
+    # From strategy/valuation.py: the headline multiple is P/E (P/B lenders,
+    # EV/EBITDA cyclicals, P/S loss-makers, yield REITs).
+    val_own_band:      {points: 5, zero: 0.9, full: 0.2, label: "Headline multiple, percentile of own 5-year band"}
+    val_peers:         {points: 4, zero: 1.6, full: 0.8, label: "Headline multiple / peer median"}
+    val_margin_of_safety: {points: 3, zero: -40, full: 20, label: "Margin of safety, base scenario (%)"}
+    val_implied_growth: {points: 3, zero: 8, full: -2, label: "Growth (ROE for lenders) the price implies minus delivered (pts)"}
   industry:
     sector_outlook:    {points: 10, manual: true, label: "Industry outlook, with evidence (sector outlook file)"}
 
