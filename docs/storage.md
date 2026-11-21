@@ -44,6 +44,7 @@ read while a job writes.
 | `mf_holdings.xlsx` | Your mutual funds, as a percentage of your fund portfolio. No rupee amounts |
 | `watching.xlsx` | Stocks you're keeping an eye on. The app adds to it when you press *Watch* |
 | `research_inputs.xlsx` | Your evidence for the [scorecard](scorecard.md)'s judgment items, per company: competitive advantage, governance, the yes/no governance flags |
+| `tradebooks/` | Your broker tradebooks (every trade: date, quantity, price) for [tax lots](tax.md). Never committed: the folder carries its own `.gitignore` |
 | `sector_outlook.xlsx` | Your outlook for each sector group, with evidence (10 scorecard points) |
 
 **Records.** In `history/`, meant for git. Each is written before the outcome

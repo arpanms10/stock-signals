@@ -55,6 +55,11 @@ book/valuations.py         values your holdings from data on disk; peers from th
 strategy/portfolio_risk.py historical risk of the current mix, themes, overlaps, flags (pure)
 strategy/optimiser.py      the Core–Satellite plan for new money: targets, buys, trims (pure)
 book/risk_view.py          risk and plan inputs from your book, scorecards, valuations, prices
+strategy/capgains.py       dated tax rates, FIFO sales, set-off and exemption, costs of selling (pure)
+strategy/lots.py           tax lots from tradebooks: opening lot, splits, bonuses, broker reconciliation (pure)
+strategy/transition.py     times each trim to the cheapest date in 3/6/12 months; gain harvesting (pure)
+book/tradebook.py          reads config/tradebooks/ (Zerodha tradebook xlsx/csv), merges by trade ID
+book/tax_view.py           lots, this year's realised gains and the timed plans from your book
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
 data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
 data/market_stats.py       52w, volume, beta, returns, market cap, free float

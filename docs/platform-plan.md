@@ -94,7 +94,7 @@ of top holdings (historical, labelled as such); position caps 8/4/2%; sector
 quality/valuation tilt) producing target weights with per-constraint
 explanation; simulation of changes without touching holdings.
 
-**P6 · Tax-aware transition.** Lot-level FIFO from a broker tradebook import
+**P6 · Tax-aware transition.** *(done: [tax & transition](tax.md); rates unchanged by Finance Act 2026; grandfathering not modelled)* Lot-level FIFO from a broker tradebook import
 (falls back to the LT/ST split); rates checked against the Finance Act in
 force; 3/6/12-month plans; monthly-amount sensitivity only if you give an
 amount (otherwise none assumed); brokerage/STT configurable.

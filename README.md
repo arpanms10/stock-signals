@@ -384,6 +384,7 @@ PYTHONPATH=. .venv/bin/python scripts/install_schedule.py --remove daily        
 | [**Scorecard**](docs/scorecard.md) | 100-point fundamental scorecard per holding, sector models, governance override, suggested role; descriptive |
 | [**Valuation**](docs/valuation.md) | Own 5-year band, peers, reverse DCF, bear/base/bull scenarios; not price targets |
 | [**Risk & plan**](docs/risk.md) | Historical risk of today's mix, exposures, and a 70:30 plan for new money; a simulation |
+| [**Tax & transition**](docs/tax.md) | Tax lots from your tradebooks, this year's gains, trims timed for tax over 3/6/12 months |
 | [**Holding data**](docs/holding_data.md) | Each holding's financials and market figures, with source, period, confidence and freshness |
 | [**Portfolio advisor**](docs/advisor.md) | Verdicts, cash constraint, concentration, tax, decision log |
 | [**Dashboard**](docs/dashboard.md) | Two sections, badges, the two target frames |

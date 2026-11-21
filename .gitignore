@@ -10,6 +10,8 @@ config/holdings.csv.bak
 # Broker downloads dropped in for import_holdings.py.
 config/*.xlsx
 config/*.xls
+# Broker tradebooks (Phase 6 tax lots): every trade you made.
+config/tradebooks
 config/holdings*.csv
 # The watch list: what you are watching is yours too (config/*.xlsx above
 # already covers watching.xlsx).

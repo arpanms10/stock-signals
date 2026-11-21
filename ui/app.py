@@ -11,6 +11,7 @@ market to be ranked.
              Scorecard     100-point fundamental scorecard, descriptive (ui/views/scorecard.py)
              Valuation     own band, peers, reverse DCF, scenarios   (ui/views/valuation.py)
              Risk & plan   historical risk, exposures, 70:30 plan    (ui/views/risk.py)
+             Tax & transition  tax lots, this year's gains, timed trims (ui/views/tax.py)
              Holding data  financials and market figures, with sources (ui/views/holding_data.py)
              Import holdings  broker file -> preview -> confirm  (ui/views/import_page.py)
   Ideas      Momentum      top band on both lookbacks (ui/views/momentum.py)
@@ -67,6 +68,11 @@ def _valuation():
 def _risk():
     from ui.views import risk
     risk.render()
+
+
+def _tax():
+    from ui.views import tax
+    tax.render()
 
 
 def _holding_data():
@@ -157,6 +163,7 @@ P.update(
     scorecard=st.Page(_scorecard, title="Scorecard", url_path="scorecard"),
     valuation=st.Page(_valuation, title="Valuation", url_path="valuation"),
     risk=st.Page(_risk, title="Risk & plan", url_path="risk"),
+    tax=st.Page(_tax, title="Tax & transition", url_path="tax"),
     holding_data=st.Page(_holding_data, title="Holding data", url_path="holding-data"),
     funds=st.Page(_funds, title="Mutual funds", url_path="mutual-funds"),
     momentum=st.Page(_momentum, title="Momentum", url_path="momentum"),
@@ -173,7 +180,7 @@ P.update(
 
 nav = st.navigation({
     "": [P["today"]],
-    "Portfolio": [P["overview"], P["stocks"], P["scorecard"], P["valuation"], P["risk"], P["holding_data"], P["funds"],
+    "Portfolio": [P["overview"], P["stocks"], P["scorecard"], P["valuation"], P["risk"], P["tax"], P["holding_data"], P["funds"],
                   P["importer"]],
     "Ideas": [P["momentum"], P["swing"], P["results"], P["picker"]],
     "Market": [P["market"], P["fno"]],
