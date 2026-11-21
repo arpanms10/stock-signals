@@ -28,6 +28,7 @@ data/holdings.json
 data/results/
 # The research pack and the assistant's saved answers (Phase 7): your positions.
 data/research/
+data/reviews/
 
 # --- Large generated data ----------------------------------------------
 # market.db is ~450MB; GitHub rejects files over 100MB and this is entirely

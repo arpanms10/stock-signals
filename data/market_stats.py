@@ -119,11 +119,16 @@ def free_float(symbol: str, promoter: list[dict]) -> list[dict]:
                confidence=LOW, note="100 - promoter %: a stand-in for free float "
                                     "(includes locked-in and strategic holders)")]
     if len(rows) > 1:
+        q = rows[1]
         prev = rows[-1]
         out.append(row(symbol, "promoter_change_pct", "instant", latest["date"],
                        float(latest["promoter_pct"]) - float(prev["promoter_pct"]), PCT,
                        CALC, method="calculated", confidence=HIGH,
                        note=f"change since {prev['date']}"))
+        out.append(row(symbol, "promoter_qoq_change_pct", "instant", latest["date"],
+                       float(latest["promoter_pct"]) - float(q["promoter_pct"]), PCT,
+                       CALC, method="calculated", confidence=HIGH,
+                       note=f"change since {q['date']} (the filing before)"))
     return out
 
 

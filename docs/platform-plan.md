@@ -101,7 +101,7 @@ amount (otherwise none assumed); brokerage/STT configurable.
 
 **P7 · Research assistant.** *(done: [research assistant](research.md))* Claude Code over a research pack (`data/research/pack.json`) built from the engines, every figure with source/period/kind/freshness; answers in a JSON schema with cited pack paths; a checker enforces §14.1 (figures, stale data, governance, certainty, orders, INSUFFICIENT DATA); `/research` skill; page of saved answers.
 
-**P8 · Monitoring & reviews.** NSE announcements, shareholding/pledge deltas,
+**P8 · Monitoring & reviews.** *(done: [monitoring](monitoring.md); keyword rules on announcement summaries, not the PDFs)* NSE announcements, shareholding/pledge deltas,
 auditor changes, results → "thesis check" events with source link; review
 report; snapshot-to-snapshot diff of scores, roles and recommendations.
 

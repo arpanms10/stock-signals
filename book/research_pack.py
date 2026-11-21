@@ -92,9 +92,11 @@ QUESTIONS = {
     "What are the largest risks in the portfolio?":
         ["/risk/flags", "/risk/history", "/risk/themes", "/portfolio/concentration"],
     "What has changed in the latest quarterly results?":
-        ["/holdings/{S}/quarters", "/holdings/{S}/metrics"],
+        ["/holdings/{S}/quarters", "/holdings/{S}/metrics", "/holdings/{S}/events"],
     "Which recommendations have changed since the previous review?":
-        ["/holdings/*/changes", "/holdings/*/history"],
+        ["/review/changes", "/holdings/*/changes", "/holdings/*/history"],
+    "Which holdings need a thesis check?":
+        ["/holdings/*/events", "/review/open_thesis_checks"],
 }
 
 
@@ -200,6 +202,38 @@ def _history(rcon, symbol: str) -> tuple[list[dict], dict | None]:
                        "role_from": a["role"], "role_to": b["role"]}
 
 
+def _event(e: dict) -> dict:
+    return {"date": e["date"], "kind": e["kind"], "severity": e["severity"],
+            "title": e["title"], "detail": e["detail"], "source": e["source"],
+            "link": e["link"], "status": e["status"], "note": e["note"] or None,
+            "facts": e["facts"]}
+
+
+def _review(today: dt.date) -> dict:
+    """Monitoring events (thesis check / watch) and the last review's diff."""
+    from book import monitoring as bm
+    from strategy import monitor as mon
+    cfg = mon.load_config()
+    con = bm.connect()
+    try:
+        since = (today - dt.timedelta(days=cfg["lookback_days"])).isoformat()
+        evs = bm.events(con, severities=(mon.THESIS, mon.WATCH), since=since)
+        dates = bm.snapshots(con)
+        cur = bm.load_snapshot(con, dates[-1]) if dates else None
+        prev = bm.previous(con, dates[-1]) if dates else None
+    finally:
+        con.close()
+    return {"kind": "calculated",
+            "note": "events are prompts to re-read the thesis, not trade signals; "
+                    "from NSE announcements, shareholding filings and results",
+            "latest": cur["as_of"] if cur else None,
+            "previous": prev["as_of"] if prev else None,
+            "changes": mon.diff(prev, cur, cfg) if cur else [],
+            "open_thesis_checks": [{"symbol": e["symbol"], **_event(e)} for e in evs
+                                   if e["severity"] == mon.THESIS and e["status"] == "open"],
+            "_events": evs}
+
+
 def _plan(p) -> dict:
     return {"contribution": p.contribution, "months": p.months,
             "buckets": p.buckets, "months_to_70_core": p.months_to_target,
@@ -224,6 +258,8 @@ def build(monthly: float = 0.0, months: int = 12, today: dt.date | None = None) 
     tg = tv.gather(today)
     rcon = rdb.connect()
     mcon = sqlite3.connect(ROOT / "data" / "market.db")
+    review = _review(today)
+    evs = review.pop("_events")
     try:
         session = (mk.sessions(mcon, 1) or [None])[0]
         total = float(o.total_value)
@@ -265,7 +301,8 @@ def build(monthly: float = 0.0, months: int = 12, today: dt.date | None = None) 
                 "plan": {"no_new_money": pin[s].no_buy if s in pin else [],
                          "cap_pct": pin[s].cap_pct if s in pin else None},
                 "tax": unreal,
-                "history": hist, "changes": changes}
+                "history": hist, "changes": changes,
+                "events": [_event(e) for e in evs if e["symbol"] == s]}
     finally:
         rcon.close()
         mcon.close()
@@ -301,6 +338,7 @@ def build(monthly: float = 0.0, months: int = 12, today: dt.date | None = None) 
                                                   "exemption_left", "overridden")},
                 "incomplete_sales": fy["unknown"],
                 "harvest": tv.harvest(tg)},
+        "review": review,
     }
     return _clean(pack)
 

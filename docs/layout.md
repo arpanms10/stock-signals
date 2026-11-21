@@ -63,6 +63,10 @@ book/tax_view.py           lots, this year's realised gains and the timed plans 
 book/research_pack.py      the research pack: every engine's figures with source, period, kind, freshness
 strategy/answer_check.py   checks an assistant's answer against the pack (§14.1 rules)
 scripts/research.py        pack / check / path / list for the /research skill
+strategy/monitor.py        announcements, shareholding, results -> thesis-check events; review diffs (pure)
+book/monitoring.py         event store, review snapshots, the review report (research.db, data/reviews/)
+data/sources/nse_announcements.py  NSE corporate announcements for one company
+scripts/run_review.py      fetch announcements, detect events, snapshot, diff, write the report
 book/scorecards.py         scores your holdings: inputs, sector group, save, fill-in files
 data/financials.py         filings + Yahoo -> metric rows with provenance; ratios, freshness
 data/market_stats.py       52w, volume, beta, returns, market cap, free float

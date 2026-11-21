@@ -38,6 +38,7 @@ plan to assume new money.
 | `…/history`, `…/changes` | Saved scorecards and what changed since the previous one |
 | `/risk` | Historical risk, correlation, themes, overlaps, flags |
 | `/plan/your_buckets`, `/plan/suggested_roles` | The Core–Satellite plan by your labels and by the scorecard's suggestion |
+| `…/events`, `/review` | Thesis-check and watch events with their filing links, open thesis checks, and what changed since the previous review ([monitoring](monitoring.md)) |
 | `/tax` | This year's gains, the exemption left, sales with unknown cost, harvest options |
 | `rules`, `questions` | The rules below, and where each common question's evidence lives |
 
@@ -77,4 +78,4 @@ committed.
   consensus estimates, deal wins, management commentary, and the
   `manual_todo` items the scorecard lists. That is deliberate.
 - **Changes need history.** "What changed since the last review" needs at
-  least two saved scorecards (`scripts/score_holdings.py --save`, or Phase 8).
+  least two saved scorecards or reviews (`scripts/run_review.py` saves both).

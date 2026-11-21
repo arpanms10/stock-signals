@@ -134,6 +134,7 @@ def test_market_stats():
     assert ff[0]["period_end"] == "2026-09-30"
     assert ff[1]["value"] == D("40.0") and ff[1]["confidence"] == fin.LOW
     assert ff[2]["value"] == D("-2.0")
+    assert ff[3]["metric"] == "promoter_qoq_change_pct" and ff[3]["value"] == D("-2.0")
 
 
 def test_store_keeps_missing_distinct_from_zero(tmp_path):

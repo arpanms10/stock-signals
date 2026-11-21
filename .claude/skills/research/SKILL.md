@@ -37,6 +37,9 @@ PYTHONPATH=. .venv/bin/python scripts/research.py check ANSWER.json --save
      quarters.
    - `/holdings/<SYMBOL>/valuation/...`, `/risk/...`, `/plan/suggested_roles/...`,
      `/plan/your_buckets/...` and `/tax/...`.
+   - `/holdings/<SYMBOL>/events` and `/review/open_thesis_checks`: monitoring
+     events (thesis check / watch) with the filing link; `/review/changes`: what
+     moved since the previous review. Cite the event's `link` when you use it.
    - `/holdings/<SYMBOL>/changes`: what changed since the previous saved
      scorecard. Its `history` is often a single entry, so say there is no
      earlier review to compare against.

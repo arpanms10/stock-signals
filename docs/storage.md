@@ -25,7 +25,7 @@ In `data/`, never in git.
 | | | Splits, bonuses, demergers, trade-for-trade spells | `market_actions`, `market_demergers`, `market_t2t` | weekly job |
 | `fo_history.db` | 100+ MB | Daily option chains and their prices, index highs and lows, results-meeting dates | `fo_chain`, `fo_spot`, `fo_index_ohlc`, `fo_results`, `fo_days` | weekly and daily jobs |
 | `mf/mf.db` | ~10 MB | Month-end NAV of every Direct Growth fund since 2013 | `nav`, `schemes`, `fetched` | monthly job |
-| `research.db` | < 1 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices, each holding's financial and market figures with provenance, the log of every retrieval, and dated scorecards | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close`, `financial_metric`, `retrieval_log`, `scorecard` | Overview, Import, Holding data and Scorecard pages |
+| `research.db` | ~6 MB | Your portfolio snapshots, the audit log of holdings imports, REIT/InvIT closing prices, each holding's financial and market figures with provenance, the log of every retrieval, dated scorecards, NSE announcements, monitoring events with your review notes, and review snapshots | `portfolio_snapshot`, `snapshot_position`, `audit_log`, `listed_close`, `financial_metric`, `retrieval_log`, `scorecard`, `announcement`, `announcement_fetch`, `monitor_event`, `review_snapshot` | Overview, Import, Holding data, Scorecard and Reviews pages |
 
 Everything here comes from free public sources (NSE, AMFI; see
 [data](data.md)). If a database is lost, `setup_project.py` downloads it
@@ -68,6 +68,7 @@ in `backtests/`, and the weekly job's dated report and logs.
 | `history/ranges/YYYY-MM.csv` | Every day's expected ranges, append-only ([ranges](ranges.md#forward-log)) | yes |
 | `data/results/` | Quarterly results per company, scorecards, backtest working files | no |
 | `data/research/` | The research pack (`pack.json`) and the assistant's checked answers ([research assistant](research.md)) | no |
+| `data/reviews/` | Review reports, `review-<date>.md` ([monitoring](monitoring.md)) | no |
 | `data/cache/` | Raw NSE filings, gzipped, so they are never fetched twice | no |
 | `config/*_calibration.json`, `config/fno_reach.json` | The latest backtest results the dashboard shows. Each backtest command rewrites its own file | no |
 | `config/equities.csv`, `config/etfs.csv`, `config/fundamentals.csv` | Derived lists and fundamentals, rebuilt by the jobs | no |
